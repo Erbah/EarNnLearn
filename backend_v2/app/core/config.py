@@ -43,6 +43,13 @@ class Settings(BaseSettings):
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            # Railway/Heroku provide DATABASE_URL. SQLAlchemy requires postgresql:// instead of postgres://
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+            return db_url
+
         if self.DATABASE_BACKEND == "sqlite":
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             db_path = os.path.join(base_dir, "ceditrees_dev.db")
