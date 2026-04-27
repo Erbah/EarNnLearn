@@ -1,0 +1,48 @@
+Traceback (most recent call last):
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: course_payments.start_season
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "D:\PROJECTS\LearNnEarn\backend_v2\debug_enroll.py", line 30, in debug
+    res = enroll_paid_course(course.id, req, user, db)
+  File "D:\PROJECTS\LearNnEarn\backend_v2\app\api\v1\learning.py", line 136, in enroll_paid_course
+    ).first()
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\orm\query.py", line 2759, in first
+    return self.limit(1)._iter().first()  # type: ignore
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\orm\query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "d:\PROJECTS\LearNnEarn\venv_v2\lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: course_payments.start_season
+[SQL: SELECT course_payments.id AS course_payments_id, course_payments.user_rid AS course_payments_user_rid, course_payments.course_id AS course_payments_course_id, course_payments.total_price AS course_payments_total_price, course_payments.amount_paid AS course_payments_amount_paid, course_payments.remaining AS course_payments_remaining, course_payments.payment_method AS course_payments_payment_method, course_payments.status AS course_payments_status, course_payments.ppc AS course_payments_ppc, course_payments.debt_threshold AS course_payments_debt_threshold, course_payments.unpaid_videos AS course_payments_unpaid_videos, course_payments.start_season AS course_payments_start_season, course_payments.created_at AS course_payments_created_at 
+FROM course_payments 
+WHERE course_payments.user_rid = ? AND course_payments.course_id = ?
+ LIMIT ? OFFSET ?]
+[parameters: ('ACNIRP', '50dd5048-7c91-4909-b712-b5e7af7d2cfa', 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Testing enrollment for user ACNIRP in course 50dd5048-7c91-4909-b712-b5e7af7d2cfa

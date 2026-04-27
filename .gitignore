@@ -1,0 +1,72 @@
+# Dependencies
+node_modules/
+**/node_modules/
+venv/
+venv_v2/
+**/__pycache__/
+*.pyc
+.venv/
+
+# Next.js
+.next/
+**/out/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/.env*
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# AI / Agent data
+.agent/
+.gemini/
+.antigravityignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project specific
+tmp/
+analytics_out.txt
+phase_9_results.txt
+test_output*.txt
+verify_output.txt
+verify_p*.txt
+debug_registration.py
+simple_check.py
+temp_fix_db.py
+check_admin.py
+check_admin_password.py
+check_db_state.py
+check_sql_schema.py
+check_startup_hang.py
+clean_codes.py
+clean_pending.py
+create_admin.py
+debug_enroll.py
+debug_hang.py
+debug_user_resp.py
+find_registered_users.py
+init_db.py
+inspect_users_schema.py
+migrate_db.py
+sync_db.py
+sync_db_final.py
+sync_db_safe.py
+test_*.py
+verify_paystack_*.py

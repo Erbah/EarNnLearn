@@ -1,0 +1,186 @@
+"use client";
+
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { ArrowRight, Lock, Mail, Loader2, Eye, EyeOff, ChevronLeft } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { API_BASE_URL, api } from "@/lib/api";
+
+const API = "/api/v1";
+
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const loginData = {
+        email: email,
+        password: password
+      };
+
+      const res = await api.post(`${API}/auth/login`, loginData);
+
+      if (res.status === 200) {
+        const data = res.data;
+        localStorage.setItem("access_token", data.access_token);
+
+        // Fetch profile to determine redirect
+        const profileRes = await api.get(`${API}/auth/me`);
+
+        if (profileRes.status === 200) {
+          const profile = profileRes.data;
+          if (profile.role === "SUPER_ADMIN") {
+            router.push("/admin");
+          } else if (profile.role === "EDUCATION_ADMIN") {
+            router.push("/education");
+          } else if (profile.tier_type === "admin") {
+            router.push("/admin"); // Fallback for transition
+          } else {
+            router.push("/dashboard");
+          }
+        } else {
+          router.push("/dashboard");
+        }
+      }
+    } catch (err: any) {
+      const data = err.response?.data;
+      const status = err.response?.status;
+      
+      console.error("Login Error Details:", {
+        message: err.message,
+        status,
+        data
+      });
+      
+      let errorMessage = "Invalid email or password";
+      
+      if (err.message === "Network Error") {
+        errorMessage = "Connection refused. Please ensure the backend server is running.";
+      } else if (data && data.detail) {
+        if (Array.isArray(data.detail)) {
+          errorMessage = data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
+        } else {
+          errorMessage = data.detail;
+        }
+      } else if (status === 404) {
+        errorMessage = "Login service not found. Please contact support.";
+      } else if (status >= 500) {
+        errorMessage = "Server error. Please try again later.";
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/20 blur-[150px] rounded-full pointer-events-none -z-10" />
+
+      {/* Back to Home */}
+      <Link
+        href="/"
+        className="absolute top-8 left-8 flex items-center gap-2 text-gray-500 hover:text-white transition-colors group z-20"
+      >
+        <div className="p-2 rounded-xl bg-white/5 border border-white/10 group-hover:border-primary/50 transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+        </div>
+        <span className="text-sm font-medium">Back to Website</span>
+      </Link>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md p-8 rounded-3xl bg-card border border-white/10 shadow-2xl glass relative z-10"
+      >
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
+            EarNnLearn
+          </h1>
+          <p className="text-gray-400">Welcome back. Enter your details to access your dashboard.</p>
+        </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-500 text-sm font-medium">
+            {typeof error === 'string' ? error : JSON.stringify(error)}
+          </div>
+        )}
+
+        <form className="space-y-5" onSubmit={handleLogin}>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-12 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
+            <div className="flex justify-end mt-2">
+              <a href="#" className="text-xs text-primary hover:text-white transition-colors">Forgot password?</a>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 bg-primary text-background font-bold rounded-xl hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(0,224,255,0.3)] hover:shadow-[0_0_25px_rgba(0,224,255,0.5)] flex items-center justify-center group mt-8 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                Sign In
+                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <p className="text-sm text-center text-gray-400 mt-6">
+          Don't have an account? <Link href="/register" className="text-white hover:text-primary transition-colors font-medium">Create one</Link>
+        </p>
+      </motion.div>
+    </div>
+  );
+}

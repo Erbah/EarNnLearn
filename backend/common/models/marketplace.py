@@ -1,0 +1,85 @@
+"""
+CediTrees 2.0 — Marketplace Models
+====================================
+Reviews, certificates, categories, and course enrollment
+for the global learning marketplace.
+"""
+import uuid
+from datetime import datetime
+from sqlalchemy import Column, String, Text, Integer, Numeric, DateTime, Boolean, ForeignKey, JSON
+from common.database.db_session import Base
+
+
+class CourseCategory(Base):
+    __tablename__ = "course_categories"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, unique=True, nullable=False)
+    icon = Column(String, nullable=True)  # emoji or icon name
+    position = Column(Integer, default=0)
+
+
+class CourseEnrollment(Base):
+    __tablename__ = "course_enrollments"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    course_id = Column(String, nullable=False, index=True)
+    user_rid = Column(String, nullable=False, index=True)
+    enrolled_at = Column(DateTime, default=datetime.utcnow)
+    completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime, nullable=True)
+    progress_percent = Column(Integer, default=0)
+
+
+class CourseReview(Base):
+    __tablename__ = "course_reviews"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    course_id = Column(String, nullable=False, index=True)
+    user_rid = Column(String, nullable=False)
+    rating = Column(Integer, nullable=False)  # 1-5
+    review_text = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Certificate(Base):
+    __tablename__ = "certificates"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    course_id = Column(String, nullable=False, index=True)
+    user_rid = Column(String, nullable=False, index=True)
+    course_title = Column(String, nullable=False)
+    user_name = Column(String, nullable=False)
+    issued_at = Column(DateTime, default=datetime.utcnow)
+    certificate_code = Column(String, unique=True)  # Verifiable code
+
+
+class Quiz(Base):
+    __tablename__ = "quizzes"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    module_id = Column(String, nullable=False, index=True)
+    question = Column(Text, nullable=False)
+    option_a = Column(String, nullable=False)
+    option_b = Column(String, nullable=False)
+    option_c = Column(String, nullable=True)
+    option_d = Column(String, nullable=True)
+    correct_answer = Column(String, nullable=False)  # "a", "b", "c", "d"
+    position = Column(Integer, default=0)
+
+class CreatorProfile(Base):
+    """
+    Expert profile for users who publish AI-taught content.
+    """
+    __tablename__ = "creator_profiles"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_rid = Column(String, index=True, unique=True)
+    expert_bio = Column(Text, nullable=True)
+    expertise_tags = Column(JSON, default=list) # e.g., ["Python", "AI", "Business"]
+    
+    # Revenue share from product code activations (e.g., 0.20 for 20%)
+    revenue_share = Column(Numeric, default=0.10) 
+    
+    is_verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
