@@ -22,24 +22,12 @@ import AITutorChat from "@/components/AITutorChat";
 import { WhiteboardView } from "@/components/WhiteboardView";
 import { pauseSpeech, resumeSpeech, stopSpeech, setSpeechVolume } from "@/lib/tts";
 import { whiteboardManager } from "@/lib/whiteboard";
+import type { LessonSceneWithActions } from "@/types/openmaic";
 
 const API = "/api/v1";
 
-interface Scene {
-  id: string;
-  type: "slide" | "quiz" | "interactive" | "discussion";
-  title: string;
-  content: string;
-  order: number;
-  completed: boolean;
+interface Scene extends LessonSceneWithActions {
   duration_minutes?: number;
-  quiz_questions?: Array<{
-    id: string;
-    question: string;
-    options: string[];
-    correct_answer: string;
-    explanation: string;
-  }>;
 }
 
 interface Lesson {
