@@ -105,6 +105,32 @@ class WhiteboardManager {
     this.notify();
   }
 
+  // --- 🎨 Legacy Support Methods (v1 compatibility) ---
+  
+  drawPath(points: [number, number][], color?: string, width?: number, duration?: number) {
+    if (!points || points.length < 2) return;
+    // Map path to a series of normalized lines
+    for (let i = 0; i < points.length - 1; i++) {
+      this.addElement({
+        type: "line",
+        from: points[i],
+        to: points[i+1],
+        color: color || "#06b6d4"
+      }, this.state.elements.length + 1);
+    }
+  }
+
+  addText(data: { content: string; x: number; y: number; color?: string; fontSize?: string }) {
+    this.addElement({
+      type: "text",
+      x: data.x,
+      y: data.y,
+      value: data.content,
+      color: data.color || "#ffffff",
+      fontSize: data.fontSize || "16px"
+    }, this.state.elements.length + 1);
+  }
+
   /**
    * 🎬 Visual Sequence Engine (Cognition Protocol v2)
    */
