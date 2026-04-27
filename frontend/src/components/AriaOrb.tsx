@@ -28,7 +28,7 @@ export const AriaOrb: React.FC<AriaOrbProps> = ({
       transition: {
         duration: 4,
         repeat: Infinity,
-        ease: "easeInOut"
+        ease: "easeInOut" as const
       }
     },
     thinking: {
@@ -38,7 +38,7 @@ export const AriaOrb: React.FC<AriaOrbProps> = ({
       transition: {
         duration: 2,
         repeat: Infinity,
-        ease: "linear"
+        ease: "linear" as const
       }
     },
     success: {
@@ -47,7 +47,7 @@ export const AriaOrb: React.FC<AriaOrbProps> = ({
       filter: "blur(2px) brightness(1.5)",
       transition: {
         duration: 0.8,
-        ease: "easeOut"
+        ease: "easeOut" as const
       }
     },
     speaking: {
@@ -55,7 +55,7 @@ export const AriaOrb: React.FC<AriaOrbProps> = ({
       transition: {
         duration: 0.6,
         repeat: Infinity,
-        ease: "easeInOut"
+        ease: "easeInOut" as const
       }
     }
   };
