@@ -29,7 +29,7 @@ export const LessonSkeleton: React.FC<LessonSkeletonProps> = ({ topic }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
       <div className="mb-12">
-        <AriaOrb state="thinking" size="lg" />
+        <AriaOrb state="thinking" size={120} />
       </div>
 
       <AnimatePresence mode="wait">

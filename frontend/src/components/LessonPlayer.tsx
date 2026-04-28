@@ -44,7 +44,7 @@ export default function LessonPlayer({
   onTutorHelp,
 }: LessonPlayerProps) {
   // --- 🎨 SEMANTIC UI MAPPING (v17) ---
-  const semanticConfig = {
+  const semanticConfig: Record<string, { label: string; icon: string; color: string; bg?: string }> = {
     title: { label: "Introduction", icon: "💎", color: "text-blue-400" },
     explanation: { label: "First Principles", icon: "🧠", color: "text-indigo-400" },
     deep_dive: { label: "Elite Deep Dive", icon: "🔬", color: "text-purple-400", bg: "bg-purple-500/5 border-purple-500/20" },

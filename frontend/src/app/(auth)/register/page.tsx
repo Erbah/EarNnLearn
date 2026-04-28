@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,7 +22,7 @@ function maskIdentifier(id: string) {
   return id;
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     firstName: "",
@@ -830,5 +830,17 @@ export default function RegisterPage() {
         </p>
       </motion.div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

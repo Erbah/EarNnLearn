@@ -46,7 +46,7 @@ export class LessonOrchestrator {
 
     try {
       // Group actions by agent and sort by timing
-      const actionsByTime = this.sortActionsByTiming(scene.agents);
+      const actionsByTime = this.sortActionsByTiming(scene.actions || []);
       let currentTime = 0;
 
       for (const action of actionsByTime) {
@@ -224,7 +224,7 @@ export class LessonOrchestrator {
       } catch (e) {
         // Fallback: draw a small circle or line if content isn't valid JSON
         await whiteboardManager.drawPath(
-          [action.position, { x: action.position.x + 10, y: action.position.y + 10 }],
+          [[action.position.x, action.position.y], [action.position.x + 10, action.position.y + 10]],
           action.color || '#ffffff',
           3,
           500

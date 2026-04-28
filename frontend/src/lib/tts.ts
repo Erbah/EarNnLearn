@@ -75,7 +75,6 @@ export class WebSpeechTTS implements TTSProvider {
             resolve();
             return;
           case 'network':
-          case 'service-not-available':
             // Temporary network/service issues, skip audio but continue
             console.warn(`Speech service temporarily unavailable: ${event.error}`);
             resolve();

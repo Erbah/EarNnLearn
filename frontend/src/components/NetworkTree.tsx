@@ -103,8 +103,8 @@ function layoutTree(tree: TreeData, x = 0, y = 0, depth = 0, spacing = { x: 250,
 
 /* ───── Main Component ───── */
 export default function NetworkTree() {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,10 +147,7 @@ export default function NetworkTree() {
   }
 
   if (error) {
-    const errorMessage = typeof error === 'string' ? error : 
-                        typeof error === 'object' && error?.message ? error.message :
-                        typeof error === 'object' ? JSON.stringify(error) : 
-                        String(error);
+    const errorMessage = error;
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', color: '#E5E7EB' }}>
         <div style={{ textAlign: 'center', padding: '40px', background: 'rgba(27,36,51,0.6)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
