@@ -22,6 +22,7 @@ import AITutorChat from "@/components/AITutorChat";
 import { WhiteboardView } from "@/components/WhiteboardView";
 import { pauseSpeech, resumeSpeech, stopSpeech, setSpeechVolume } from "@/lib/tts";
 import { whiteboardManager } from "@/lib/whiteboard";
+import type { LessonSceneWithActions } from "@/types/openmaic";
 
 import { LessonSceneWithActions } from "@/types/openmaic";
 
