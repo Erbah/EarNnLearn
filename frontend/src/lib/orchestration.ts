@@ -3,10 +3,10 @@
  * Coordinates agent actions, TTS, and effects during lesson playback
  */
 
-import type { AgentAction, LessonSceneWithActions } from '@/types/openmaic';
+import type { AgentAction, LessonSceneWithActions } from '@/types/lesson';
 import { speak, stopSpeech } from './tts';
 import { useEffects } from './effects';
-import { whiteboardManager } from './whiteboard';
+// import { whiteboardManager } from './whiteboard';
 
 export interface OrchestrationEvent {
   type: 'action_start' | 'action_end' | 'agent_change' | 'scene_complete';
@@ -91,25 +91,21 @@ export class LessonOrchestrator {
           await this.executeSpeech(action);
           break;
         case 'spotlight':
-          await this.executeSpotlight(action);
-          break;
         case 'laser':
-          await this.executeLaser(action);
-          break;
         case 'highlight':
-          await this.executeHighlight(action);
+          // Deprecated: Visual effects are no longer executed.
           break;
         case 'pause':
           await this.executePause(action);
           break;
         case 'whiteboard_draw':
-          await this.executeWhiteboardDraw(action);
+          // await this.executeWhiteboardDraw(action); // Deprecated
           break;
         case 'whiteboard_text':
-          await this.executeWhiteboardText(action);
+          // await this.executeWhiteboardText(action); // Deprecated
           break;
         case 'whiteboard_clear':
-          await this.executeWhiteboardClear(action);
+          // await this.executeWhiteboardClear(action); // Deprecated
           break;
         case 'tutor_help':
         case 'ask_tutor':
@@ -135,11 +131,10 @@ export class LessonOrchestrator {
       case 'speech':
         return this.executeSpeech(action);
       case 'spotlight':
-        return this.executeSpotlight(action);
       case 'laser':
-        return this.executeLaser(action);
       case 'highlight':
-        return this.executeHighlight(action);
+        // Deprecated
+        return Promise.resolve();
       case 'pause':
         return this.executePause(action);
       case 'whiteboard_draw':
@@ -206,50 +201,6 @@ export class LessonOrchestrator {
       ...action,
       delay: index * 2000, // Default 2 second spacing
     }));
-  }
-
-  private async executeWhiteboardDraw(action: AgentAction): Promise<void> {
-    if (action.position && action.content) {
-      // For whiteboard_draw, 'content' is expected to be a JSON string of points or a description
-      try {
-        const points = JSON.parse(action.content);
-        if (Array.isArray(points)) {
-          await whiteboardManager.drawPath(
-            points, 
-            action.color || '#ffffff', 
-            action.width || 3, 
-            action.duration || 1000
-          );
-        }
-      } catch (e) {
-        // Fallback: draw a small circle or line if content isn't valid JSON
-        await whiteboardManager.drawPath(
-          [[action.position.x, action.position.y], [action.position.x + 10, action.position.y + 10]],
-          action.color || '#ffffff',
-          3,
-          500
-        );
-      }
-    }
-  }
-
-  private async executeWhiteboardText(action: AgentAction): Promise<void> {
-    if (action.position && action.content) {
-      whiteboardManager.addText({
-        content: action.content,
-        x: action.position.x,
-        y: action.position.y,
-        color: action.color || '#ffffff',
-        fontSize: '20px'
-      });
-      if (action.duration) {
-        await this.delay(action.duration);
-      }
-    }
-  }
-
-  private async executeWhiteboardClear(action: AgentAction): Promise<void> {
-    whiteboardManager.clear();
   }
 
   private delay(ms: number): Promise<void> {

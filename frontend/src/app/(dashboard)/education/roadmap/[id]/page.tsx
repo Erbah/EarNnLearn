@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   ChevronDown, ChevronUp, Lock, CheckCircle2, Play, 
   Circle, Clock, BarChart3, GraduationCap, ArrowLeft,
-  Settings2, HelpCircle
+  Settings2, HelpCircle, BookOpen, Zap, ShieldCheck, X, Cpu
 } from "lucide-react";
 import { api } from "@/lib/api";
 import Link from "next/link";
@@ -18,6 +18,7 @@ export default function RoadmapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedUnits, setExpandedUnits] = useState<Record<string, boolean>>({ "Unit 1": true });
+  const [activeTab, setActiveTab] = useState<"curriculum" | "foundation" | "path">("curriculum");
 
   useEffect(() => {
     async function fetchRoadmap() {
@@ -60,7 +61,7 @@ export default function RoadmapPage() {
   );
 
   return (
-    <div className="max-w-5xl mx-auto pb-20">
+    <div className="flex min-h-screen bg-[#0a0e14] -mt-8 -mx-8">
       {/* Navigation */}
       <button 
         onClick={() => router.push("/education")}
@@ -125,100 +126,273 @@ export default function RoadmapPage() {
         </div>
       </header>
 
-      {/* Course Content (Units) */}
-      <div className="space-y-6">
-        {roadmap.roadmap_data?.units?.map((unit: any, uIdx: number) => (
-          <div key={uIdx} className="bg-card/20 border border-white/5 rounded-3xl overflow-hidden transition-all hover:bg-card/30">
-            <button 
-              onClick={() => toggleUnit(unit.title)}
-              className="w-full flex items-center justify-between p-6 md:p-8 text-left"
-            >
-              <div className="flex items-center gap-5">
-                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-gray-500 border border-white/10">
-                  {uIdx + 1}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white tracking-tight">{unit.title}</h3>
-                  <p className="text-sm text-gray-500">
-                    {unit.topics?.length} Chapters • {unit.description || "Foundational concepts"}
-                  </p>
-                </div>
-              </div>
-              {expandedUnits[unit.title] ? <ChevronUp className="w-6 h-6 text-gray-600" /> : <ChevronDown className="w-6 h-6 text-gray-600" />}
-            </button>
-
-            <AnimatePresence>
-              {expandedUnits[unit.title] && (
-                <motion.div 
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="border-t border-white/5 bg-black/20"
-                >
-                  <div className="p-4 md:p-6 space-y-3">
-                    {unit.topics?.map((topic: any, tIdx: number) => {
-                      const progress = roadmap.progress_data?.[topic.id] || {};
-                      const isCompleted = progress.status === "completed" || progress.verified;
-                      const isLocked = roadmap.guided_mode && tIdx > 0 && !(roadmap.progress_data?.[unit.topics[tIdx-1].id]?.status === "completed");
-                      
-                      return (
-                        <div 
-                          key={topic.id}
-                          className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                            isLocked 
-                              ? "bg-transparent border-transparent opacity-40 grayscale pointer-events-none" 
-                              : "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/[0.07] group"
-                          }`}
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
-                              isCompleted 
-                                ? "bg-green-500/20 border-green-500/40 text-green-500" 
-                                : "bg-white/5 border-white/10 text-gray-500"
-                            }`}>
-                              {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isLocked ? <Lock className="w-4 h-4" /> : <Circle className="w-2 h-2 fill-current" />}
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-white group-hover:text-primary transition-colors">
-                                {topic.title}
-                              </h4>
-                              <div className="flex items-center gap-3 text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">
-                                <span className={topic.difficulty === 'advanced' ? 'text-red-400' : 'text-gray-500'}>
-                                  {topic.difficulty}
-                                </span>
-                                {isCompleted && progress.score && (
-                                  <span className="text-green-500">Score: {progress.score}%</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-4">
-                            {!isCompleted && !isLocked && (
-                               <Link 
-                                 href={`/education/studio?topic=${encodeURIComponent(topic.title)}&subject=${encodeURIComponent(roadmap.subject)}`}
-                                 className="flex items-center gap-2 px-4 py-2 bg-primary text-background text-xs font-black rounded-lg hover:scale-105 transition-transform"
-                               >
-                                 <Play className="w-3 h-3 fill-current" />
-                                 Start Lesson
-                               </Link>
-                            )}
-                            {isCompleted && (
-                               <button className="text-[10px] text-gray-500 font-bold uppercase tracking-widest hover:text-white transition-colors">
-                                 Review
-                               </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+      {/* 📑 Academic Framework Tabs */}
+      <div className="flex items-center gap-2 mb-8 bg-white/5 p-1 rounded-2xl w-fit border border-white/5">
+        {[
+          { id: "curriculum", label: "Curriculum", icon: BookOpen },
+          { id: "foundation", label: "Foundation", icon: GraduationCap },
+          { id: "path", label: "Mastery Path", icon: BarChart3 }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              activeTab === tab.id 
+                ? "bg-primary text-background shadow-lg" 
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
         ))}
       </div>
+
+      <AnimatePresence mode="wait">
+        {activeTab === "curriculum" && (
+          <motion.div 
+            key="curriculum"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            className="space-y-6"
+          >
+            {/* Course Content (Units) */}
+            <div className="space-y-6">
+              {roadmap.roadmap_data?.units?.map((unit: any, uIdx: number) => (
+                <div key={uIdx} className="bg-card/20 border border-white/5 rounded-3xl overflow-hidden transition-all hover:bg-card/30">
+                  <button 
+                    onClick={() => toggleUnit(unit.title)}
+                    className="w-full flex items-center justify-between p-6 md:p-8 text-left"
+                  >
+                    <div className="flex items-center gap-5">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-gray-500 border border-white/10">
+                        {uIdx + 1}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white tracking-tight">{unit.title}</h3>
+                        <p className="text-sm text-gray-500">
+                          {unit.topics?.length} Chapters • {unit.description || "Foundational concepts"}
+                        </p>
+                      </div>
+                    </div>
+                    {expandedUnits[unit.title] ? <ChevronUp className="w-6 h-6 text-gray-600" /> : <ChevronDown className="w-6 h-6 text-gray-600" />}
+                  </button>
+
+                  <AnimatePresence>
+                    {expandedUnits[unit.title] && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-white/5 bg-black/20"
+                      >
+                        <div className="p-4 md:p-6 space-y-3">
+                          {unit.topics?.map((topic: any, tIdx: number) => {
+                            const progress = roadmap.progress_data?.[topic.id] || {};
+                            const isCompleted = progress.status === "completed" || progress.verified;
+                            const isLocked = roadmap.guided_mode && tIdx > 0 && !(roadmap.progress_data?.[unit.topics[tIdx-1].id]?.status === "completed");
+                            
+                            return (
+                              <div 
+                                key={topic.id}
+                                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                                  isLocked 
+                                    ? "bg-transparent border-transparent opacity-40 grayscale pointer-events-none" 
+                                    : "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/[0.07] group"
+                                }`}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
+                                    isCompleted 
+                                      ? "bg-green-500/20 border-green-500/40 text-green-500" 
+                                      : "bg-white/5 border-white/10 text-gray-500"
+                                  }`}>
+                                    {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isLocked ? <Lock className="w-4 h-4" /> : <Circle className="w-2 h-2 fill-current" />}
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-white group-hover:text-primary transition-colors">
+                                      {topic.title}
+                                    </h4>
+                                    <div className="flex items-center gap-3 text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">
+                                      <span className={topic.difficulty === 'advanced' ? 'text-red-400' : 'text-gray-500'}>
+                                        {topic.difficulty}
+                                      </span>
+                                      {isCompleted && progress.score && (
+                                        <span className="text-green-500">Score: {progress.score}%</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                  {!isCompleted && !isLocked && (
+                                     <Link 
+                                       href={`/education/studio?topic=${encodeURIComponent(topic.title)}&subject=${encodeURIComponent(roadmap.subject)}`}
+                                       className="flex items-center gap-2 px-4 py-2 bg-primary text-background text-xs font-black rounded-lg hover:scale-105 transition-transform"
+                                     >
+                                       <Play className="w-3 h-3 fill-current" />
+                                       Start Lesson
+                                     </Link>
+                                  )}
+                                  {isCompleted && (
+                                     <button className="text-[10px] text-gray-500 font-bold uppercase tracking-widest hover:text-white transition-colors">
+                                       Review
+                                     </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === "foundation" && (
+          <motion.div 
+            key="foundation"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-8"
+          >
+            {/* Section A: Course Foundation */}
+            <div className="space-y-6">
+              <div className="bg-card/30 border border-white/5 rounded-3xl p-8">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                  <GraduationCap className="w-6 h-6 text-primary" />
+                  Academic Foundation
+                </h3>
+                
+                <div className="space-y-4">
+                  {[
+                    { label: "Purpose", value: roadmap.roadmap_data?.section_a?.purpose },
+                    { label: "Academic Level", value: roadmap.roadmap_data?.section_a?.academic_level },
+                    { label: "Prerequisites", value: roadmap.roadmap_data?.section_a?.prerequisites?.join(", ") },
+                    { label: "Study Duration", value: roadmap.roadmap_data?.section_a?.study_duration }
+                  ].map((item, idx) => (
+                    <div key={idx} className="border-b border-white/5 pb-3">
+                      <p className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-1">{item.label}</p>
+                      <p className="text-sm text-gray-300">{item.value || "Not specified"}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-card/30 border border-white/5 rounded-3xl p-8">
+                <h3 className="text-xl font-bold text-white mb-6">Learning Outcomes</h3>
+                <ul className="space-y-3">
+                  {roadmap.roadmap_data?.section_a?.outcomes?.map((outcome: string, idx: number) => (
+                    <li key={idx} className="flex gap-3 text-sm text-gray-400">
+                      <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+                      {outcome}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {/* Section G: Resources */}
+              <div className="bg-card/30 border border-white/5 rounded-3xl p-8">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                  <Settings2 className="w-6 h-6 text-secondary" />
+                  Recommended Resources
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {roadmap.roadmap_data?.section_g?.resources?.map((res: string, idx: number) => (
+                    <span key={idx} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-gray-300">
+                      {res}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section H: Career Path */}
+              <div className="bg-card/30 border border-white/5 rounded-3xl p-8">
+                <h3 className="text-xl font-bold text-white mb-4">Professional Pathway</h3>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  {roadmap.roadmap_data?.section_h?.career_path || "This course prepares you for advanced roles in the field by building fundamental and applied skills."}
+                </p>
+              </div>
+
+              {/* Section I: Final Academic Map */}
+              <div className="bg-primary/5 border border-primary/20 rounded-3xl p-8">
+                <h3 className="text-sm font-bold text-primary mb-4 uppercase tracking-[0.2em]">Mastery Map</h3>
+                <div className="text-xs font-mono text-primary/80 break-words leading-loose">
+                  {roadmap.roadmap_data?.section_i?.academic_map}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === "path" && (
+          <motion.div 
+            key="path"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            className="space-y-8"
+          >
+            {/* Section C: Learning Phases */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {roadmap.roadmap_data?.section_c?.phases?.map((phase: any, idx: number) => (
+                <div key={idx} className="bg-card/30 border border-white/5 rounded-3xl p-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <span className="text-4xl font-black">{idx + 1}</span>
+                  </div>
+                  <h4 className="text-lg font-bold text-white mb-4">{phase.phase} Phase</h4>
+                  <p className="text-xs text-gray-500 mb-4 line-clamp-3">{phase.learned}</p>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-primary uppercase">Core Competency</p>
+                    <p className="text-xs text-gray-300">{phase.competencies}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Assessment & Practice Strategy */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <div className="bg-card/30 border border-white/5 rounded-3xl p-8">
+                 <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                   <Settings2 className="w-6 h-6 text-orange-400" />
+                   Assessment Strategy
+                 </h3>
+                 <div className="space-y-3">
+                   {roadmap.roadmap_data?.section_d?.assessment_plan?.map((item: string, idx: number) => (
+                     <div key={idx} className="flex items-center gap-3 text-sm text-gray-400">
+                       <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                       {item}
+                     </div>
+                   ))}
+                 </div>
+               </div>
+
+               <div className="bg-card/30 border border-white/5 rounded-3xl p-8">
+                 <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                   <Zap className="w-6 h-6 text-yellow-400" />
+                   Practice System
+                 </h3>
+                 <div className="space-y-3">
+                   {roadmap.roadmap_data?.section_e?.practice_system?.map((item: string, idx: number) => (
+                     <div key={idx} className="flex items-center gap-3 text-sm text-gray-400">
+                       <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                       {item}
+                     </div>
+                   ))}
+                 </div>
+               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="mt-12 p-8 bg-gradient-to-r from-secondary/5 to-primary/5 border border-white/10 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-4">

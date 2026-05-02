@@ -18,11 +18,10 @@ class CourseEngine:
 
         # Count total videos in course (via module joins conceptually, simplified here)
         # Note: Proper join across `modules` to `videos` happens here in production
-        video_count = db.query(Video).filter(Video.module_id.in_(
-             # Pseudo-query for skeleton structure: Find modules for this course, then videos.
-             # In complete prod, we'd use a raw SQL / proper joined relations.
-             [m.id for m in db.query(Module).filter(Module.course_id == course_id).all()]
-        )).count()
+        video_count = db.query(Video).filter(
+            Video.module_id.in_([m.id for m in db.query(Module).filter(Module.course_id == course_id).all()]),
+            Video.is_preview == False
+        ).count()
 
         if video_count <= course.acceleration_factor:
             return course.price # Fallback if params misconfigured
@@ -34,6 +33,10 @@ class CourseEngine:
         """
         Pay-As-You-Learn atomic wallet deduction whenever a video hits the 90% threshold.
         """
+        video = db.query(Video).filter(Video.id == video_id).first()
+        if video and video.is_preview:
+            return True # Explicitly free preview video
+
         ppc_cost = CourseEngine.calculate_ppc(db, course_id)
         if ppc_cost == Decimal('0.00'):
             return True # Free video / free course

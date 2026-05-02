@@ -326,7 +326,7 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
     # ═══════════════════════════════════════════
 
     @staticmethod
-    def generate_roadmap(db: Session, user_rid: str, subject: str) -> dict:
+    def generate_roadmap(db: Session, user_rid: str, subject: str, timeout: int = 60) -> dict:
         """
         Phase 1: Generates a complete structured curriculum for a subject.
         Persists it to the subject_roadmaps table.
@@ -346,13 +346,14 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 SubjectRoadmap.subject.ilike(subject)
             ).first()
             if existing:
-                return existing.roadmap_data
+                return existing
 
             prompt = ROADMAP_PROMPT.format(subject=subject)
 
             response = litellm.completion(
                 model=settings.AI_MODEL,
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                timeout=timeout
             )
             raw_text = response.choices[0].message.content
             # Extract JSON from response (handle markdown code blocks)
@@ -362,14 +363,34 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 raw_text = json_match.group(1).strip()
             roadmap_json = json.loads(raw_text)
             
+            # --- 🛡️ Elite: Flatten Unit Logic for Backward Compatibility (v17) ---
+            if "section_b" in roadmap_json:
+                flattened_units = []
+                for part in roadmap_json["section_b"].get("parts", []):
+                    for unit in part.get("units", []):
+                        unit_copy = {
+                            "title": f"{part.get('title')}: {unit.get('title')}",
+                            "description": unit.get("description", ""),
+                            "topics": []
+                        }
+                        for chapter in unit.get("chapters", []):
+                            for lesson in chapter.get("lessons", []):
+                                unit_copy["topics"].extend(lesson.get("topics", []))
+                        flattened_units.append(unit_copy)
+                
+                # Only overwrite if empty or explicitly migrating
+                if not roadmap_json.get("units"):
+                    roadmap_json["units"] = flattened_units
+
             # --- 🚨 Hardening: Dependency Graph Generation ---
             # If the AI didn't provide a graph, generate a default linear one
-            if "dependency_graph" not in roadmap_json:
+            if "dependency_graph" not in roadmap_json or not roadmap_json["dependency_graph"]:
                 graph = {}
                 flat_topics = []
                 for unit in roadmap_json.get("units", []):
                     for topic in unit.get("topics", []):
-                        flat_topics.append(topic["id"])
+                        if "id" in topic:
+                            flat_topics.append(topic["id"])
                 
                 for i, tid in enumerate(flat_topics):
                     graph[tid] = [flat_topics[i-1]] if i > 0 else []
@@ -386,7 +407,7 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             db.commit()
             db.refresh(new_roadmap)
             
-            return roadmap_json
+            return new_roadmap
         except Exception as e:
             print(f"Roadmap Generation Error: {str(e)}")
             return {"error": "Failed to generate roadmap", "details": str(e)}
@@ -602,11 +623,9 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
 
 
     @classmethod
-    def generate_lesson_chapter(cls, db: Session, user_rid: str, topic: str, section_key: str, mode: str = "normal", retry_count: int = 0, deficiencies: list = None) -> list:
+    def generate_lesson_chapter(cls, db: Session, user_rid: str, topic: str, section_key: str, difficulty: str = "beginner", education_level: str = "Self-Learning", learner_goal: str = "General Mastery", style: str = "balanced", mode: str = "normal", retry_count: int = 0, deficiencies: list = None, uai: str = None, timeout: int = 60) -> list:
         """
-        Generates a modular chapter of a lesson.
-        Aria Persona (v9): Handles Normal, Review, and Challenge Modes.
-        Includes performance logging and recursive validation logic.
+        Generates a modular chapter of a lesson using the OCE (Omni-Curriculum Engine) Protocol.
         """
         from app.core.config import Settings
         from app.models.ai import LessonProgress
@@ -674,11 +693,9 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 topic=topic,
                 section_name=section_name,
                 section_instructions=instr,
-                student_state=student_state,
-                learning_goal=learning_goal,
-                preferred_style=preferred_style,
-                difficulty_constraint=diff_constraint,
-                reinforcement_instructions=reinf_instr,
+                learning_goal=learner_goal,
+                education_level=education_level,
+                module_id=uai or "N/A",
                 whiteboard_protocol=WHITEBOARD_PROTOCOL
             )
 
@@ -704,7 +721,8 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                     {"role": "system", "content": system_instruction},
                     {"role": "user", "content": prompt + retry_feedback}
                 ],
-                max_tokens=4000 # Elite Depth headroom
+                max_tokens=4000, # Elite Depth headroom
+                timeout=timeout
             )
             raw_content = response.choices[0].message.content
 
@@ -721,7 +739,8 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 continuation = litellm.completion(
                     model=settings.AI_MODEL,
                     messages=followup_messages,
-                    max_tokens=2500
+                    max_tokens=2500,
+                    timeout=timeout
                 )
                 raw_content = raw_content.replace("[CONTINUE]", "").strip() + "\n\n" + continuation.choices[0].message.content.strip()
                 continuation_count += 1
@@ -767,12 +786,24 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 
                 perf_log.success = False
                 perf_log.operation_metadata = {"deficiencies": new_deficiencies}
-                db.add(perf_log)
-                db.commit()
+                try:
+                    db.add(perf_log)
+                    db.flush()
+                except Exception as log_err:
+                    print(f"WARNING: Performance log failed (recursive): {log_err}")
+                    db.rollback()
 
                 return cls.generate_lesson_chapter(
-                    db, user_rid, topic, section_key, mode, 
-                    retry_count + 1, deficiencies=new_deficiencies
+                    db, user_rid, topic, section_key, 
+                    difficulty=difficulty,
+                    education_level=education_level,
+                    learner_goal=learner_goal,
+                    style=style,
+                    mode=mode, 
+                    retry_count=retry_count + 1, 
+                    deficiencies=new_deficiencies,
+                    uai=uai,
+                    timeout=timeout
                 )
             
             # --- 🛡️ Final Quality Check vs Fallback ---
@@ -800,8 +831,12 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                     "quiz_questions": quiz_questions if i == len(raw_scenes) - 1 else []
                 })
             
-            db.add(perf_log)
-            db.commit()
+            try:
+                db.add(perf_log)
+                db.flush()
+            except Exception as log_err:
+                print(f"WARNING: Performance log failed (final): {log_err}")
+                db.rollback()
             return final_scenes
             
         except Exception as e:
@@ -812,8 +847,12 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             perf_log.success = False
             perf_log.failure_reason = str(e)
             perf_log.latency_category = "Failure"
-            db.add(perf_log)
-            db.commit()
+            try:
+                db.add(perf_log)
+                db.flush()
+            except Exception as log_err:
+                print(f"WARNING: Performance log failed (error path): {log_err}")
+                db.rollback()
             
             # Use Fallback Template to avoid dead ends
             fallback_content = CORE_PRINCIPLES_FALLBACK.format(

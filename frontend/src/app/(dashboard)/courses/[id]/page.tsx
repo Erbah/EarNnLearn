@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Star, Users, BookOpen, PlayCircle, ChevronDown, ChevronRight,
-  Award, Clock, Zap, ArrowLeft, CheckCircle, Lock, ArrowUpRight
+  Award, Clock, Zap, ArrowLeft, CheckCircle, Lock, ArrowUpRight, HelpCircle
 } from "lucide-react";
 
 import { API_BASE_URL, api } from "@/lib/api";
@@ -181,16 +181,37 @@ export default function CourseDetailPage() {
               {expandedModule === mod.id && (
                 <div className="border-t border-white/5">
                   {mod.videos.map((vid, j) => (
-                    <div key={vid.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                    <div 
+                      key={vid.id} 
+                      onClick={() => isEnrolled && router.push(`/learn/${id}?v=${vid.id}`)}
+                      className={`flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 ${isEnrolled ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
+                    >
                       {isEnrolled ? (
                         <PlayCircle className="w-4 h-4 text-primary shrink-0" />
                       ) : (
                         <Lock className="w-4 h-4 text-gray-600 shrink-0" />
                       )}
                       <span className="text-gray-300 text-sm flex-1">{vid.title}</span>
+                      {(vid as any).is_preview && (
+                        <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Preview</span>
+                      )}
                       {vid.duration > 0 && (
                         <span className="text-gray-600 text-xs">{Math.floor(vid.duration / 60)}m</span>
                       )}
+                    </div>
+                  ))}
+                  {mod.quizzes && mod.quizzes.length > 0 && mod.quizzes.map((quiz, k) => (
+                    <div 
+                      key={quiz.id} 
+                      onClick={() => isEnrolled && router.push(`/learn/${id}?tab=quizzes&quiz=${quiz.id}`)}
+                      className={`flex items-center gap-3 px-4 py-4 hover:bg-primary/5 transition-colors border-b border-white/5 last:border-0 bg-primary/[0.02] ${isEnrolled ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
+                    >
+                      <HelpCircle className={`w-4 h-4 ${isEnrolled ? "text-primary" : "text-gray-600"} shrink-0`} />
+                      <div className="flex-1">
+                        <span className="text-white text-sm font-bold block">{quiz.title}</span>
+                        <span className="text-[10px] text-gray-500 uppercase tracking-widest font-black">Assessment • {quiz.question_count || 0} Questions</span>
+                      </div>
+                      {isEnrolled && <ArrowUpRight className="w-4 h-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />}
                     </div>
                   ))}
                 </div>

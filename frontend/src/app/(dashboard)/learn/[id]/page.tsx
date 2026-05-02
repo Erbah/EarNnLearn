@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import YouTube, { YouTubeEvent, YouTubePlayer } from "react-youtube";
 import {
   ArrowLeft, PlayCircle, CheckCircle, Lock, Zap, BookOpen,
-  ChevronDown, ChevronRight, Award, AlertTriangle, Sparkles
+  ChevronDown, ChevronRight, Award, AlertTriangle, Sparkles,
+  HelpCircle, MessageSquare, Send, FileText, CheckSquare, XCircle, User
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { API_BASE_URL, api } from "@/lib/api";
@@ -18,8 +19,12 @@ interface ModuleItem { id: string; title: string; position: number; videos: Vide
 
 export default function LearnPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const courseId = params.id as string;
+  const targetVideoId = searchParams.get("v");
+  const targetTab = searchParams.get("tab");
+  const targetQuizId = searchParams.get("quiz");
 
   const [course, setCourse] = useState<any>(null);
   const [modules, setModules] = useState<ModuleItem[]>([]);
@@ -30,7 +35,8 @@ export default function LearnPage() {
   // Anti-Cheat State
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
   const [watchResult, setWatchResult] = useState<any>(null);
-  const [maxTime, setMaxTime] = useState(0); 
+  const [maxTimeState, setMaxTimeState] = useState(0); // For trigger re-render if needed, though not currently used in UI
+  const maxTimeRef = useRef(0);
   const playerRef = useRef<YouTubePlayer>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -41,6 +47,19 @@ export default function LearnPage() {
   
   // XP Animation
   const [showXpPop, setShowXpPop] = useState(false);
+
+  // Engagement State
+  const [activeTab, setActiveTab] = useState<"ai-tutor" | "qa" | "quizzes">("ai-tutor");
+  const [discussions, setDiscussions] = useState<any[]>([]);
+  const [courseQuizzes, setCourseQuizzes] = useState<any[]>([]);
+  const [activeQuiz, setActiveQuiz] = useState<any>(null);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [submittingQuiz, setSubmittingQuiz] = useState(false);
+  const [quizResult, setQuizResult] = useState<any>(null);
+  const [newQuestionTitle, setNewQuestionTitle] = useState("");
+  const [newQuestionContent, setNewQuestionContent] = useState("");
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
 
   const headers: any = { "Content-Type": "application/json" };
 
@@ -61,14 +80,88 @@ export default function LearnPage() {
         
         // Auto-select first un-watched or first overall
         if (data.modules?.length > 0) {
-          const firstVid = data.modules[0].videos[0];
+          const all = getAllVideos(data.modules);
+          const target = targetVideoId ? all.find(v => v.id === targetVideoId) : null;
+          const firstVid = target || all[0];
+          
           setActiveVideo(firstVid);
-          setMaxTime(0);
-          setExpandedModule(data.modules[0].id);
+          setMaxTimeState(0);
+          
+          // Expand the module containing the active video
+          const parentMod = data.modules.find((m: any) => m.videos.some((v: any) => v.id === firstVid.id));
+          if (parentMod) setExpandedModule(parentMod.id);
+        }
+
+        // Deep link to tab
+        if (targetTab === "quizzes") {
+          setActiveTab("quizzes");
+        } else if (targetTab === "qa") {
+          setActiveTab("qa");
         }
       });
+    
+    // Fetch Engagement Data
+    api.get(`/api/v1/engagement/quizzes/course/${courseId}`).then(res => {
+      setCourseQuizzes(res.data);
+      // Auto-open quiz if deep linked
+      if (targetQuizId && res.data) {
+        const q = res.data.find((qz: any) => qz.id === targetQuizId);
+        if (q) setActiveQuiz(q);
+      }
+    }).catch(() => {});
+    api.get(`/api/v1/engagement/discussions/course/${courseId}`).then(res => setDiscussions(res.data)).catch(() => {});
+    
     refreshStatus();
-  }, [courseId]);
+  }, [courseId, targetVideoId]);
+
+  async function postQuestion() {
+    if (!newQuestionTitle || !newQuestionContent) return;
+    try {
+      const res = await api.post(`/api/v1/engagement/discussions`, {
+        course_id: courseId,
+        video_id: activeVideo?.id,
+        title: newQuestionTitle,
+        content: newQuestionContent
+      });
+      setDiscussions([res.data, ...discussions]);
+      setNewQuestionTitle("");
+      setNewQuestionContent("");
+    } catch (e) {
+      alert("Failed to post question");
+    }
+  }
+
+  async function postReply(discussionId: string) {
+    if (!replyContent) return;
+    try {
+      const res = await api.post(`/api/v1/engagement/discussions/${discussionId}/replies`, {
+        content: replyContent
+      });
+      setDiscussions(prev => prev.map(d => d.id === discussionId ? { ...d, replies: [...(d.replies || []), res.data] } : d));
+      setReplyContent("");
+      setReplyingTo(null);
+    } catch (e) {
+      alert("Failed to post reply");
+    }
+  }
+
+  async function submitQuiz() {
+    if (!activeQuiz) return;
+    setSubmittingQuiz(true);
+    try {
+      const answersList = Object.entries(quizAnswers).map(([q_id, o_id]) => ({
+        question_id: q_id,
+        option_id: o_id
+      }));
+      const res = await api.post(`/api/v1/engagement/quizzes/${activeQuiz.id}/submit`, {
+        answers: answersList
+      });
+      setQuizResult(res.data);
+    } catch (e) {
+      alert("Failed to submit quiz");
+    }
+    setSubmittingQuiz(false);
+  }
 
   async function refreshStatus() {
     try {
@@ -103,13 +196,16 @@ export default function LearnPage() {
     const currentTime = await playerRef.current.getCurrentTime();
     
     // 1. Anti-Skip: if they jumped more than 2 seconds ahead of maxTime
-    if (currentTime > maxTime + 2 && !watchedIds.has(activeVideo.id)) {
-      playerRef.current.seekTo(maxTime);
+    if (currentTime > maxTimeRef.current + 2 && !watchedIds.has(activeVideo.id)) {
+      playerRef.current.seekTo(maxTimeRef.current);
       return; // Rewind and quit
     }
     
     // Update max time securely
-    if (currentTime > maxTime) setMaxTime(currentTime);
+    if (currentTime > maxTimeRef.current) {
+      maxTimeRef.current = currentTime;
+      setMaxTimeState(currentTime);
+    }
 
     // 2. Tab out / focus checks
     if (document.hidden) {
@@ -167,7 +263,8 @@ export default function LearnPage() {
     }
 
     setActiveVideo(video);
-    setMaxTime(0);
+    maxTimeRef.current = 0;
+    setMaxTimeState(0);
   }
 
   async function requestCertificate() {
@@ -289,8 +386,14 @@ export default function LearnPage() {
                     width: "100%",
                     height: "100%",
                     playerVars: {
-                      autoplay: 1, controls: 1, modestbranding: 1, rel: 0, disablekb: 1,
-                      fs: 0, iv_load_policy: 3
+                      autoplay: 1, 
+                      controls: 1, 
+                      modestbranding: 1, 
+                      rel: 0, 
+                      disablekb: 0,
+                      fs: 1, 
+                      iv_load_policy: 3,
+                      origin: typeof window !== 'undefined' ? window.location.origin : undefined
                     }
                   }}
                   onReady={onPlayerReady}
@@ -350,46 +453,222 @@ export default function LearnPage() {
             </motion.div>
           )}
 
-          {/* AI Tutor Placeholder */}
-          <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-5 mt-6 glass">
-            <h3 className="text-white font-semibold flex items-center gap-2 mb-3">
-              🤖 AI Learning Assistant
-            </h3>
-            <p className="text-sm text-gray-400 mb-4">
-              Ask questions about this lesson, request a summary, or generate a quick quiz. (AI Tokens apply)
-            </p>
-            
-            {aiChat.length > 0 && (
-              <div className="mb-4 space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                {aiChat.map((msg, i) => (
-                  <div key={i} className="space-y-1">
-                    <p className="text-[10px] text-primary/70 font-bold uppercase">Question</p>
-                    <p className="text-xs text-gray-300 bg-white/5 p-2 rounded-lg italic">"{msg.q}"</p>
-                    <p className="text-[10px] text-cyan-400/70 font-bold uppercase mt-2">AI Answer</p>
-                    <p className="text-xs text-white bg-primary/10 p-2 rounded-lg border-l-2 border-primary">{msg.a}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+          {/* Engagement Tabs */}
+          <div className="rounded-[2rem] bg-white/[0.02] border border-white/10 mt-8 overflow-hidden glass shadow-2xl">
+            <div className="flex bg-white/[0.03] border-b border-white/10 p-2">
+              {[
+                { id: "ai-tutor", label: "AI Tutor", icon: Sparkles },
+                { id: "qa", label: "Q&A", icon: MessageSquare },
+                { id: "quizzes", label: "Quizzes", icon: HelpCircle },
+              ].map(t => (
+                <button 
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id as any)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    activeTab === t.id 
+                      ? "bg-primary text-background shadow-[0_5px_15px_rgba(0,224,255,0.3)]" 
+                      : "text-gray-500 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <t.icon size={14} />
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                value={aiQuestion}
-                onChange={(e) => setAiQuestion(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && askAI()}
-                placeholder="Explain the concept shown at 2:30..." 
-                aria-label="Ask AI Tutor"
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-primary/50 outline-none"
-              />
-              <button 
-                onClick={askAI}
-                disabled={isAiLoading || !aiQuestion.trim()}
-                aria-label={isAiLoading ? "Asking AI..." : "Send question to AI"}
-                className="px-5 py-2 bg-primary text-background font-bold rounded-xl text-sm disabled:opacity-50 transition-opacity"
-              >
-                {isAiLoading ? "..." : "Ask"}
-              </button>
+            <div className="p-8 min-h-[300px]">
+              {/* AI Tutor Tab */}
+              {activeTab === "ai-tutor" && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-white tracking-tighter">AI Learning Assistant</h3>
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">On-demand cognitive support</p>
+                    </div>
+                    <Sparkles className="text-primary w-8 h-8 opacity-20" />
+                  </div>
+
+                  {aiChat.length > 0 ? (
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                      {aiChat.map((msg, i) => (
+                        <div key={i} className="space-y-2">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0 border border-white/10">
+                              <User size={14} className="text-gray-400" />
+                            </div>
+                            <p className="text-sm text-gray-300 bg-white/5 p-4 rounded-3xl rounded-tl-none leading-relaxed italic">"{msg.q}"</p>
+                          </div>
+                          <div className="flex items-start gap-3 justify-end">
+                            <p className="text-sm text-white bg-primary/10 p-4 rounded-3xl rounded-tr-none border border-primary/20 leading-relaxed shadow-[0_5px_15px_rgba(0,224,255,0.05)]">{msg.a}</p>
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30">
+                              <Sparkles size={14} className="text-primary" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-12 text-center bg-white/[0.01] rounded-3xl border border-dashed border-white/10">
+                      <Sparkles className="w-12 h-12 text-gray-600 mx-auto mb-4 animate-pulse" />
+                      <p className="text-gray-500 text-sm italic">Ask anything about the current lesson...</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 bg-white/5 p-2 rounded-2xl border border-white/10">
+                    <input 
+                      type="text" 
+                      value={aiQuestion}
+                      onChange={(e) => setAiQuestion(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && askAI()}
+                      placeholder="e.g. Explain the math at 05:20..." 
+                      className="flex-1 bg-transparent border-none focus:ring-0 px-4 text-sm text-white outline-none"
+                    />
+                    <button 
+                      onClick={askAI}
+                      disabled={isAiLoading || !aiQuestion.trim()}
+                      className="p-3 bg-primary text-background rounded-xl transition-all hover:scale-105 disabled:opacity-30 shadow-lg"
+                    >
+                      <Send size={18} />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Q&A Tab */}
+              {activeTab === "qa" && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-white tracking-tighter">Course Discussion</h3>
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Connect with the community</p>
+                    </div>
+                    <button 
+                      onClick={() => setReplyingTo(replyingTo === "new" ? null : "new")}
+                      className="px-6 py-2.5 bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all border border-white/10"
+                    >
+                      Ask Question
+                    </button>
+                  </div>
+
+                  {replyingTo === "new" && (
+                    <div className="p-6 rounded-3xl bg-primary/5 border border-primary/20 space-y-4">
+                      <input 
+                        value={newQuestionTitle}
+                        onChange={e => setNewQuestionTitle(e.target.value)}
+                        placeholder="Question Title (e.g. Confused about ROI)"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-primary/50 outline-none"
+                      />
+                      <textarea 
+                        value={newQuestionContent}
+                        onChange={e => setNewQuestionContent(e.target.value)}
+                        placeholder="Detailed explanation..."
+                        rows={3}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-primary/50 outline-none resize-none"
+                      />
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => setReplyingTo(null)} className="text-xs text-gray-500 font-bold uppercase">Cancel</button>
+                        <button onClick={postQuestion} className="px-5 py-2 bg-primary text-background rounded-lg text-[10px] font-black uppercase shadow-lg">Post Question</button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                    {discussions.length > 0 ? discussions.map(d => (
+                      <div key={d.id} className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 space-y-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
+                              <User size={18} className="text-gray-400" />
+                            </div>
+                            <div>
+                              <h4 className="text-white font-bold tracking-tight">{d.title}</h4>
+                              <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{d.user_rid} • {new Date(d.created_at).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-300 leading-relaxed">{d.content}</p>
+                        
+                        {/* Replies */}
+                        {d.replies?.map((r: any) => (
+                          <div key={r.id} className={`ml-8 p-4 rounded-2xl ${r.is_instructor_reply ? "bg-primary/5 border border-primary/10" : "bg-white/5 border border-white/5"}`}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-[10px] font-black uppercase tracking-tighter text-primary">{r.user_rid}</span>
+                              {r.is_instructor_reply && <span className="text-[8px] bg-primary text-background px-2 py-0.5 rounded-full font-black uppercase">Instructor</span>}
+                            </div>
+                            <p className="text-xs text-gray-300">{r.content}</p>
+                          </div>
+                        ))}
+
+                        <div className="pt-2">
+                          {replyingTo === d.id ? (
+                            <div className="flex gap-2">
+                              <input 
+                                value={replyContent}
+                                onChange={e => setReplyContent(e.target.value)}
+                                placeholder="Add a reply..."
+                                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none"
+                              />
+                              <button onClick={() => postReply(d.id)} className="p-2 bg-primary text-background rounded-xl"><Send size={14} /></button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={() => setReplyingTo(d.id)}
+                              className="text-[10px] text-primary font-bold uppercase tracking-widest flex items-center gap-2 hover:opacity-70 transition-opacity"
+                            >
+                              <MessageSquare size={12} /> Reply
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="py-12 text-center">
+                        <MessageSquare className="w-12 h-12 text-gray-600 mx-auto mb-4 opacity-20" />
+                        <p className="text-gray-500 text-sm">No discussions yet. Be the first to ask!</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Quizzes Tab */}
+              {activeTab === "quizzes" && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black text-white tracking-tighter">Knowledge Checks</h3>
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Validate your progress</p>
+                    </div>
+                    <HelpCircle className="text-primary w-8 h-8 opacity-20" />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {courseQuizzes.length > 0 ? courseQuizzes.map(q => (
+                      <div key={q.id} className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 flex items-center justify-between group hover:border-primary/30 transition-all">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:bg-primary/20 transition-all">
+                            <FileText className="text-primary w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="text-white font-bold tracking-tight">{q.title}</h4>
+                            <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{q.questions?.length || 0} Questions • Pass: {q.passing_score}%</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setActiveQuiz(q)}
+                          className="px-6 py-3 bg-primary/20 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary text-background transition-all border border-primary/30 shadow-[0_5px_15px_rgba(0,224,255,0.1)]"
+                        >
+                          Start Quiz
+                        </button>
+                      </div>
+                    )) : (
+                      <div className="py-12 text-center bg-white/[0.01] rounded-3xl border border-dashed border-white/10">
+                        <HelpCircle className="w-12 h-12 text-gray-600 mx-auto mb-4 opacity-20" />
+                        <p className="text-gray-500 text-sm">No quizzes available for this course yet.</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
             </div>
           </div>
         </div>
@@ -474,6 +753,101 @@ export default function LearnPage() {
           </div>
         </div>
       </div>
+      {/* Quiz Player Modal */}
+      <AnimatePresence>
+        {activeQuiz && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              className="w-full max-w-2xl bg-[#111827] border border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden"
+            >
+              {!quizResult ? (
+                <>
+                  <div className="p-8 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                    <div>
+                      <h2 className="text-2xl font-black text-white tracking-tighter">{activeQuiz.title}</h2>
+                      <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Passing Score: {activeQuiz.passing_score}%</p>
+                    </div>
+                    <button onClick={() => setActiveQuiz(null)} className="p-2 rounded-full hover:bg-white/10 transition-colors">
+                      <XCircle className="w-8 h-8 text-gray-500" />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+                    {activeQuiz.questions?.map((q: any, idx: number) => (
+                      <div key={q.id} className="space-y-4">
+                        <div className="flex gap-4">
+                          <span className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-black shrink-0">{idx + 1}</span>
+                          <p className="text-white font-bold leading-relaxed">{q.question_text}</p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 ml-12">
+                          {q.options?.map((o: any) => (
+                            <button 
+                              key={o.id}
+                              onClick={() => setQuizAnswers({ ...quizAnswers, [q.id]: o.id })}
+                              className={`p-4 rounded-2xl text-left text-xs font-bold uppercase tracking-widest border transition-all ${
+                                quizAnswers[q.id] === o.id 
+                                  ? "bg-primary text-background border-primary shadow-[0_5px_15px_rgba(0,224,255,0.3)]" 
+                                  : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
+                              }`}
+                            >
+                              {o.option_text}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-8 border-t border-white/10 bg-white/[0.02]">
+                    <button 
+                      onClick={submitQuiz}
+                      disabled={submittingQuiz || Object.keys(quizAnswers).length < (activeQuiz.questions?.length || 0)}
+                      className="w-full py-5 bg-primary text-background rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-[0_20px_40px_rgba(0,224,255,0.3)] hover:scale-[1.02] transition-all disabled:opacity-30"
+                    >
+                      {submittingQuiz ? "Evaluating..." : "Submit Assessment"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="p-12 text-center space-y-8">
+                  <div className="flex justify-center">
+                    <div className={`w-24 h-24 rounded-full flex items-center justify-center border-4 ${quizResult.passed ? "bg-green-500/10 border-green-500 text-green-500" : "bg-red-500/10 border-red-500 text-red-500"}`}>
+                      {quizResult.passed ? <CheckCircle size={48} /> : <XCircle size={48} />}
+                    </div>
+                  </div>
+                  <div>
+                    <h2 className={`text-4xl font-black tracking-tighter ${quizResult.passed ? "text-green-500" : "text-red-500"}`}>
+                      {quizResult.passed ? "Assessment Passed!" : "Assessment Failed"}
+                    </h2>
+                    <p className="text-gray-400 mt-2 font-bold uppercase tracking-widest">
+                      Your Score: {Math.round((quizResult.score / quizResult.total_points) * 100)}%
+                    </p>
+                  </div>
+                  <p className="text-sm text-gray-500 max-w-sm mx-auto">
+                    {quizResult.passed 
+                      ? "Congratulations! You have demonstrated mastery of this module's core concepts." 
+                      : "Don't worry. Review the lessons and try again to improve your score."}
+                  </p>
+                  <button 
+                    onClick={() => {
+                      setActiveQuiz(null);
+                      setQuizResult(null);
+                      setQuizAnswers({});
+                    }}
+                    className="w-full py-4 bg-white/10 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/20 transition-all"
+                  >
+                    Close Result
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

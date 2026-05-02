@@ -49,3 +49,4 @@ class Video(Base):
     youtube_id = Column(String)
     duration = Column(Integer)
     position = Column(Integer)
+    is_preview = Column(Boolean, default=False)

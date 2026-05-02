@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { EffectState } from '@/lib/effects';
 import { effectsManager } from '@/lib/effects';
-import { WhiteboardView } from './WhiteboardView';
+// import { WhiteboardView } from './WhiteboardView';
 
 export function SpotlightOverlay() {
   const [effects, setEffects] = useState<EffectState>(effectsManager.getState());
@@ -143,10 +143,11 @@ export function VisualEffects({ state }: { state?: EffectState }) {
 
   return (
     <>
-      {/* Whiteboard Layer */}
-      <WhiteboardView />
+      {/* Whiteboard Layer - Deprecated */}
+      {/* <WhiteboardView /> */}
 
-      {/* Render all active effects */}
+      {/* Render all active effects (Deprecated) */}
+      {/* 
       {effects?.spotlight.active && (
         <SpotlightOverlay />
       )}
@@ -160,6 +161,7 @@ export function VisualEffects({ state }: { state?: EffectState }) {
           ))}
         </div>
       )}
+      */}
     </>
   );
 }

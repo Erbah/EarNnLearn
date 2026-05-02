@@ -4,7 +4,7 @@ CediTrees 2.0 — Marketplace API Router
 Course publishing, enrollment, reviews, certificates, and creator analytics.
 Supports the global learning marketplace where creators earn through the referral economy.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from pydantic import BaseModel
@@ -17,12 +17,14 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.course import Course, Module, Video
 from app.models.marketplace import (
-    CourseCategory, CourseEnrollment, CourseReview, Certificate, Quiz
+    CourseCategory, CourseEnrollment, CourseReview, Certificate
 )
+from app.models.engagement import Quiz
 from app.models.learning import CoursePayment
 from app.models.transaction import ReferralIndex
 from app.models.notification import Notification
 from app.services.currency_engine import currency_engine
+from app.services.ingestion_service import ingestion_service
 
 router = APIRouter()
 
@@ -55,6 +57,7 @@ class VideoCreate(BaseModel):
     youtube_id: str
     duration: int = 0
     position: int = 0
+    is_preview: bool = False
 
 class ReviewCreate(BaseModel):
     rating: int  # 1-5
@@ -230,11 +233,11 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
     module_data = []
     for m in modules:
         videos = db.query(Video).filter(Video.module_id == m.id).order_by(Video.position).all()
-        quizzes = db.query(Quiz).filter(Quiz.module_id == m.id).order_by(Quiz.position).all()
+        quizzes = db.query(Quiz).filter(Quiz.module_id == m.id).all()
         module_data.append({
             "id": m.id, "title": m.title, "position": m.position,
-            "videos": [{"id": v.id, "title": v.title, "youtube_id": v.youtube_id, "duration": v.duration} for v in videos],
-            "quizzes": [{"id": q.id, "question": q.question, "options": [q.option_a, q.option_b, q.option_c, q.option_d]} for q in quizzes]
+            "videos": [{"id": v.id, "title": v.title, "youtube_id": v.youtube_id, "duration": v.duration, "is_preview": v.is_preview} for v in videos],
+            "quizzes": [{"id": q.id, "title": q.title, "question_count": len(q.questions)} for q in quizzes]
         })
 
     return {
@@ -253,7 +256,12 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
 #  CREATOR: COURSE PUBLISHING
 # ═══════════════════════════════════════
 @router.post("/create", response_model=CourseOut)
-def create_course(body: CourseCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_course(
+    body: CourseCreate, 
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
     """Create a new course (creator must have an RID)."""
     if not current_user.rid:
         raise HTTPException(status_code=403, detail="Activate your account first")
@@ -268,6 +276,10 @@ def create_course(body: CourseCreate, current_user: User = Depends(get_current_u
     db.add(course)
     db.commit()
     db.refresh(course)
+
+    # ── Trigger Ingestion ──
+    if body.playlist_url:
+        background_tasks.add_task(ingestion_service.process_playlist, course.id)
 
     # ── Notification ──
     try:
@@ -316,11 +328,18 @@ def add_module(course_id: str, body: ModuleCreate, current_user: User = Depends(
 @router.post("/modules/{module_id}/videos")
 def add_video(module_id: str, body: VideoCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Add a video to a module."""
-    video = Video(module_id=module_id, title=body.title, youtube_id=body.youtube_id, duration=body.duration, position=body.position)
+    video = Video(
+        module_id=module_id, 
+        title=body.title, 
+        youtube_id=body.youtube_id, 
+        duration=body.duration, 
+        position=body.position,
+        is_preview=body.is_preview
+    )
     db.add(video)
     db.commit()
     db.refresh(video)
-    return {"id": video.id, "title": video.title, "youtube_id": video.youtube_id}
+    return {"id": video.id, "title": video.title, "youtube_id": video.youtube_id, "is_preview": video.is_preview}
 
 
 # ═══════════════════════════════════════

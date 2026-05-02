@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.api.v1 import auth, wallet, codes, referral, admin, marketplace, learning, ai, payments, education, users
+from app.api.v1 import auth, wallet, codes, referral, admin, marketplace, learning, ai, payments, education, users, engagement
 
 # Import all models so Base.metadata knows about them
 from app.models.user import User
@@ -14,8 +14,9 @@ from app.models.course import Course, Module, Video
 from app.models.progress import CourseProgress
 from app.models.ai import AIUsage, AILesson, LessonProgress, LessonChat
 from app.models.admin import SystemSetting, Tier, AdminLog, Advertisement, Season
-from app.models.marketplace import CourseCategory, CourseEnrollment, CourseReview, Certificate, Quiz
 from app.models.learning import CoursePayment, VideoProgress
+from app.models.marketplace import CourseCategory, CourseEnrollment, CourseReview, Certificate
+from app.models.engagement import Quiz, QuizQuestion, QuizOption, QuizAttempt, Discussion, DiscussionReply
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -160,6 +161,7 @@ def create_app() -> FastAPI:
     app.include_router(ai.router, prefix=f"{settings.API_V1_STR}/ai", tags=["AI Tutor"])
     app.include_router(payments.router, prefix=f"{settings.API_V1_STR}/payments", tags=["Payment Simulator"])
     app.include_router(education.router, prefix=f"{settings.API_V1_STR}/education", tags=["Education Management"])
+    app.include_router(engagement.router, prefix=f"{settings.API_V1_STR}/engagement", tags=["Engagement & Quizzes"])
     app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["User Profile & Onboarding"])
 
     @app.get("/health")

@@ -42,6 +42,8 @@ class AILesson(Base):
     
     # Lesson content structure
     scenes = Column(JSON, default=[])  # Array of scene objects
+    curriculum_metadata = Column(JSON, default={}) # Full LessonAi Framework (Sections A-I)
+    module_id = Column(String, index=True, nullable=True)  # UAI Index Reference
     
     target_duration_minutes = Column(Integer, default=30)
     
@@ -69,6 +71,9 @@ class LessonProgress(Base):
     current_scene = Column(Integer, default=0)
     completed_scenes = Column(Integer, default=0)
     total_scenes = Column(Integer, default=0)
+    
+    # OCE v2 Indexing
+    module_id = Column(String, index=True, nullable=True)  # UAI (e.g., UAI-CODE-1.1.1)
     
     completed = Column(Boolean, default=False)
     completion_verified = Column(Boolean, default=False)  # Set only if score >= 60%
@@ -128,5 +133,53 @@ class SubjectRoadmap(Base):
     learning_goal = Column(String, nullable=True)  # exam, career, interest
     teacher_id = Column(String, nullable=True) # Prepare for Teacher/Admin mode
     
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class KnowledgeSource(Base):
+    """
+    Uploaded academic materials for the Global AI Library.
+    Supports PDF, EPUB, DOCX, TXT, PPT, CSV, and scanned documents.
+    """
+    __tablename__ = "knowledge_sources"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    uploader_rid = Column(String, index=True, nullable=False)
+
+    # Document metadata
+    title = Column(String, nullable=False)
+    filename = Column(String, nullable=False)
+    file_type = Column(String, nullable=False)  # pdf, epub, docx, txt, pptx, csv
+    file_size_bytes = Column(Integer, default=0)
+    file_path = Column(String, nullable=False)  # Storage path
+
+    # Extracted metadata
+    author = Column(String, nullable=True)
+    isbn = Column(String, nullable=True)
+    edition = Column(String, nullable=True)
+    subject = Column(String, index=True, nullable=True)
+    description = Column(Text, nullable=True)
+
+    # Processing pipeline
+    status = Column(String, default="uploaded")  # uploaded, processing, indexed, failed, rejected
+    chunk_count = Column(Integer, default=0)
+    page_count = Column(Integer, default=0)
+
+    # Source classification
+    source_type = Column(String, default="user_upload")  # user_upload, institutional, ai_generated, public_domain
+    is_ai_generated = Column(Boolean, default=False)
+    ai_confidence = Column(Numeric(5, 2), nullable=True)
+
+    # Governance
+    is_approved = Column(Boolean, default=False)
+    approved_by = Column(String, nullable=True)
+    is_shared = Column(Boolean, default=True)  # Available in Global AI Library
+    moderation_notes = Column(Text, nullable=True)
+
+    # Quality
+    quality_score = Column(Numeric(5, 2), default=0.0)
+    usage_count = Column(Integer, default=0)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -8,7 +8,7 @@ import { LessonOrchestrator } from "@/lib/orchestration";
 import { effectsManager } from "@/lib/effects";
 import { SpotlightOverlay, LaserPointer, HighlightBox } from "@/components/VisualEffects";
 import { VisualEffects } from "@/components/VisualEffects";
-import type { AgentAction, LessonSceneWithActions, QuizQuestion } from "@/types/openmaic";
+import type { AgentAction, LessonSceneWithActions, QuizQuestion } from "@/types/lesson";
 import confetti from "canvas-confetti";
 import { AriaOrb } from "@/components/AriaOrb";
 import { cleanLessonContent } from "@/lib/content";

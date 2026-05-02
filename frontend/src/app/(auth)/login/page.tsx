@@ -53,29 +53,41 @@ export default function LoginPage() {
         }
       }
     } catch (err: any) {
-      const data = err.response?.data;
-      const status = err.response?.status;
+      const responseData = err.response?.data;
+      const responseStatus = err.response?.status;
       
-      console.error("Login Error Details:", {
-        message: err.message,
-        status,
-        data
-      });
+      // Robust detailed logging to diagnose the "Details: {}" issue
+      console.error("DEBUG: Login Error Full Object:", err);
+      console.error("DEBUG: Login Error Message:", err.message);
+      console.error("DEBUG: Login Response Status:", responseStatus);
+      console.error("DEBUG: Login Response Data:", JSON.stringify(responseData, null, 2));
       
-      let errorMessage = "Invalid email or password";
+      let errorMessage = "An unexpected error occurred. Please try again.";
       
       if (err.message === "Network Error") {
-        errorMessage = "Connection refused. Please ensure the backend server is running.";
-      } else if (data && data.detail) {
-        if (Array.isArray(data.detail)) {
-          errorMessage = data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
-        } else {
-          errorMessage = data.detail;
+        errorMessage = `Connection refused. Backend server at ${API_BASE_URL} might be down.`;
+      } else if (responseStatus === 422) {
+        // Specifically handle FastAPI validation errors (e.g. JSON vs Form mismatch)
+        errorMessage = "Backend validation error (422). Possible data format mismatch.";
+        if (responseData?.detail) {
+          errorMessage += ": " + (typeof responseData.detail === 'string' 
+            ? responseData.detail 
+            : JSON.stringify(responseData.detail));
         }
-      } else if (status === 404) {
-        errorMessage = "Login service not found. Please contact support.";
-      } else if (status >= 500) {
-        errorMessage = "Server error. Please try again later.";
+      } else if (responseData?.detail) {
+        if (Array.isArray(responseData.detail)) {
+          errorMessage = responseData.detail.map((d: any) => d.msg || JSON.stringify(d)).join(", ");
+        } else {
+          errorMessage = responseData.detail;
+        }
+      } else if (responseStatus === 401) {
+        errorMessage = "Invalid email or password.";
+      } else if (responseStatus === 404) {
+        errorMessage = `Login service not found (404) at ${API_BASE_URL}. Check your configuration.`;
+      } else if (responseStatus === 502) {
+        errorMessage = "Gateway error (502). The authentication service might be unreachable.";
+      } else if (responseStatus >= 500) {
+        errorMessage = "Server error (500). Please try again later.";
       }
       
       setError(errorMessage);

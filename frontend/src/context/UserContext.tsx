@@ -68,6 +68,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setError(errorMsg);
       setUser(null); // Ensure user is cleared on error
       console.error("Failed to fetch user:", err);
+      if (err.code) console.error("Error Code:", err.code);
+      if (err.config) console.error("Request Config:", err.config.url, err.config.baseURL);
     } finally {
       setLoading(false);
     }

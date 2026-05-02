@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { API_BASE_URL } from '@/lib/api';
+import { API_BASE_URL, api } from '@/lib/api';
 import {
   ReactFlow,
   Background,
@@ -111,29 +111,19 @@ export default function NetworkTree() {
   useEffect(() => {
     async function fetchTree() {
       try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_BASE_URL}/api/v1/network/tree-view`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        if (!res.ok) {
-          setError('Failed to load network tree');
-          setLoading(false);
-          return;
-        }
-        
-        const tree: TreeData = await res.json();
+        const res = await api.get('/api/v1/network/tree-view');
+        const tree: TreeData = res.data;
         const { nodes: layoutNodes, edges: layoutEdges } = layoutTree(tree);
         setNodes(layoutNodes);
         setEdges(layoutEdges);
       } catch (err) {
-        setError('Failed to connect to server');
+        setError('Failed to load network tree');
       } finally {
         setLoading(false);
       }
     }
     fetchTree();
-  }, []);
+  }, [setNodes, setEdges]);
 
   if (loading) {
     return (

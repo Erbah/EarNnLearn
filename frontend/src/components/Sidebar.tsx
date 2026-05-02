@@ -31,7 +31,7 @@ const navItems = [
   { name: "Network", href: "/network", icon: Network, roles: ["USER"] },
   { name: "Courses", href: "/courses", icon: GraduationCap, roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "AI Studio", href: "/education-studio", icon: Wand2, roles: ["USER", "EDUCATION_ADMIN", "SUPER_ADMIN"] },
-  { name: "Creator", href: "/creator", icon: ArrowRightLeft, roles: ["USER"] },
+  { name: "Creator", href: "/creator", icon: ArrowRightLeft, roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Platform Admin", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Education Admin", href: "/education", icon: GraduationCap, roles: ["EDUCATION_ADMIN", "SUPER_ADMIN"] },
 ];

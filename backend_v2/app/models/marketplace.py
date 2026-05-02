@@ -54,15 +54,3 @@ class Certificate(Base):
     certificate_code = Column(String, unique=True)  # Verifiable code
 
 
-class Quiz(Base):
-    __tablename__ = "quizzes"
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    module_id = Column(String, nullable=False, index=True)
-    question = Column(Text, nullable=False)
-    option_a = Column(String, nullable=False)
-    option_b = Column(String, nullable=False)
-    option_c = Column(String, nullable=True)
-    option_d = Column(String, nullable=True)
-    correct_answer = Column(String, nullable=False)  # "a", "b", "c", "d"
-    position = Column(Integer, default=0)

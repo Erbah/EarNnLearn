@@ -104,6 +104,193 @@ function CoursePanel() {
   );
 }
 
+function QuizDetailModal({ quiz, onClose }: { quiz: any; onClose: () => void }) {
+  const [details, setDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/api/v1/engagement/quizzes/${quiz.id}`)
+      .then(res => setDetails(res.data))
+      .finally(() => setLoading(false));
+  }, [quiz.id]);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+        className="w-full max-w-4xl max-h-[90vh] bg-[#111827] border border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden"
+      >
+        <div className="p-8 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+          <div>
+            <h2 className="text-2xl font-black text-white tracking-tighter flex items-center gap-3">
+              <HelpCircle className="text-primary" />
+              {quiz.title}
+            </h2>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Quiz Oversight & Configuration</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/10 transition-colors">
+            <FilterX className="w-6 h-6 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+          {loading ? (
+            <div className="py-20 text-center text-gray-500">Retrieving quiz architecture...</div>
+          ) : (
+            <>
+              {/* Questions */}
+              <div className="space-y-6">
+                <h3 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  Assessment Logic ({details.questions?.length || 0} Questions)
+                </h3>
+                <div className="grid grid-cols-1 gap-4">
+                  {details.questions?.map((q: any, idx: number) => (
+                    <div key={q.id} className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 relative group">
+                      <span className="absolute top-6 right-8 text-primary/20 font-black text-4xl group-hover:text-primary/40 transition-colors">{idx + 1}</span>
+                      <p className="text-white font-bold mb-4 pr-12">{q.question_text}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {q.options?.map((o: any) => (
+                          <div key={o.id} className={`p-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest border ${o.is_correct ? "bg-green-500/10 border-green-500/20 text-green-400" : "bg-white/5 border-white/5 text-gray-500"}`}>
+                            {o.option_text}
+                            {o.is_correct && <span className="float-right">✓ Correct</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function QuizzesPanel() {
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedQuiz, setSelectedQuiz] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [qRes, sRes] = await Promise.all([
+          api.get(`${API}/quizzes`),
+          api.get(`${API}/quizzes/stats`)
+        ]);
+        setQuizzes(qRes.data);
+        setStats(sRes.data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="p-10 text-center text-gray-500">Loading assessments...</div>;
+  if (error) return <div className="p-10 text-center text-red-500">Error: {error}</div>;
+
+  return (
+    <div className="space-y-8">
+      {/* Quiz Stats */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-card/70 border border-white/5 rounded-2xl p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
+              <HelpCircle className="w-6 h-6 text-orange-400" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Total Quizzes</div>
+              <div className="text-xl font-bold text-white">{stats.total_quizzes}</div>
+            </div>
+          </div>
+          <div className="bg-card/70 border border-white/5 rounded-2xl p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Users className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Total Attempts</div>
+              <div className="text-xl font-bold text-white">{stats.total_attempts}</div>
+            </div>
+          </div>
+          <div className="bg-card/70 border border-white/5 rounded-2xl p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Avg. Pass Rate</div>
+              <div className="text-xl font-bold text-white">{stats.avg_pass_rate}%</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quiz List */}
+      <div className="bg-card/70 border border-white/5 rounded-[2rem] p-8">
+        <div className="flex justify-between items-center mb-8">
+          <h3 className="text-lg font-bold text-white">📋 Active Assessments</h3>
+          <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">Platform Wide Oversight</div>
+        </div>
+
+        <div className="grid gap-4">
+          {quizzes.length > 0 ? quizzes.map(quiz => (
+            <div 
+              key={quiz.id} 
+              onClick={() => setSelectedQuiz(quiz)}
+              className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 flex justify-between items-center hover:border-primary/20 transition-all group cursor-pointer"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                  <HelpCircle className="w-5 h-5 text-gray-400 group-hover:text-primary" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-white">{quiz.title}</h4>
+                  <div className="text-[10px] text-gray-500 flex gap-4 mt-1 font-bold uppercase tracking-wider">
+                    <span>Course: {quiz.course_id.slice(0, 8)}</span>
+                    <span className={quiz.pass_rate > 70 ? 'text-emerald-500' : 'text-orange-400'}>
+                      {quiz.pass_rate}% Pass Rate
+                    </span>
+                    <span>{quiz.total_attempts} Attempts</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-6">
+                <div className="text-right">
+                  <div className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Passing Threshold</div>
+                  <div className="text-sm font-bold text-white">{quiz.passing_score}%</div>
+                </div>
+                <button className="p-2 hover:bg-white/5 rounded-lg text-gray-400">
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )) : (
+            <div className="p-10 text-center text-gray-500 border border-dashed border-white/10 rounded-2xl">
+              No quizzes found on the platform.
+            </div>
+          )}
+        </div>
+        {selectedQuiz && (
+          <QuizDetailModal 
+            quiz={selectedQuiz} 
+            onClose={() => setSelectedQuiz(null)} 
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProgressPanel() {
   const [progress, setProgress] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -526,7 +713,7 @@ export default function EducationAdminPage() {
         {activeTab === 'lessons' && <LessonsPanel />}
         {activeTab === 'courses' && <CoursePanel />}
         {activeTab === 'progress' && <ProgressPanel />}
-        {activeTab === 'quizzes' && <div className="p-20 text-center text-gray-500 border border-dashed border-white/10 rounded-3xl">Quiz Management Module Coming Soon</div>}
+        {activeTab === 'quizzes' && <QuizzesPanel />}
       </motion.div>
     </div>
   );

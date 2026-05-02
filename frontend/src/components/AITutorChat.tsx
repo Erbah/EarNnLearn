@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { Send, User, Bot, AlertCircle, Maximize2, Minimize2, X } from "lucide-react";
-import { whiteboardManager } from "@/lib/whiteboard";
+// import { whiteboardManager } from "@/lib/whiteboard";
 import { AriaOrb } from "@/components/AriaOrb";
 import { cleanLessonContent } from "@/lib/content";
 
@@ -68,121 +68,9 @@ export default function AITutorChat({
   }, []);
 
   const processWhiteboardCommands = (text: string) => {
-    // 🎬 Visual Sequence Engine Parser (v1)
-    let remainingText = text;
-    let sequenceStartIndex;
-    
-    while ((sequenceStartIndex = remainingText.indexOf("[VISUAL_SEQUENCE:")) !== -1) {
-      let bracketCount = 0;
-      let braceCount = 0;
-      let endIndex = -1;
-      
-      for (let i = sequenceStartIndex; i < remainingText.length; i++) {
-        if (remainingText[i] === "[") bracketCount++;
-        else if (remainingText[i] === "]") bracketCount--;
-        else if (remainingText[i] === "{") braceCount++;
-        else if (remainingText[i] === "}") braceCount--;
-        
-        if (bracketCount === 0 && braceCount === 0 && i > sequenceStartIndex + 15) {
-          endIndex = i;
-          break;
-        }
-      }
-
-      if (endIndex !== -1) {
-        const rawTag = remainingText.substring(sequenceStartIndex, endIndex + 1);
-        try {
-          const jsonStart = rawTag.indexOf("{");
-          const jsonEnd = rawTag.lastIndexOf("}");
-          if (jsonStart !== -1 && jsonEnd !== -1) {
-            let commandJson = rawTag.substring(jsonStart, jsonEnd + 1).trim();
-            
-            // --- 🛡️ STEEL-PLATED JSON CLEANER ---
-            // Remove markdown code fences if the AI wrapped the JSON
-            commandJson = commandJson.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
-            
-            const sequenceData = JSON.parse(commandJson);
-            whiteboardManager.runSequence(sequenceData);
-          }
-        } catch (err) {
-          console.error("Error parsing visual sequence:", err);
-        }
-        remainingText = remainingText.substring(0, sequenceStartIndex) + remainingText.substring(endIndex + 1);
-      } else { break; }
-    }
-
-    // 🎨 Legacy Whiteboard Command Extractor
-    let startIndex;
-    while ((startIndex = remainingText.indexOf("[WHITEBOARD:")) !== -1) {
-      let bracketCount = 0;
-      let braceCount = 0;
-      let endIndex = -1;
-      
-      for (let i = startIndex; i < remainingText.length; i++) {
-        if (remainingText[i] === "[") bracketCount++;
-        else if (remainingText[i] === "]") bracketCount--;
-        else if (remainingText[i] === "{") braceCount++;
-        else if (remainingText[i] === "}") braceCount--;
-        
-        if (bracketCount === 0 && braceCount === 0 && i > startIndex + 12) {
-          endIndex = i;
-          break;
-        }
-      }
-
-      if (endIndex !== -1) {
-        const rawTag = remainingText.substring(startIndex, endIndex + 1);
-        try {
-          // Inner JSON is between the first '{' and the last '}' before the closing ']'
-          const jsonStart = rawTag.indexOf("{");
-          const jsonEnd = rawTag.lastIndexOf("}");
-          
-          if (jsonStart !== -1 && jsonEnd !== -1) {
-            let commandJson = rawTag.substring(jsonStart, jsonEnd + 1).trim();
-
-            // --- STEEL-PLATED JSON REPAIR LAYER ---
-            commandJson = commandJson.replace(/}\s*({)/g, '},$1');
-            commandJson = commandJson.replace(/]\s*({)/g, '],$1');
-            commandJson = commandJson.replace(/}\s*(\[)/g, '},$1');
-            commandJson = commandJson.replace(/,\s*([\]}])/g, '$1');
-            
-            const command = JSON.parse(commandJson);
-
-            // Execute drawing commands
-            if (command.action === "drawPath") {
-              whiteboardManager.drawPath(
-                command.points,
-                command.color || "#06b6d4",
-                command.width || 2,
-                command.duration || 500
-              );
-            } else if (command.action === "addText") {
-              whiteboardManager.addText({
-                content: command.content,
-                x: command.x,
-                y: command.y,
-                color: command.color || "#ffffff",
-                fontSize: command.fontSize || "16px",
-              });
-            } else if (command.action === "clear") {
-              whiteboardManager.clear();
-            }
-          }
-        } catch (err) {
-          console.error("Error parsing whiteboard command:", err);
-        }
-        
-        // Remove the processed tag from the text
-        remainingText = remainingText.substring(0, startIndex) + remainingText.substring(endIndex + 1);
-      } else {
-        // Unclosed tag - remove from this point forward to prevent UI leaks
-        remainingText = remainingText.substring(0, startIndex);
-        break;
-      }
-    }
-
-    // Use the global cleaner for equation formatting and whitespace normalization
-    return cleanLessonContent(remainingText);
+    // Deprecated: All visual sequence and whiteboard command parsing has been removed.
+    // The tutor now only returns cleaned natural language content.
+    return cleanLessonContent(text);
   };
 
   const handleSendMessage = async () => {
@@ -217,26 +105,18 @@ export default function AITutorChat({
         const rawContent = res.data.response;
         let cleanContent = "";
 
-        // --- 🧠 DUAL-CHANNEL COGNITION ORCHESTRATOR ---
+        // --- 🧠 SIMPLIFIED COGNITION ORCHESTRATOR ---
         try {
           // Attempt to parse the response as a Pure JSON reasoning object
           const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
           const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
 
-          if (parsed && typeof parsed.explanation === "string" && parsed.visual) {
-            // Priority 1: High-Fidelity Reasoning Protocol
+          if (parsed && typeof parsed.explanation === "string") {
             cleanContent = cleanLessonContent(parsed.explanation);
-            
-            // Execute Visual Sequence if present
-            if (parsed.visual.type === "sequence" && Array.isArray(parsed.visual.steps)) {
-              whiteboardManager.runSequence(parsed.visual);
-            }
           } else {
-            // Priority 2: Legacy Tag-Based Protocol
             cleanContent = processWhiteboardCommands(rawContent);
           }
         } catch (err) {
-          // Priority 3: Raw Text Fallback
           cleanContent = processWhiteboardCommands(rawContent);
         }
 
