@@ -56,7 +56,7 @@ class User(Base):
     preferred_style = Column(String, default="Balanced")
     onboarding_completed = Column(Boolean, default=False)
     last_onboarding_step = Column(Integer, default=0)
-    is_beta_user = Column(Boolean, default=False)
+    is_beta_user = Column(Boolean, default=True)
 
     # Relationships
     codes = relationship("Code", primaryjoin="User.rid == Code.owner_rid", foreign_keys="[Code.owner_rid]", overlaps="codes")

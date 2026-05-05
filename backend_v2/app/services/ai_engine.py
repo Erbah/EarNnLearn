@@ -195,8 +195,30 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
 """
         return persona_base.strip()
 
-    @staticmethod
-    def chat(user_message: str, context: dict, history: list = None, user: any = None) -> str:
+    @classmethod
+    def _get_active_model(cls, db: Session) -> tuple:
+        """
+        Fetches the active AI provider and model from SystemSettings.
+        Falls back to app Settings if not found in DB.
+        """
+        from app.models.admin import SystemSetting
+        from app.core.config import Settings
+        settings = Settings()
+        
+        provider = db.query(SystemSetting).filter(SystemSetting.key == "ai_provider").first()
+        model = db.query(SystemSetting).filter(SystemSetting.key == "ai_model").first()
+        custom_key = db.query(SystemSetting).filter(SystemSetting.key == "AI_API_KEY").first()
+        base_url = db.query(SystemSetting).filter(SystemSetting.key == "ai_base_url").first()
+        
+        active_provider = provider.value if provider else settings.AI_PROVIDER
+        active_model = model.value if model else settings.AI_MODEL
+        active_api_key = custom_key.value if custom_key else None
+        active_base_url = base_url.value if base_url else None
+        
+        return active_provider, active_model, active_api_key, active_base_url
+
+    @classmethod
+    def chat(cls, user_message: str, context: dict, db: Session, history: list = None, user: any = None) -> str:
         """
         The Master AI Chat Engine with History and Flexible Persona.
         Routes requests through LiteLLM with contextual awareness.
@@ -211,9 +233,12 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
         topic = context.get("topic", "the current subject")
         role = context.get("tutor_role", "tutor")
         
+        # 0. Get Active Model from DB
+        active_provider, active_model, active_api_key, active_base_url = cls._get_active_model(db)
+        
         # If provider is mock, use the legacy random response system
-        if settings.AI_PROVIDER == "mock":
-            return AITutorEngine._mock_chat_fallback(user_message, topic, role)
+        if active_provider == "mock":
+            return cls._mock_chat_fallback(user_message, topic, role)
 
         import litellm
         import os
@@ -226,11 +251,22 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 "deepseek": settings.DEEPSEEK_API_KEY,
             }
             
-            model = settings.AI_MODEL
-            api_key = api_keys.get(settings.AI_PROVIDER)
+            # Use dynamic model
+            model = active_model
+            # Priority: 1. DB Custom Key, 2. settings.py Key
+            api_key = active_api_key or api_keys.get(active_provider)
 
-            if not api_key:
-                return f"[Config Error] API Key for {settings.AI_PROVIDER} is missing."
+            # 🛑 Elite: Fallback to environment model if DB model is clearly blank
+            if not model or model == "":
+                 model = settings.AI_MODEL
+
+            # 🛑 Elite: Handle generic providers (Ollama, DeepSeek, etc.)
+            # If the provider is not one of the majors, we assume the model string 
+            # contains the provider prefix (e.g., 'ollama/qwen')
+            
+            if not api_key and active_provider not in ["mock", "google", "openai", "anthropic", "deepseek"]:
+                 # Check if we have a generic API key set in env
+                 api_key = os.getenv("AI_API_KEY")
 
             # Explicitly set environment variable for LiteLLM
             env_key_map = {
@@ -239,8 +275,8 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 "deepseek": "DEEPSEEK_API_KEY",
                 "anthropic": "ANTHROPIC_API_KEY"
             }
-            if settings.AI_PROVIDER in env_key_map:
-                os.environ[env_key_map[settings.AI_PROVIDER]] = api_key
+            if active_provider in env_key_map:
+                os.environ[env_key_map[active_provider]] = api_key or ""
 
             # ---------------------------------------------------------
             # 1. MESSAGE CONSTRUCTION (Memory Management)
@@ -275,19 +311,25 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             })
 
             # Execute the call with a safe token limit for diagrams
-            print(f"DEBUG: Calling Master AI Engine with model={model} and {len(messages)} messages")
-            response = litellm.completion(
-                model=model, 
-                messages=messages,
-                max_tokens=3000 # Increased headroom for detailed chat answers
-            )
+            print(f"DEBUG: Calling Master AI Engine with model={model} and {len(messages)} messages (BaseURL: {active_base_url})")
+            
+            # Construct LiteLLM completion args
+            completion_args = {
+                "model": model,
+                "messages": messages,
+                "max_tokens": 3000
+            }
+            if active_base_url:
+                completion_args["api_base"] = active_base_url
+
+            response = litellm.completion(**completion_args)
             
             return response.choices[0].message.content
 
         except Exception as e:
-            error_msg = f"AI Provider Error ({settings.AI_PROVIDER}): {str(e)}"
+            error_msg = f"AI Provider Error ({active_provider}): {str(e)}"
             print(error_msg)
-            return f"DEBUG: {error_msg}\n\nFALLBACK: {AITutorEngine._mock_chat_fallback(user_message, topic, role)}"
+            return f"DEBUG: {error_msg}\n\nFALLBACK: {cls._mock_chat_fallback(user_message, topic, role)}"
 
     @staticmethod
     def _mock_chat_fallback(user_message: str, topic: str, role: str) -> str:
@@ -326,7 +368,48 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
     # ═══════════════════════════════════════════
 
     @staticmethod
-    def generate_roadmap(db: Session, user_rid: str, subject: str, timeout: int = 60) -> dict:
+    def _get_context_from_source(db: Session, source_id: str, query: str, limit: int = 5) -> str:
+        """
+        Retrieves relevant text chunks from a knowledge source.
+        Uses a simple keyword search since we aren't using a Vector DB yet.
+        """
+        from app.models.ai import KnowledgeChunk
+        from sqlalchemy import or_
+        
+        if not source_id:
+            return ""
+            
+        # Clean query for search
+        keywords = [word.lower() for word in query.split() if len(word) > 3]
+        
+        query_obj = db.query(KnowledgeChunk).filter(KnowledgeChunk.source_id == source_id)
+        
+        if keywords:
+            # Search for chunks containing any of the keywords
+            # We also prioritize chunks found in the first 20 pages if it's a ToC search
+            filters = [KnowledgeChunk.content.ilike(f"%{kw}%") for kw in keywords]
+            chunks = query_obj.filter(or_(*filters)).order_by(KnowledgeChunk.page_number).limit(limit).all()
+        else:
+            chunks = []
+            
+        if not chunks:
+            # Fallback: get first chunks (beginning of document)
+            chunks = query_obj.order_by(KnowledgeChunk.page_number).limit(limit).all()
+
+        if not chunks:
+            return ""
+            
+        context_str = "\n\n### 📚 SOURCE CONTEXT (PRIORITY INFORMATION)\n"
+        context_str += "The following segments are extracted from the user's uploaded material. Prioritize this information for accuracy:\n\n"
+        
+        for chunk in chunks:
+            context_str += f"--- [Page {chunk.page_number}] ---\n"
+            context_str += f"{chunk.content}\n\n"
+            
+        return context_str
+
+    @classmethod
+    def generate_roadmap(cls, db: Session, user_rid: str, subject: str, source_id: str = None, timeout: int = 60) -> dict:
         """
         Phase 1: Generates a complete structured curriculum for a subject.
         Persists it to the subject_roadmaps table.
@@ -335,9 +418,21 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
         settings = Settings()
         import litellm
         import os
+        # 0. Get Active Model from DB
+        active_provider, active_model, active_api_key, active_base_url = cls._get_active_model(db)
+        
         # Ensure LiteLLM can find the API key
-        if settings.AI_PROVIDER == "google" and settings.GOOGLE_API_KEY:
-            os.environ["GEMINI_API_KEY"] = settings.GOOGLE_API_KEY
+        env_key_map = {
+            "google": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY"
+        }
+        
+        if active_provider in env_key_map:
+            # Priority: 1. DB Key, 2. ENV Key
+            fallback_key = getattr(settings, f"{active_provider.upper()}_API_KEY", None)
+            os.environ[env_key_map[active_provider]] = active_api_key or fallback_key or ""
 
         try:
             # Check for existing valid roadmap with same subject
@@ -348,13 +443,33 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             if existing:
                 return existing
 
-            prompt = ROADMAP_PROMPT.format(subject=subject)
+            # 2. RAG Context Injection
+            source_context = ""
+            if source_id:
+                # 🚀 PRIORITY: Find Table of Contents for roadmaps
+                source_context = cls._get_context_from_source(db, source_id, "Contents Index Chapters Table", limit=25)
+                
+                # If the ToC search yielded little or nothing, try the subject as well
+                if len(source_context) < 1000:
+                    extra_context = cls._get_context_from_source(db, source_id, subject, limit=5)
+                    if extra_context:
+                        source_context += "\n" + extra_context
 
-            response = litellm.completion(
-                model=settings.AI_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                timeout=timeout
-            )
+            # 3. Construct Prompt
+            prompt = ROADMAP_PROMPT.format(subject=subject)
+            if source_context:
+                prompt = source_context + "\n\n" + prompt
+
+            # Construct LiteLLM completion args
+            completion_args = {
+                "model": active_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "timeout": timeout
+            }
+            if active_base_url:
+                completion_args["api_base"] = active_base_url
+
+            response = litellm.completion(**completion_args)
             raw_text = response.choices[0].message.content
             # Extract JSON from response (handle markdown code blocks)
             import re as _re
@@ -623,7 +738,7 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
 
 
     @classmethod
-    def generate_lesson_chapter(cls, db: Session, user_rid: str, topic: str, section_key: str, difficulty: str = "beginner", education_level: str = "Self-Learning", learner_goal: str = "General Mastery", style: str = "balanced", mode: str = "normal", retry_count: int = 0, deficiencies: list = None, uai: str = None, timeout: int = 60) -> list:
+    def generate_lesson_chapter(cls, db: Session, user_rid: str, topic: str, section_key: str, difficulty: str = "beginner", education_level: str = "Self-Learning", learner_goal: str = "General Mastery", style: str = "balanced", mode: str = "normal", retry_count: int = 0, deficiencies: list = None, uai: str = None, source_id: str = None, timeout: int = 60) -> list:
         """
         Generates a modular chapter of a lesson using the OCE (Omni-Curriculum Engine) Protocol.
         """
@@ -637,9 +752,21 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
         import os
         
         settings = Settings()
+        # 0. Get Active Model from DB
+        active_provider, active_model, active_api_key, active_base_url = cls._get_active_model(db)
+
         # Ensure LiteLLM can find the API key
-        if settings.AI_PROVIDER == "google" and settings.GOOGLE_API_KEY:
-            os.environ["GEMINI_API_KEY"] = settings.GOOGLE_API_KEY
+        env_key_map = {
+            "google": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY"
+        }
+        
+        if active_provider in env_key_map:
+            # Priority: 1. DB Key, 2. Settings Key
+            fallback_key = getattr(settings, f"{active_provider.upper()}_API_KEY", None)
+            os.environ[env_key_map[active_provider]] = active_api_key or fallback_key or ""
         start_time = time.time()
         perf_log = AIPerformanceLog(
             user_rid=user_rid,
@@ -647,8 +774,8 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             subject="AI Tutor", # Could be passed in
             topic=topic,
             operation_metadata={"section": section_key, "mode": mode, "retry": retry_count},
-            model_name=settings.AI_MODEL,
-            provider="LiteLLM"
+            model_name=active_model,
+            provider=active_provider
         )
 
         try:
@@ -689,6 +816,13 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             section_name = section_key.replace("_", " ").title()
             instr = SECTION_INSTRUCTIONS.get(section_key, "Provide detailed content.")
             
+            # 2. RAG Context Injection
+            source_context = ""
+            if source_id:
+                # Use module/chapter name as query for RAG
+                source_context = cls._get_context_from_source(db, source_id, section_name, limit=5)
+
+            # 3. Prompt Construction
             prompt = LESSON_SECTION_PROMPT.format(
                 topic=topic,
                 section_name=section_name,
@@ -698,6 +832,9 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 module_id=uai or "N/A",
                 whiteboard_protocol=WHITEBOARD_PROTOCOL
             )
+            
+            if source_context:
+                prompt = source_context + "\n\n" + prompt
 
             # Pass full context to Persona Engine
             system_context = {
@@ -715,15 +852,20 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
 
             system_instruction = cls.get_system_instruction(role="AI Tutor", topic=topic, context=system_context)
 
-            response = litellm.completion(
-                model=settings.AI_MODEL,
-                messages=[
+            # Construct LiteLLM completion args
+            completion_args = {
+                "model": active_model,
+                "messages": [
                     {"role": "system", "content": system_instruction},
                     {"role": "user", "content": prompt + retry_feedback}
                 ],
-                max_tokens=4000, # Elite Depth headroom
-                timeout=timeout
-            )
+                "max_tokens": 4000,
+                "timeout": timeout
+            }
+            if active_base_url:
+                completion_args["api_base"] = active_base_url
+
+            response = litellm.completion(**completion_args)
             raw_content = response.choices[0].message.content
 
             # --- 🛑 SELF-HEALING [CONTINUE] LOOP (v17) ---
@@ -737,7 +879,7 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                     {"role": "user", "content": "Please continue from exactly where you left off. Do not repeat headers or preamble. Complete the remaining sections of the Elite Protocol."}
                 ]
                 continuation = litellm.completion(
-                    model=settings.AI_MODEL,
+                    model=active_model,
                     messages=followup_messages,
                     max_tokens=2500,
                     timeout=timeout

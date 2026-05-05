@@ -9,10 +9,11 @@ Full control center for the platform:
 - Season control
 - Analytics overview
 """
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from pydantic import BaseModel
+from typing import Annotated
 from datetime import datetime, timedelta
 from decimal import Decimal
 import uuid
@@ -29,14 +30,11 @@ from app.models.course import Course
 from app.models.notification import Notification
 from app.services.code_engine import generate_admin_rid
 from app.services.ai_engine import ai_tutor_engine
+from app.core.permissions import require_super_admin, require_education_admin, ROLE_SUPER_ADMIN, ROLE_EDUCATION_ADMIN
 
 router = APIRouter()
 
-# ─── Helper: Admin-Only Guard ───
-def require_super_admin(user: User):
-    if user.role != "SUPER_ADMIN":
-        raise HTTPException(status_code=403, detail="Super Admin access required")
-
+# ─── Elevation / Auth Logic ───
 class AdminLoginRequest(BaseModel):
     admin_password: str
 
@@ -61,7 +59,7 @@ def login_admin(body: AdminLoginRequest, db: Session = Depends(get_db)):
         db.commit()
     
     # Find the actual super admin user to issue a real token
-    admin_user = db.query(User).filter(User.role == "SUPER_ADMIN").first()
+    admin_user = db.query(User).filter(User.role == ROLE_SUPER_ADMIN).first()
     if not admin_user:
         raise HTTPException(status_code=500, detail="No Super Admin user found in database")
 
@@ -72,10 +70,12 @@ def login_admin(body: AdminLoginRequest, db: Session = Depends(get_db)):
     return {"status": "authenticated", "tier_type": "admin", "token": new_token}
 
 @router.put("/credentials")
-def update_admin_credentials(body: CredentialUpdateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def update_admin_credentials(
+    body: CredentialUpdateRequest, 
+    current_user: Annotated[User, Depends(require_super_admin)], 
+    db: Session = Depends(get_db)
+):
     """Update the root admin master password."""
-    require_super_admin(current_user)
-    
     setting = db.query(SystemSetting).filter(SystemSetting.key == "ADMIN_PASSWORD").first()
     
     if setting:
@@ -90,16 +90,7 @@ def update_admin_credentials(body: CredentialUpdateRequest, current_user: User =
     db.commit()
     return {"status": "success", "detail": "Admin credentials updated"}
 
-# ─── Helpers: Role-Only Guards ───
 ADMIN_SECRET = "erbah1983"
-
-def require_super_admin(user: User):
-    if user.role != "SUPER_ADMIN":
-        raise HTTPException(status_code=403, detail="Super Admin access required")
-
-def require_education_admin(user: User):
-    if user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
-        raise HTTPException(status_code=403, detail="Education Admin access required")
 
 class ElevateRequest(BaseModel):
     admin_password: str
@@ -110,17 +101,17 @@ def elevate_to_admin(body: ElevateRequest, current_user: User = Depends(get_curr
     if body.admin_password != ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin credential")
     
-    current_user.role = "SUPER_ADMIN"
+    current_user.role = ROLE_SUPER_ADMIN
     db.commit()
     
     # Issue a fresh token so next requests pass the role check correctly if needed
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     sub_claim = current_user.rid if current_user.rid else current_user.email
     new_token = create_access_token(
-        data={"sub": sub_claim, "role": "SUPER_ADMIN"}, expires_delta=access_token_expires
+        data={"sub": sub_claim, "role": ROLE_SUPER_ADMIN}, expires_delta=access_token_expires
     )
     
-    return {"status": "elevated", "role": "SUPER_ADMIN", "token": new_token}
+    return {"status": "elevated", "role": ROLE_SUPER_ADMIN, "token": new_token}
 
 
 # ═══════════════════════════════════════
@@ -247,13 +238,18 @@ class NotificationOut(BaseModel):
 class CourseApprovalRequest(BaseModel):
     reason: str | None = None
 
+class AIConfigUpdate(BaseModel):
+    provider: str
+    model: str
+    api_key: str | None = None
+    base_url: str | None = None
+
 
 # ═══════════════════════════════════════
 #  DASHBOARD OVERVIEW / ANALYTICS
 # ═══════════════════════════════════════
 @router.get("/analytics", response_model=AnalyticsOut)
-def get_analytics(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def get_analytics(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     
     total_users = db.query(func.count(User.id)).scalar() or 0
     activated_users = db.query(func.count(User.id)).filter(User.rid != None).scalar() or 0
@@ -294,13 +290,11 @@ def get_analytics(current_user: User = Depends(get_current_user), db: Session = 
 #  SYSTEM SETTINGS
 # ═══════════════════════════════════════
 @router.get("/settings", response_model=list[SettingOut])
-def get_all_settings(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def get_all_settings(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     return db.query(SystemSetting).all()
 
 @router.put("/settings/{key}", response_model=SettingOut)
-def update_setting(key: str, body: SettingUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def update_setting(key: str, body: SettingUpdate, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
     if not setting:
         setting = SystemSetting(key=key, value=body.value)
@@ -315,16 +309,79 @@ def update_setting(key: str, body: SettingUpdate, current_user: User = Depends(g
 
 
 # ═══════════════════════════════════════
+#  AI MODEL MANAGEMENT
+# ═══════════════════════════════════════
+@router.get("/ai-settings")
+def get_ai_settings(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """Get active AI provider and model configuration."""
+    
+    provider = db.query(SystemSetting).filter(SystemSetting.key == "ai_provider").first()
+    model = db.query(SystemSetting).filter(SystemSetting.key == "ai_model").first()
+    base_url = db.query(SystemSetting).filter(SystemSetting.key == "ai_base_url").first()
+    
+    from app.core.config import Settings
+    settings_obj = Settings()
+    
+    return {
+        "active_provider": provider.value if provider else settings_obj.AI_PROVIDER,
+        "active_model": model.value if model else settings_obj.AI_MODEL,
+        "active_base_url": base_url.value if base_url else None,
+        "is_custom": provider is not None or model is not None
+    }
+
+@router.put("/ai-settings")
+def update_ai_settings(body: AIConfigUpdate, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """Dynamically switch AI models and providers (Qwen, DeepSeek, Ollama, etc.)"""
+    
+    # 1. Update Provider
+    provider_setting = db.query(SystemSetting).filter(SystemSetting.key == "ai_provider").first()
+    if not provider_setting:
+        provider_setting = SystemSetting(key="ai_provider", value=body.provider, description="Active AI Provider (openai, google, deepseek, ollama, etc.)")
+        db.add(provider_setting)
+    else:
+        provider_setting.value = body.provider
+        
+    # 2. Update Model
+    model_setting = db.query(SystemSetting).filter(SystemSetting.key == "ai_model").first()
+    if not model_setting:
+        model_setting = SystemSetting(key="ai_model", value=body.model, description="Specific LLM Model String")
+        db.add(model_setting)
+    else:
+        model_setting.value = body.model
+        
+    # 3. Optional: Update Global API Key if provided
+    if body.api_key:
+        key_setting = db.query(SystemSetting).filter(SystemSetting.key == "AI_API_KEY").first()
+        if not key_setting:
+            key_setting = SystemSetting(key="AI_API_KEY", value=body.api_key, description="Universal AI API Key override")
+            db.add(key_setting)
+        else:
+            key_setting.value = body.api_key
+            
+    # 4. Optional: Update Base URL (for Ollama Cloud / Self-hosted)
+    if body.base_url:
+        url_setting = db.query(SystemSetting).filter(SystemSetting.key == "ai_base_url").first()
+        if not url_setting:
+            url_setting = SystemSetting(key="ai_base_url", value=body.base_url, description="Base URL for AI Provider (e.g. Ollama Cloud)")
+            db.add(url_setting)
+        else:
+            url_setting.value = body.base_url
+
+    db.add(AdminLog(admin_rid=current_user.rid, action="Updated AI Master Strategy", details={"provider": body.provider, "model": body.model}))
+    db.commit()
+    
+    return {"status": "success", "message": f"AI Strategy updated to {body.model} via {body.provider}"}
+
+
+# ═══════════════════════════════════════
 #  TIER MANAGEMENT
 # ═══════════════════════════════════════
 @router.get("/tiers", response_model=list[TierOut])
-def get_tiers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def get_tiers(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     return db.query(Tier).all()
 
 @router.put("/tiers/{tier_name}", response_model=TierOut)
-def update_tier(tier_name: str, body: TierUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def update_tier(tier_name: str, body: TierUpdate, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     tier = db.query(Tier).filter(Tier.name == tier_name).first()
     if not tier:
         raise HTTPException(status_code=404, detail="Tier not found")
@@ -348,8 +405,7 @@ def update_tier(tier_name: str, body: TierUpdate, current_user: User = Depends(g
 #  CODE GENERATION
 # ═══════════════════════════════════════
 @router.post("/codes/generate")
-def generate_codes(body: CodeGenRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def generate_codes(body: CodeGenRequest, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     
     owner = body.owner_rid or current_user.rid
     codes_created = []
@@ -390,9 +446,8 @@ def generate_codes(body: CodeGenRequest, current_user: User = Depends(get_curren
     return {"generated": len(codes_created), "codes": codes_created}
 
 @router.get("/codes/sessions", response_model=list[CodeGenerationSessionOut])
-def get_generation_sessions(limit: int = 20, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_generation_sessions(current_user: Annotated[User, Depends(require_super_admin)], limit: int = 20, db: Session = Depends(get_db)):
     """Retrieve history of RID generation sessions for AI analysis."""
-    require_super_admin(current_user)
     return db.query(CodeGenerationSession).order_by(desc(CodeGenerationSession.created_at)).limit(limit).all()
 
 @router.get("/ai/advice", response_model=AIAdviceOut)
@@ -402,14 +457,13 @@ def get_ai_advice(
     platform_share: float,
     seller_share: float,
     family_share: float,
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(require_super_admin)],
     db: Session = Depends(get_db)
 ):
     """
     Active AI Advisor: Analyzes current configuration against heuristics 
     and historical trends to provide optimization advice.
     """
-    require_super_admin(current_user)
     
     advice_parts = []
     score = 100
@@ -463,12 +517,11 @@ def get_ai_advice(
 
 
 @router.get("/ai/strategy", response_model=AIStrategyOut)
-def get_ai_strategy(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_ai_strategy(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     """
     Global Platform Advisor: Evaluates long-term ecosystem health 
     based on aggregated generation sessions.
     """
-    require_super_admin(current_user)
     
     sessions = db.query(CodeGenerationSession).order_by(desc(CodeGenerationSession.created_at)).limit(50).all()
     
@@ -535,8 +588,7 @@ def get_ai_strategy(current_user: User = Depends(get_current_user), db: Session 
 
 
 @router.get("/codes")
-def list_codes(search: str | None = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def list_codes(current_user: Annotated[User, Depends(require_super_admin)], search: str | None = None, db: Session = Depends(get_db)):
     
     q = db.query(Code)
     if search:
@@ -564,8 +616,7 @@ def list_codes(search: str | None = None, current_user: User = Depends(get_curre
     ]
 
 @router.get("/codes/stats")
-def get_code_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def get_code_stats(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     
     total = db.query(func.count(Code.id)).scalar() or 0
     used = db.query(func.count(Code.id)).filter(Code.used == True).scalar() or 0
@@ -580,8 +631,7 @@ def get_code_stats(current_user: User = Depends(get_current_user), db: Session =
 import uuid
 
 @router.put("/codes/{code_id}")
-def update_code_tier(code_id: str, body: CodeUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def update_code_tier(code_id: str, body: CodeUpdate, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     
     # Cast to UUID to avoid SQLAlchemy error
     try:
@@ -608,8 +658,7 @@ def update_code_tier(code_id: str, body: CodeUpdate, current_user: User = Depend
     return {"status": "success"}
 
 @router.delete("/codes/{code_id}")
-def delete_individual_code(code_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def delete_individual_code(code_id: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     try:
         u_id = uuid.UUID(code_id)
     except ValueError:
@@ -628,8 +677,7 @@ def delete_individual_code(code_id: str, current_user: User = Depends(get_curren
     return {"status": "success"}
 
 @router.delete("/codes/sessions/{session_id}")
-def delete_generation_session(session_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def delete_generation_session(session_id: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     try:
         s_id = uuid.UUID(session_id)
     except ValueError:
@@ -656,8 +704,7 @@ def delete_generation_session(session_id: str, current_user: User = Depends(get_
     return {"status": "success", "message": msg, "deleted_count": deleted_count, "kept_used": used_count}
 
 @router.delete("/codes/purge-unused")
-def purge_all_unused_codes(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def purge_all_unused_codes(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     deleted_count = db.query(Code).filter(Code.used == False).delete(synchronize_session=False)
     db.add(AdminLog(admin_rid=current_user.rid, action="Purged all unused RIDs", details={"deleted_count": deleted_count}))
     db.commit()
@@ -668,13 +715,11 @@ def purge_all_unused_codes(current_user: User = Depends(get_current_user), db: S
 #  USER MANAGEMENT
 # ═══════════════════════════════════════
 @router.get("/users", response_model=list[UserOut])
-def list_users(skip: int = 0, limit: int = 50, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def list_users(current_user: Annotated[User, Depends(require_super_admin)], skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
     return db.query(User).offset(skip).limit(limit).all()
 
 @router.get("/users/{rid}")
-def get_user_detail(rid: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def get_user_detail(rid: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     user = db.query(User).filter(User.rid == rid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -699,8 +744,7 @@ def get_user_detail(rid: str, current_user: User = Depends(get_current_user), db
     }
 
 @router.post("/users/{rid}/suspend")
-def suspend_user(rid: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def suspend_user(rid: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     user = db.query(User).filter(User.rid == rid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -710,8 +754,7 @@ def suspend_user(rid: str, current_user: User = Depends(get_current_user), db: S
     return {"status": "User suspended"}
 
 @router.post("/users/{rid}/activate")
-def reactivate_user(rid: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def reactivate_user(rid: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     user = db.query(User).filter(User.rid == rid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -721,8 +764,7 @@ def reactivate_user(rid: str, current_user: User = Depends(get_current_user), db
     return {"status": "User reactivated"}
 
 @router.post("/users/{rid}/adjust-wallet")
-def adjust_wallet(rid: str, amount: float, reason: str = "Admin adjustment", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def adjust_wallet(rid: str, amount: float, current_user: Annotated[User, Depends(require_super_admin)], reason: str = "Admin adjustment", db: Session = Depends(get_db)):
     wallet = db.query(Wallet).filter(Wallet.user_rid == rid).first()
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet not found")
@@ -744,13 +786,11 @@ class SeasonCreate(BaseModel):
     end_date: datetime | None = None
 
 @router.get("/seasons")
-def list_seasons(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def list_seasons(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     return db.query(Season).order_by(desc(Season.start_date)).all()
 
 @router.post("/seasons")
-def create_season(body: SeasonCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def create_season(body: SeasonCreate, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     
     # Deactivate other seasons to ensure only one is active (optional but recommended)
     db.query(Season).filter(Season.is_active == True).update({"is_active": False})
@@ -770,15 +810,10 @@ def create_season(body: SeasonCreate, current_user: User = Depends(get_current_u
 def delete_season_rids(
     season_id: str, 
     confirmation_phrase: str,
+    current_user: Annotated[User, Depends(require_super_admin)], 
     password: str = None, # Optional but recommended
-    current_user: User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    """
-    Destructive action: Deletes all unused RID codes for a specific season.
-    Requires typing a specific phrase for safety.
-    """
-    require_super_admin(current_user)
     
     if confirmation_phrase != "DELETE RID SEASON":
         raise HTTPException(status_code=400, detail="Invalid confirmation phrase")
@@ -815,13 +850,11 @@ def delete_season_rids(
 #  COURSE APPROVALS
 # ═══════════════════════════════════════
 @router.get("/courses/pending")
-def list_pending_courses(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def list_pending_courses(current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     return db.query(Course).filter(Course.approval_status == "pending").order_by(desc(Course.created_at)).all()
 
 @router.post("/courses/{course_id}/approve")
-def approve_course(course_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def approve_course(course_id: str, current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -835,8 +868,7 @@ def approve_course(course_id: str, current_user: User = Depends(get_current_user
     return {"status": "success", "message": f"Course '{course.title}' approved and published."}
 
 @router.post("/courses/{course_id}/ai-review")
-def get_course_ai_review(course_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def get_course_ai_review(course_id: str, current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -851,8 +883,7 @@ def get_course_ai_review(course_id: str, current_user: User = Depends(get_curren
     return review
 
 @router.post("/courses/{course_id}/reject")
-def reject_course(course_id: str, body: CourseApprovalRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def reject_course(course_id: str, body: CourseApprovalRequest, current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -869,13 +900,11 @@ def reject_course(course_id: str, body: CourseApprovalRequest, current_user: Use
 #  NOTIFICATIONS
 # ═══════════════════════════════════════
 @router.get("/notifications", response_model=list[NotificationOut])
-def get_admin_notifications(limit: int = 50, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def get_admin_notifications(current_user: Annotated[User, Depends(require_education_admin)], limit: int = 50, db: Session = Depends(get_db)):
     return db.query(Notification).order_by(desc(Notification.created_at)).limit(limit).all()
 
 @router.post("/notifications/{note_id}/read")
-def mark_notification_read(note_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def mark_notification_read(note_id: str, current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     note = db.query(Notification).filter(Notification.id == note_id).first()
     if note:
         note.is_read = True
@@ -886,13 +915,11 @@ def mark_notification_read(note_id: str, current_user: User = Depends(get_curren
 #  WITHDRAWAL MANAGEMENT
 # ═══════════════════════════════════════
 @router.get("/withdrawals/pending", response_model=list[WithdrawalRequestOut])
-def get_pending_withdrawals(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def get_pending_withdrawals(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     return db.query(WithdrawalRequest).filter(WithdrawalRequest.status == "PENDING").all()
 
 @router.post("/withdrawals/{request_id}/approve")
-def approve_withdrawal(request_id: str, admin_notes: str = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def approve_withdrawal(request_id: str, current_user: Annotated[User, Depends(require_super_admin)], admin_notes: str = None, db: Session = Depends(get_db)):
     req = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -913,8 +940,7 @@ def approve_withdrawal(request_id: str, admin_notes: str = None, current_user: U
     return {"status": "success"}
 
 @router.post("/withdrawals/{request_id}/reject")
-def reject_withdrawal(request_id: str, reason: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def reject_withdrawal(request_id: str, reason: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     req = db.query(WithdrawalRequest).filter(WithdrawalRequest.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
@@ -951,6 +977,5 @@ def reject_withdrawal(request_id: str, reason: str, current_user: User = Depends
 #  ADMIN ACTIVITY LOGS
 # ═══════════════════════════════════════
 @router.get("/logs", response_model=list[AdminLogOut])
-def get_admin_logs(limit: int = 50, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_super_admin(current_user)
+def get_admin_logs(current_user: Annotated[User, Depends(require_super_admin)], limit: int = 50, db: Session = Depends(get_db)):
     return db.query(AdminLog).order_by(desc(AdminLog.created_at)).limit(limit).all()

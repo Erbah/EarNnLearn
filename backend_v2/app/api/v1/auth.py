@@ -1,6 +1,6 @@
 import uuid
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -34,7 +34,7 @@ def simulate_payment_webhook(tx_id: str, code_id: str, user_id: str):
         db.close()
 
 @router.post("/register", response_model=RegistrationResponse)
-def register_user(user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def register_user(response: Response, user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # 1. Check if user exists
     if db.query(User).filter(User.email == user_in.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -112,7 +112,18 @@ def register_user(user_in: UserCreate, background_tasks: BackgroundTasks, db: Se
     # 7. Generate Token for Activation Polling
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": new_user.email}, expires_delta=access_token_expires
+        data={"sub": new_user.email, "role": new_user.role}, expires_delta=access_token_expires
+    )
+    
+    # Set secure cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+        secure=True
     )
     
     return {
@@ -121,7 +132,7 @@ def register_user(user_in: UserCreate, background_tasks: BackgroundTasks, db: Se
     }
 
 @router.post("/login", response_model=Token)
-def login_for_access_token(login_data: LoginRequest, db: Session = Depends(get_db)):
+def login_for_access_token(response: Response, login_data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == login_data.email).first()
     if not user or not verify_password(login_data.password, user.password_hash):
         raise HTTPException(
@@ -136,8 +147,20 @@ def login_for_access_token(login_data: LoginRequest, db: Session = Depends(get_d
     sub_claim = user.rid if user.rid else user.email
     
     access_token = create_access_token(
-        data={"sub": sub_claim}, expires_delta=access_token_expires
+        data={"sub": sub_claim, "role": user.role}, expires_delta=access_token_expires
     )
+    
+    # Set secure cookie
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax", # Using lax for compatibility, strict might block some redirects
+        secure=False # Set to True in production
+    )
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me", response_model=UserResponse)

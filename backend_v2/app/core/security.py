@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import bcrypt
 from jose import jwt
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
@@ -30,12 +30,34 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
     return encoded_jwt
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def get_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+    token: str | None = None
+) -> User:
+    # 1. Try to get token from header via oauth2_scheme
+    # Note: oauth2_scheme (OAuth2PasswordBearer) is a callable that looks at the Authorization header
+    try:
+        from fastapi.security.utils import get_authorization_scheme_param
+        authorization = request.headers.get("Authorization")
+        scheme, param = get_authorization_scheme_param(authorization)
+        if scheme.lower() == "bearer":
+            token = param
+    except Exception:
+        pass
+
+    # 2. If no header token, try to get from cookie
+    if not token:
+        token = request.cookies.get("access_token")
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    if not token:
+        raise credentials_exception
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         sub: str = payload.get("sub")

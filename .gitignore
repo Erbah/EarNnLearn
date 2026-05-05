@@ -70,3 +70,7 @@ sync_db_final.py
 sync_db_safe.py
 test_*.py
 verify_paystack_*.py
+backend_v2/app/uploads/
+*.db-*
+*.txt
+scratch/

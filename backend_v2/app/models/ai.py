@@ -183,3 +183,22 @@ class KnowledgeSource(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class KnowledgeChunk(Base):
+    """
+    Chunks of text from KnowledgeSources for RAG (Retrieval-Augmented Generation).
+    """
+    __tablename__ = "knowledge_chunks"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    source_id = Column(String, index=True, nullable=False)
+
+    content = Column(Text, nullable=False)
+    page_number = Column(Integer, nullable=True)
+    chunk_index = Column(Integer, nullable=True)
+
+    # Metadata for potential filtering/ranking
+    extra_metadata = Column(JSON, default={})
+
+    created_at = Column(DateTime, default=datetime.utcnow)

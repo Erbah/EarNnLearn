@@ -6,9 +6,20 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     TESTING: bool = False
     
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "SUPER_SECRET_KEY_FOR_JWT_SIGNATURE_OVERRIDE_IN_PROD")
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
+    # Root User Seeding
+    ROOT_USER_EMAIL: str = os.getenv("ROOT_USER_EMAIL", "root@ceditrees.com")
+    ROOT_USER_PASSWORD: str = os.getenv("ROOT_USER_PASSWORD", "rootpass123")
+    
+    # CORS Configuration
+    BACKEND_CORS_ORIGINS: str = os.getenv("BACKEND_CORS_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://[::1]:3000,http://[::1]:3001,http://[::1]:3002")
+    
+    @property
+    def CORS_ORIGINS_LIST(self) -> list[str]:
+        return [s.strip() for s in self.BACKEND_CORS_ORIGINS.split(",") if s.strip()]
+
     # Database — defaults to SQLite for local dev, override with env vars for Postgres in prod
     DATABASE_BACKEND: str = os.getenv("DATABASE_BACKEND", "sqlite")
     

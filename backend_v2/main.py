@@ -25,18 +25,9 @@ def create_app() -> FastAPI:
         debug=True
     )
 
-    origins = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:3002",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "http://127.0.0.1:3002",
-    ]
-
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=settings.CORS_ORIGINS_LIST,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -50,15 +41,16 @@ def create_app() -> FastAPI:
         
         # Ensure tables exist
         Base.metadata.create_all(bind=engine)
+        print(f"CORS Allowed Origins: {settings.CORS_ORIGINS_LIST}")
         
         db = SessionLocal()
         try:
             existing = db.query(User).first()
             if not existing:
                 root_rid = "ACNIRP"
-                hashed = bcrypt.hashpw("rootpass123".encode(), bcrypt.gensalt()).decode()
+                hashed = bcrypt.hashpw(settings.ROOT_USER_PASSWORD.encode(), bcrypt.gensalt()).decode()
                 root_user = User(
-                    rid=root_rid, name="Platform Root", email="root@ceditrees.com",
+                    rid=root_rid, name="Platform Root", email=settings.ROOT_USER_EMAIL,
                     phone="000-0000", password_hash=hashed, tier_type="admin", 
                     role="SUPER_ADMIN", status="active"
                 )

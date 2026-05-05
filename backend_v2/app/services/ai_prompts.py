@@ -100,8 +100,9 @@ Return a single JSON object with these exact keys representing the sections in t
 
 ### 🛑 CRITICAL RULES
 1. **Academic Rigor**: The structure must be deeply detailed and academically progressive.
-2. **Textbook Quality**: Group topics into Parts, Units, Chapters, and Lessons.
-3. **No Preamble**: Output ONLY the JSON.
+2. **Source Mirroring**: If SOURCE CONTEXT is provided, you MUST prioritize following its chapters, sections, and pedagogical flow. Use the provided Table of Contents as your primary architectural blueprint.
+3. **Textbook Quality**: Group topics into Parts, Units, Chapters, and Lessons.
+4. **No Preamble**: Output ONLY the JSON.
 """
 
 # 🧠 PHASE 2: LESSON SECTION GENERATION (ELITE PROTOCOL - OCE v2)
@@ -155,6 +156,7 @@ You MUST generate content in the following 6-part structure using the exact Mark
 * NEVER end mid-sentence or mid-paragraph.
 * ALWAYS complete the final section ("Bridge to Next Section") before stopping.
 * **If nearing output limits**: Finish the current section cleanly and end with exactly: [CONTINUE]
+* **SOURCE FIDELITY**: If SOURCE CONTEXT is provided, you MUST use its definitions, examples, and logic. Prioritize the textbook's specific approach over generic knowledge.
 
 ## 🔬 DEPTH & FORMATTING
 * **Elite Depth**: Prioritize intuitive reasoning over simple definitions.

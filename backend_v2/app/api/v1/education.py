@@ -7,14 +7,16 @@ Management of educational content:
 - Quiz administration
 - Student progress monitoring
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from pydantic import BaseModel
+from typing import Annotated
 from datetime import datetime
 import os, shutil
 from app.core.database import get_db, SessionLocal
 from app.core.security import get_current_user
+from app.core.permissions import require_education_admin, require_super_admin
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.models.user import User
 from app.models.course import Course, Module, Video
@@ -23,26 +25,20 @@ from app.models.engagement import Quiz, QuizAttempt
 from app.models.progress import CourseProgress
 from app.models.ai import AILesson, LessonProgress, LessonChat, SubjectRoadmap, KnowledgeSource
 from app.services.ai_engine import ai_tutor_engine
+from app.services.document_service import document_service
 from app.services.ai_prompts import SECTION_INSTRUCTIONS
 
 router = APIRouter()
-
-# ─── Helpers: Role Guard ───
-def require_education_admin(user: User):
-    if user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
-        raise HTTPException(status_code=403, detail="Education Admin access required")
 
 # ═══════════════════════════════════════
 #  COURSE MANAGEMENT
 # ═══════════════════════════════════════
 @router.get("/courses")
-def list_all_courses(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def list_all_courses(current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     return db.query(Course).all()
 
 @router.get("/courses/{course_id}/stats")
-def get_course_admin_stats(course_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def get_course_admin_stats(course_id: str, current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     
     enrollments = db.query(func.count(CourseEnrollment.id)).filter(CourseEnrollment.course_id == course_id).scalar() or 0
     completions = db.query(func.count(CourseEnrollment.id)).filter(
@@ -63,12 +59,11 @@ def get_course_admin_stats(course_id: str, current_user: User = Depends(get_curr
 # ═══════════════════════════════════════
 @router.get("/students/progress")
 def monitor_all_progress(
+    current_user: Annotated[User, Depends(require_education_admin)], 
     course_id: str | None = None, 
     skip: int = 0, limit: int = 50,
-    current_user: User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-    require_education_admin(current_user)
     q = db.query(CourseProgress)
     if course_id:
         q = q.filter(CourseProgress.course_id == course_id)
@@ -86,8 +81,7 @@ class QuizCreate(BaseModel):
     passing_score: int = 70
 
 @router.post("/quizzes")
-def create_quiz(body: QuizCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def create_quiz(body: QuizCreate, current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     quiz = Quiz(**body.dict())
     db.add(quiz)
     db.commit()
@@ -96,11 +90,10 @@ def create_quiz(body: QuizCreate, current_user: User = Depends(get_current_user)
 
 @router.get("/quizzes")
 def list_all_quizzes(
+    current_user: Annotated[User, Depends(require_education_admin)],
     course_id: str | None = None,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    require_education_admin(current_user)
     query = db.query(Quiz)
     if course_id:
         query = query.filter(Quiz.course_id == course_id)
@@ -124,8 +117,7 @@ def list_all_quizzes(
     return result
 
 @router.get("/quizzes/stats")
-def get_global_quiz_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    require_education_admin(current_user)
+def get_global_quiz_stats(current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
     total_quizzes = db.query(func.count(Quiz.id)).scalar() or 0
     total_attempts = db.query(func.count(QuizAttempt.id)).scalar() or 0
     passed_attempts = db.query(func.count(QuizAttempt.id)).filter(QuizAttempt.passed == True).scalar() or 0
@@ -154,6 +146,7 @@ class GenerateLessonRequest(BaseModel):
     target_duration_minutes: int
     uai: str | None = None
     roadmap_id: str | None = None
+    source_id: str | None = None
 
 @router.get("/roadmaps")
 def list_roadmaps(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -163,11 +156,12 @@ def list_roadmaps(current_user: User = Depends(get_current_user), db: Session = 
 @router.post("/roadmaps/generate")
 def generate_subject_roadmap(
     subject: str,
+    source_id: str | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Phase 1: Generate or retrieve a subject roadmap."""
-    roadmap = ai_tutor_engine.generate_roadmap(db, current_user.rid, subject)
+    roadmap = ai_tutor_engine.generate_roadmap(db, current_user.rid, subject, source_id=source_id)
     # Handle error dict if generation failed
     if isinstance(roadmap, dict) and "error" in roadmap:
         return roadmap
@@ -195,19 +189,27 @@ def get_roadmap_details(
     completed_topics = 0
     
     for unit in units:
+        if not isinstance(unit, dict):
+            continue
+            
         unit_topics = unit.get("topics", [])
         total_topics += len(unit_topics)
         unit_completed = 0
         
         for topic in unit_topics:
-            tid = topic.get("id")
+            tid = None
+            if isinstance(topic, dict):
+                tid = topic.get("id")
+            
+            if not tid: continue
+
             status = (roadmap.progress or {}).get(tid, {}).get("status", "not_started")
             if status == "completed":
                 unit_completed += 1
                 completed_topics += 1
         
         unit_stats.append({
-            "title": unit.get("title"),
+            "title": unit.get("title", "Untitled Unit"),
             "total_topics": len(unit_topics),
             "completed_topics": unit_completed,
             "is_completed": (unit_completed == len(unit_topics)) if unit_topics else False
@@ -278,7 +280,7 @@ def update_roadmap_config(
     db.commit()
     return {"status": "success", "guided_mode": roadmap.guided_mode}
 
-def generate_deep_lesson_scenes(db: Session, user_rid: str, topic: str, difficulty: str, education_level: str, learner_goal: str, style: str, uai: str | None = None):
+def generate_deep_lesson_scenes(db: Session, user_rid: str, topic: str, difficulty: str, education_level: str, learner_goal: str, style: str, uai: str | None = None, source_id: str | None = None):
     """
     Phase 3: Parallel Assembly Pipeline (Chapter Concurrency).
     Generates textbook-level lesson scenes for a specific topic with depth validation in parallel.
@@ -308,6 +310,7 @@ def generate_deep_lesson_scenes(db: Session, user_rid: str, topic: str, difficul
                 learner_goal=learner_goal,
                 style=style,
                 uai=uai,
+                source_id=source_id,
                 timeout=60 # Pass timeout to litellm
             )
             thread_db.commit()
@@ -369,7 +372,7 @@ def generate_lesson(
 
             r_db = SessionLocal()
             try:
-                return ai_tutor_engine.generate_roadmap(r_db, current_user.rid, body.topic, timeout=60)
+                return ai_tutor_engine.generate_roadmap(r_db, current_user.rid, body.topic, source_id=body.source_id, timeout=60)
             except Exception as e:
                 print(f"WARNING: Roadmap generation failed (non-fatal): {str(e)}")
                 return None
@@ -386,7 +389,8 @@ def generate_lesson(
                 education_level=body.education_level,
                 learner_goal=body.learner_goal,
                 style=body.style,
-                uai=body.uai
+                uai=body.uai,
+                source_id=body.source_id
             )
             roadmap_future = outer_executor.submit(generate_roadmap_threaded)
             
@@ -480,12 +484,12 @@ def get_lesson(
 
 @router.get("/lessons")
 def list_lessons(
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(require_education_admin)],
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 50
 ):
-    """List all lessons"""
+    """List all lessons (Admin View)"""
     lessons = db.query(AILesson).offset(skip).limit(limit).all()
     return {
         "lessons": [
@@ -783,7 +787,8 @@ def send_chat_message(
             user_message=user_message,
             history=history,
             context={"topic": lesson.topic, "tutor_role": tutor_role},
-            user=current_user
+            user=current_user,
+            db=db
         )
     except Exception as e:
         print(f"Education API Chat Error: {str(e)}")
@@ -844,6 +849,7 @@ ALLOWED_EXTENSIONS = {".pdf", ".epub", ".docx", ".txt", ".pptx", ".csv"}
 
 @router.post("/knowledge/upload")
 async def upload_knowledge_source(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
@@ -864,7 +870,7 @@ async def upload_knowledge_source(
     title = os.path.splitext(file.filename)[0].replace("_", " ").replace("-", " ").title()
 
     source = KnowledgeSource(
-        uploader_rid=user.referral_id,
+        uploader_rid=user.rid,
         title=title,
         filename=file.filename,
         file_type=ext.lstrip("."),
@@ -877,6 +883,18 @@ async def upload_knowledge_source(
     db.add(source)
     db.commit()
     db.refresh(source)
+
+    # 🚀 Trigger Indexing in the Background
+    # We pass a fresh session for the background task
+    from app.core.database import SessionLocal
+    def run_indexing(source_id):
+        new_db = SessionLocal()
+        try:
+            document_service.index_document(new_db, source_id)
+        finally:
+            new_db.close()
+
+    background_tasks.add_task(run_indexing, source.id)
 
     return {
         "id": source.id,
@@ -963,3 +981,100 @@ async def get_knowledge_source(
         "usage_count": source.usage_count,
         "created_at": source.created_at.isoformat() if source.created_at else None
     }
+
+
+@router.get("/knowledge/{source_id}/topics")
+async def get_source_topics(
+    source_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """
+    Retrieves or generates a Table of Contents (Units/Topics) for a specific book.
+    Used for the dynamic Topic Explorer in the Knowledge Forge.
+    """
+    source = db.query(KnowledgeSource).filter(KnowledgeSource.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Knowledge source not found")
+
+    # 1. Check for existing SubjectRoadmap for this specific source/subject
+    # (Note: In this implementation, we treat the roadmap as the source of truth for TOC)
+    subject = source.subject or source.title
+    roadmap = db.query(SubjectRoadmap).filter(
+        SubjectRoadmap.user_rid == user.rid,
+        SubjectRoadmap.subject.ilike(subject)
+    ).first()
+
+    if not roadmap:
+        # 🚀 Phase 1: Fast Roadmap Generation (Curriculum-Only)
+        # We use a 45s timeout to ensure the user isn't waiting indefinitely
+        roadmap = ai_tutor_engine.generate_roadmap(db, user.rid, subject, source_id=source_id, timeout=45)
+        
+        if isinstance(roadmap, dict) and "error" in roadmap:
+            # Fallback: return a basic structure if AI fails
+            return {
+                "source_id": source_id,
+                "title": source.title,
+                "units": [
+                    {
+                        "title": "General Concepts",
+                        "topics": [source.title]
+                    }
+                ]
+            }
+
+    # Extract clean units/topics for the frontend
+    roadmap_data = roadmap.roadmap_data if hasattr(roadmap, 'roadmap_data') else roadmap
+    units = roadmap_data.get("units", [])
+    
+    # 🛡️ Elite: Map legacy data structures if needed
+    formatted_units = []
+    for unit in units:
+        if not isinstance(unit, dict):
+            formatted_units.append({
+                "name": str(unit),
+                "topics": []
+            })
+            continue
+
+        topics = []
+        for topic in unit.get("topics", []):
+            if isinstance(topic, dict):
+                topics.append(topic.get("title", "Untitled Topic"))
+            else:
+                topics.append(str(topic))
+        
+        formatted_units.append({
+            "name": unit.get("title", "Untitled Unit"),
+            "topics": topics
+        })
+
+    return {
+        "source_id": source_id,
+        "title": source.title,
+        "units": formatted_units
+    }
+
+
+@router.post("/knowledge/{source_id}/reindex")
+async def reindex_knowledge_source(
+    source_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """Manually trigger re-indexing of a knowledge source."""
+    source = db.query(KnowledgeSource).filter(KnowledgeSource.id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Knowledge source not found")
+
+    from app.core.database import SessionLocal
+    def run_indexing(sid):
+        new_db = SessionLocal()
+        try:
+            document_service.index_document(new_db, sid)
+        finally:
+            new_db.close()
+
+    background_tasks.add_task(run_indexing, source.id)
+    return {"message": "Re-indexing started in the background."}

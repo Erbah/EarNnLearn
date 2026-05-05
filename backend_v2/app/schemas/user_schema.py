@@ -40,6 +40,7 @@ class UserResponse(BaseModel):
     preferred_style: str | None = "Balanced"
     onboarding_completed: bool = False
     last_onboarding_step: int = 0
+    is_beta_user: bool = True
     
     class Config:
         from_attributes = True
