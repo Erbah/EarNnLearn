@@ -9,13 +9,7 @@ export default function AdminPage() {
   const { user, loading } = useUser();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!loading && (!user || user.role !== 'SUPER_ADMIN')) {
-      router.push('/dashboard');
-    }
-  }, [user, loading, router]);
-
-  if (loading || !user || user.role !== 'SUPER_ADMIN') {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] text-gray-500 animate-pulse font-mono">
         Verifying Security Credentials...

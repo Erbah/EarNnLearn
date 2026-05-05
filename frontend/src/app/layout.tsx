@@ -1,11 +1,12 @@
 // Google Fonts removed to resolve Internal Server Error (font fetching failure)
 
 import type { Metadata } from "next";
+import { PLATFORM_NAME, PLATFORM_DESCRIPTION } from "@/lib/config";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "EarNnLearn",
-  description: "Standardizing Identity through Decentralized Learning",
+  title: PLATFORM_NAME,
+  description: PLATFORM_DESCRIPTION,
 };
 
 export default function RootLayout({

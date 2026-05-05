@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, ArrowRight, Cpu, Zap, Globe, Brain, Book, Upload, X, Library, FileText } from "lucide-react";
-import { api, API_BASE_URL as API } from "@/lib/api";
+import { Sparkles, ArrowRight, Cpu, Zap, Globe, Brain, Book, Upload, X, Library, FileText, ChevronDown, LayoutGrid } from "lucide-react";
+import { api } from "@/lib/api";
+
+const API = "/api/v1";
 
 interface ForgeIntakeProps {
   onComplete: (data: { topic: string; difficulty: string; style: string; source_id?: string }) => void;
@@ -16,8 +18,45 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
   const [showSources, setShowSources] = useState(false);
   const [selectedSource, setSelectedSource] = useState<{ id: string; name: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [showTopics, setShowTopics] = useState(false);
   const [librarySources, setLibrarySources] = useState<{id: string; title: string}[]>([]);
+  const [sourceTopics, setSourceTopics] = useState<{name: string; topics: string[]}[]>([]);
+  const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const topicsRef = useRef<HTMLDivElement>(null);
+
+  const TOPIC_CATEGORIES = [
+    {
+      name: "Computer Science",
+      icon: <Cpu className="w-4 h-4 text-primary" />,
+      topics: ["Python Programming", "Machine Learning", "Neural Networks", "Fullstack Development", "Cyber Security", "Cloud Architecture"]
+    },
+    {
+      name: "Business & Finance",
+      icon: <Zap className="w-4 h-4 text-yellow-400" />,
+      topics: ["Startup Scaling", "Venture Capital", "Financial Modeling", "Product Management", "Strategic Marketing", "Growth Engineering"]
+    },
+    {
+      name: "Physical Sciences",
+      icon: <Globe className="w-4 h-4 text-blue-400" />,
+      topics: ["Particle Physics", "Organic Chemistry", "Astrophysics", "Quantum Mechanics", "Thermodynamics", "Materials Science"]
+    },
+    {
+      name: "Mathematics",
+      icon: <Brain className="w-4 h-4 text-purple-400" />,
+      topics: ["Advanced Calculus", "Linear Algebra", "Game Theory", "Theoretical Mathematics", "Statistics", "Discrete Math"]
+    },
+    {
+      name: "Engineering",
+      icon: <Zap className="w-4 h-4 text-green-400" />,
+      topics: ["Robotics Engineering", "Structural Engineering", "Electrical Circuits", "Aerospace Design", "Civil Systems", "Bio-Engineering"]
+    },
+    {
+      name: "Humanities",
+      icon: <Book className="w-4 h-4 text-pink-400" />,
+      topics: ["Psychology", "Modern Philosophy", "World History", "Political Science", "Linguistics", "Sociology"]
+    }
+  ];
 
   // Effect to handle "Resonance" - background pulse based on input length/keywords
   useEffect(() => {
@@ -32,6 +71,33 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
       .then(res => setLibrarySources(res.data?.sources || []))
       .catch(() => setLibrarySources([]));
   }, [showSources]);
+
+  // Fetch topics when a source is selected
+  useEffect(() => {
+    if (selectedSource) {
+      setIsLoadingTopics(true);
+      api.get(`${API}/education/knowledge/${selectedSource.id}/topics`)
+        .then(res => {
+          setSourceTopics(res.data.units || []);
+          setShowTopics(true); // Auto-open explorer
+        })
+        .catch(() => setSourceTopics([]))
+        .finally(() => setIsLoadingTopics(false));
+    } else {
+      setSourceTopics([]);
+    }
+  }, [selectedSource]);
+
+  // Handle click outside for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (topicsRef.current && !topicsRef.current.contains(event.target as Node)) {
+        setShowTopics(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && prompt.trim().length > 3) {
@@ -110,20 +176,23 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
           <div className="relative">
             <button 
               onClick={() => setShowSources(!showSources)}
-              className={`p-4 ml-2 rounded-2xl transition-colors group/source ${selectedSource ? 'bg-primary/20 text-primary border border-primary/50' : 'hover:bg-white/5 text-gray-400'}`}
+              className={`p-3 md:p-4 ml-1 md:ml-2 rounded-2xl transition-colors group/source flex items-center gap-2 ${selectedSource ? 'bg-primary/20 text-primary border border-primary/50' : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10'}`}
               title="Add Knowledge Source"
             >
-              <Book className={`w-6 h-6 ${selectedSource ? 'animate-pulse' : ''}`} />
+              <Library className={`w-5 h-5 md:w-6 md:h-6 ${selectedSource ? 'animate-pulse text-primary' : 'text-gray-400 group-hover/source:text-white'}`} />
+              <span className="text-xs md:text-sm font-bold tracking-wide">
+                {selectedSource ? 'Source Attached' : 'Add Source'}
+              </span>
             </button>
 
             {/* Knowledge Source Dropdown */}
             <AnimatePresence>
               {showSources && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute bottom-full left-0 mb-4 w-80 bg-[#161b22] border border-white/10 rounded-3xl p-6 shadow-3xl z-50 backdrop-blur-xl"
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  className="absolute top-full left-0 mt-4 w-80 bg-[#161b22] border border-white/10 rounded-3xl p-6 shadow-3xl z-50 backdrop-blur-xl"
                 >
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
@@ -187,15 +256,118 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
             </AnimatePresence>
           </div>
 
+          <div className="relative" ref={topicsRef}>
+            <button 
+              onClick={() => { setShowTopics(!showTopics); setShowSources(false); }}
+              className={`p-3 md:p-4 ml-1 md:ml-2 rounded-2xl transition-colors group/topic flex items-center gap-2 ${showTopics ? 'bg-primary/20 text-primary border border-primary/50' : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10'}`}
+              title="Browse Topics"
+            >
+              <LayoutGrid className={`w-5 h-5 md:w-6 md:h-6 ${showTopics ? 'text-primary' : 'text-gray-400 group-hover/topic:text-white'}`} />
+              <ChevronDown className={`w-3 h-3 transition-transform ${showTopics ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Topics Dropdown */}
+            <AnimatePresence>
+              {showTopics && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  className="absolute top-full left-0 mt-4 w-[20rem] md:w-[32rem] bg-[#161b22]/95 border border-white/10 rounded-3xl p-6 shadow-3xl z-50 backdrop-blur-xl"
+                >
+                  <div className="flex items-center justify-between mb-6 px-2">
+                      <div className="flex items-center gap-2">
+                        <LayoutGrid className="w-4 h-4 text-primary" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white">Course & Topic Explorer</span>
+                      </div>
+                    <button onClick={() => setShowTopics(false)}>
+                      <X className="w-4 h-4 text-gray-500 hover:text-white" />
+                    </button>
+                  </div>
+
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                    {isLoadingTopics ? (
+                      <div key="topics-loading" className="col-span-full py-12 flex flex-col items-center gap-4">
+                        <Cpu className="w-8 h-8 text-primary animate-spin" />
+                        <span className="text-xs font-black uppercase tracking-[0.2em] text-gray-500">Mapping Knowledge Layers...</span>
+                      </div>
+                    ) : sourceTopics.length > 0 ? (
+                      sourceTopics.map((unit, uIdx) => (
+                        <div key={`unit-${uIdx}-${unit.name}`} className="space-y-3">
+                          <button 
+                            onClick={() => {
+                              setPrompt(unit.name);
+                              setShowTopics(false);
+                            }}
+                            className="w-full flex items-center gap-2 px-2 pb-1 border-b border-white/5 hover:border-primary/50 group/unit transition-colors text-left"
+                          >
+                            <Book className="w-3 h-3 text-primary group-hover/unit:scale-110 transition-transform" />
+                            <span className="text-[9px] font-black uppercase tracking-tighter text-gray-500 group-hover/unit:text-white transition-colors">Unit: {unit.name}</span>
+                          </button>
+                          <div className="grid grid-cols-1 gap-1">
+                            {unit.topics.map((topic) => (
+                              <button
+                                key={topic}
+                                onClick={() => {
+                                  setPrompt(topic);
+                                  setShowTopics(false);
+                                }}
+                                className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                              >
+                                {topic}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      TOPIC_CATEGORIES.map((category, cIdx) => (
+                        <div key={`cat-${cIdx}-${category.name}`} className="space-y-3">
+                          <button 
+                            onClick={() => {
+                              setPrompt(category.name);
+                              setShowTopics(false);
+                            }}
+                            className="w-full flex items-center gap-2 px-2 pb-1 border-b border-white/5 hover:border-primary/50 group/course transition-colors text-left"
+                          >
+                            <span className="group-hover/course:scale-110 transition-transform">{category.icon}</span>
+                            <span className="text-[9px] font-black uppercase tracking-tighter text-gray-500 group-hover/course:text-white transition-colors">Course: {category.name}</span>
+                          </button>
+                          <div className="grid grid-cols-1 gap-1">
+                            {category.topics.map((topic) => (
+                              <button
+                                key={topic}
+                                onClick={() => {
+                                  setPrompt(topic);
+                                  setShowTopics(false);
+                                }}
+                                className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                              >
+                                {topic}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <input
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            onFocus={() => setIsFocused(true)}
+            onFocus={() => {
+              setIsFocused(true);
+              if (!prompt) setShowTopics(true);
+            }}
             onBlur={() => setIsFocused(false)}
             onKeyDown={handleKeyDown}
             placeholder={selectedSource ? `Master ${selectedSource.name}...` : "e.g. Quantum Computing, Advanced Python..."}
-            className="flex-1 bg-transparent border-none py-6 px-8 text-xl md:text-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-0"
+            className="flex-1 bg-transparent border-none py-6 px-4 md:px-8 text-xl md:text-2xl text-white placeholder-gray-600 focus:outline-none focus:ring-0"
           />
           
           <button 

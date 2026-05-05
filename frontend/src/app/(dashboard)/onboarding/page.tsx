@@ -44,7 +44,7 @@ export default function OnboardingPage() {
     if (user?.last_onboarding_step && user.last_onboarding_step > 0 && currentStep === 0) {
       setCurrentStep(user.last_onboarding_step);
     }
-  }, [user]);
+  }, [user, currentStep]);
 
   // Phase 4: Logging Step Analytics
   const logStep = async (step: number, action: string) => {
@@ -59,6 +59,22 @@ export default function OnboardingPage() {
     }
   };
 
+  useEffect(() => {
+    // State Transitions based on current step
+    if (currentStep === 1) {
+      setAriaState("speaking");
+      setAriaMessage("What would you like to achieve with your learning?");
+    } else if (currentStep === 2) {
+      setAriaState("speaking");
+      setAriaMessage("Excellent. How do you prefer to absorb new concepts?");
+    } else if (currentStep === 3) {
+      triggerMagicalGeneration();
+    } else if (currentStep === 4) {
+      setAriaState("success");
+      setAriaMessage("Ready. I've prepared a roadmap uniquely for you.");
+    }
+  }, [currentStep]);
+
   const handleNextStep = async () => {
     const next = currentStep + 1;
     setCurrentStep(next);
@@ -66,44 +82,58 @@ export default function OnboardingPage() {
     
     // Persist step progress (Soft Re-entry)
     await axios.put("/api/v1/users/onboarding", { step: next });
-
-    // State Transitions
-    if (next === 1) {
-      setAriaState("speaking");
-      setAriaMessage("What would you like to achieve with your learning?");
-    } else if (next === 2) {
-      setAriaState("speaking");
-      setAriaMessage("Excellent. How do you prefer to absorb new concepts?");
-    } else if (next === 3) {
-      triggerMagicalGeneration();
-    }
   };
 
+  const isGeneratingRef = React.useRef(false);
+
   const triggerMagicalGeneration = async () => {
+    if (isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
+    
     setAriaState("thinking");
     setAriaMessage("One moment while I craft your path...");
     
-    // Simulate generation narrative
-    for (let i = 0; i < narrativeSteps.length; i++) {
-       setGenerationPhase(i);
-       await new Promise(r => setTimeout(r, 1200));
-    }
+    try {
+      // Simulate generation narrative
+      for (let i = 0; i < narrativeSteps.length; i++) {
+         setGenerationPhase(i);
+         await new Promise(r => setTimeout(r, 1200));
+      }
 
-    // Finalize Preferences & Onboarding
-    await axios.put("/api/v1/users/onboarding", {
-      learning_goal: goal,
-      preferred_style: style,
-      onboarding_completed: true
-    });
-    
-    setAriaState("success");
-    setAriaMessage("Ready. I've prepared a roadmap uniquely for you.");
-    setCurrentStep(4); // Preview
-    refreshUser();
+      // Finalize Preferences & Onboarding
+      await axios.put("/api/v1/users/onboarding", {
+        learning_goal: goal,
+        preferred_style: style,
+        onboarding_completed: true,
+        step: 4
+      });
+    } catch (e) {
+      console.error("Failed to complete onboarding generation API call:", e);
+      // Fallback: Ensure they are marked completed locally to avoid getting stuck forever
+    } finally {
+      setAriaState("success");
+      setAriaMessage("Ready. I've prepared a roadmap uniquely for you.");
+      setCurrentStep(4); // Preview
+      await refreshUser();
+      isGeneratingRef.current = false;
+    }
   };
 
   const startFirstLesson = () => {
     router.push("/dashboard"); // Or direct to first lesson topic if known
+  };
+
+  const skipOnboarding = async () => {
+    try {
+      await axios.put("/api/v1/users/onboarding", {
+        onboarding_completed: true
+      });
+      await refreshUser();
+      router.push("/dashboard");
+    } catch (e) {
+      console.error("Failed to skip onboarding:", e);
+      router.push("/dashboard");
+    }
   };
 
   const renderStepContent = () => {
@@ -115,9 +145,17 @@ export default function OnboardingPage() {
             <p className="text-muted-foreground mb-8 text-lg">
               No generic courses. No fluff. Just high-fidelity tutoring <br /> designed for your specific goals.
             </p>
-            <Button size="lg" onClick={handleNextStep} className="px-10 h-14 text-lg rounded-full">
-               Let's Get Started <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
+            <div className="flex flex-col items-center gap-4">
+              <Button size="lg" onClick={handleNextStep} className="px-10 h-14 text-lg rounded-full">
+                Let's Get Started <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+              <button 
+                onClick={skipOnboarding}
+                className="text-muted-foreground hover:text-primary transition-colors text-sm font-medium"
+              >
+                Skip for now, take me to dashboard
+              </button>
+            </div>
           </motion.div>
         );
 
@@ -245,8 +283,16 @@ export default function OnboardingPage() {
             />
           ))}
         </div>
-        <div className="text-sm font-bold text-muted-foreground">
-          Step {currentStep + 1} of {steps.length}
+        <div className="flex items-center gap-6">
+          <div className="text-sm font-bold text-muted-foreground">
+            Step {currentStep + 1} of {steps.length}
+          </div>
+          <button 
+            onClick={skipOnboarding}
+            className="text-[10px] uppercase font-black tracking-widest text-muted-foreground hover:text-primary transition-colors bg-white/5 px-3 py-1 rounded-full border border-white/10"
+          >
+            Skip
+          </button>
         </div>
       </div>
 

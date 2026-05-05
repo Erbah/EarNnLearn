@@ -25,6 +25,7 @@ export default function EducationStudio() {
   const [roadmap, setRoadmap] = useState<any>(null);
   const [generatedLessonId, setGeneratedLessonId] = useState<string | null>(null);
   const [generatedRoadmapId, setGeneratedRoadmapId] = useState<string | null>(null);
+  const [sourceId, setSourceId] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
 
@@ -39,13 +40,20 @@ export default function EducationStudio() {
   }, [searchParams]);
 
   // Phase 1: Architect Blueprint
-  const handleIntakeComplete = async (data: { topic: string; difficulty: string; style: string }) => {
+  const handleIntakeComplete = async (data: { topic: string; difficulty: string; style: string; source_id?: string }) => {
     setTopic(data.topic);
+    if (data.source_id) {
+      setSourceId(data.source_id);
+    }
     setLoading(true);
     setError(null);
     try {
       // Stage 1: Generate Roadmap
-      const res = await api.post(`${API}/education/roadmaps/generate?subject=${encodeURIComponent(data.topic)}`);
+      let url = `${API}/education/roadmaps/generate?subject=${encodeURIComponent(data.topic)}`;
+      if (data.source_id) {
+        url += `&source_id=${data.source_id}`;
+      }
+      const res = await api.post(url);
       if (res.status === 200 || res.status === 201) {
         // roadmap data is often wrapped in roadmap_data or directly
         const roadmapData = res.data.roadmap_data || res.data;
@@ -80,7 +88,8 @@ export default function EducationStudio() {
         objectives: roadmap?.units?.map((u: any) => u.title) || ["Master the core concepts"],
         style: "interactive",
         target_duration_minutes: 45,
-        roadmap_id: roadmap.id
+        roadmap_id: roadmap.id,
+        source_id: sourceId
       });
 
       if (res.status === 200 || res.status === 201) {

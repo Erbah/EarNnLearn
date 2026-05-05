@@ -6,8 +6,9 @@ import { ArrowRight, Lock, Mail, Loader2, Eye, EyeOff, ChevronLeft } from "lucid
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL, api } from "@/lib/api";
+import { PLATFORM_NAME, API_PREFIX } from "@/lib/config";
 
-const API = "/api/v1";
+const API = API_PREFIX;
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -56,16 +57,13 @@ export default function LoginPage() {
       const responseData = err.response?.data;
       const responseStatus = err.response?.status;
       
-      // Robust detailed logging to diagnose the "Details: {}" issue
-      console.error("DEBUG: Login Error Full Object:", err);
-      console.error("DEBUG: Login Error Message:", err.message);
-      console.error("DEBUG: Login Response Status:", responseStatus);
-      console.error("DEBUG: Login Response Data:", JSON.stringify(responseData, null, 2));
+      // Removed explicit console.error to keep the terminal clean
+
       
       let errorMessage = "An unexpected error occurred. Please try again.";
       
       if (err.message === "Network Error") {
-        errorMessage = `Connection refused. Backend server at ${API_BASE_URL} might be down.`;
+        errorMessage = `Connection refused. Backend server at ${API_BASE_URL} might be down or unreachable. Please ensure the backend is running on port 8000 and that CORS is configured for your origin.`;
       } else if (responseStatus === 422) {
         // Specifically handle FastAPI validation errors (e.g. JSON vs Form mismatch)
         errorMessage = "Backend validation error (422). Possible data format mismatch.";
@@ -120,14 +118,14 @@ export default function LoginPage() {
       >
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
-            EarNnLearn
+            {PLATFORM_NAME}
           </h1>
           <p className="text-gray-400">Welcome back. Enter your details to access your dashboard.</p>
         </div>
 
         {error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-xl text-red-500 text-sm font-medium">
-            {typeof error === 'string' ? error : JSON.stringify(error)}
+            {typeof error === 'string' ? error : (error as any).message || "An error occurred"}
           </div>
         )}
 

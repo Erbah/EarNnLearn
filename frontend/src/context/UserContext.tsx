@@ -17,6 +17,7 @@ interface User {
   learning_goal?: string;
   preferred_style?: string;
   last_onboarding_step?: number;
+  is_beta_user?: boolean;
   [key: string]: any;
 }
 
