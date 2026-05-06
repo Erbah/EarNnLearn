@@ -56,16 +56,16 @@ export default function LessonPlayer({
   const config = scene.semantic_type ? semanticConfig[scene.semantic_type] : null;
 
   // --- 🧠 SMART TITLE EXTRACTION ---
-  const displayTitle = scene.semantic_type === "title" 
+  // --- 🧠 SMART TITLE EXTRACTION (v17) ---
+  const displayTitle = scene.title || (scene.semantic_type === "title" 
     ? scene.content.split("\n")[0].replace(/^#+\s*/, "").trim()
     : (() => {
-        // Find first sentence that isn't a header
         const cleanBody = scene.content.replace(/^#+\s*.*$/gm, "").trim();
         const firstSentence = cleanBody.split(/[.!?]/)[0].trim();
         return firstSentence.length > 2 && firstSentence.length < 70 
           ? firstSentence 
-          : (config?.label || scene.title);
-      })();
+          : (config?.label || "Untitled Section");
+      })());
 
   const [completed, setCompleted] = useState(scene.completed);
   const [quizAnswers, setQuizAnswers] = useState<QuizAnswers>({});

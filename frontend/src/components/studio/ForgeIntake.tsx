@@ -60,7 +60,7 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
 
   // Effect to handle "Resonance" - background pulse based on input length/keywords
   useEffect(() => {
-    const len = prompt.length;
+    const len = prompt?.length || 0;
     setComplexity(Math.min(len / 50, 1));
   }, [prompt]);
 
@@ -295,21 +295,25 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
                       sourceTopics.map((unit, uIdx) => (
                         <div key={`unit-${uIdx}-${unit.name}`} className="space-y-3">
                           <button 
-                            onClick={() => {
-                              setPrompt(unit.name);
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const name = unit.name || "Untitled Unit";
+                              setPrompt(name);
                               setShowTopics(false);
                             }}
-                            className="w-full flex items-center gap-2 px-2 pb-1 border-b border-white/5 hover:border-primary/50 group/unit transition-colors text-left"
+                            className="w-full flex items-center gap-2 px-2 pb-2 mb-1 border-b border-white/5 hover:border-primary/50 group/unit transition-colors text-left"
                           >
-                            <Book className="w-3 h-3 text-primary group-hover/unit:scale-110 transition-transform" />
-                            <span className="text-[9px] font-black uppercase tracking-tighter text-gray-500 group-hover/unit:text-white transition-colors">Unit: {unit.name}</span>
+                            <Book className="w-3.5 h-3.5 text-primary group-hover/unit:scale-110 transition-transform" />
+                            <span className="text-[10px] font-black uppercase tracking-tight text-gray-500 group-hover/unit:text-white transition-colors">Unit: {unit.name}</span>
                           </button>
                           <div className="grid grid-cols-1 gap-1">
-                            {unit.topics.map((topic) => (
+                            {unit.topics?.map((topic) => (
                               <button
                                 key={topic}
                                 onClick={() => {
-                                  setPrompt(topic);
+                                  setPrompt(topic || "");
                                   setShowTopics(false);
                                 }}
                                 className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
@@ -325,7 +329,7 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
                         <div key={`cat-${cIdx}-${category.name}`} className="space-y-3">
                           <button 
                             onClick={() => {
-                              setPrompt(category.name);
+                              setPrompt(category.name || "");
                               setShowTopics(false);
                             }}
                             className="w-full flex items-center gap-2 px-2 pb-1 border-b border-white/5 hover:border-primary/50 group/course transition-colors text-left"
@@ -338,7 +342,7 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
                               <button
                                 key={topic}
                                 onClick={() => {
-                                  setPrompt(topic);
+                                  setPrompt(topic || "");
                                   setShowTopics(false);
                                 }}
                                 className="w-full text-left px-2 py-1.5 rounded-lg text-[11px] text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
@@ -358,7 +362,7 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
 
           <input
             type="text"
-            value={prompt}
+            value={prompt || ""}
             onChange={(e) => setPrompt(e.target.value)}
             onFocus={() => {
               setIsFocused(true);
@@ -413,7 +417,7 @@ export default function ForgeIntake({ onComplete }: ForgeIntakeProps) {
               {["Artificial Intelligence", "Blockchain", "Digital Arts", "Psychology"].map((tag) => (
                 <button
                   key={tag}
-                  onClick={() => setPrompt(tag)}
+                  onClick={() => setPrompt(tag || "")}
                   className="px-5 py-2.5 rounded-full bg-white/5 border border-white/10 text-sm text-gray-400 hover:text-white hover:border-primary/50 transition-all"
                 >
                   {tag}

@@ -5,10 +5,11 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.models.code import Code
-from app.models.wallet import Wallet
+from app.models.wallet import Wallet, WalletTransaction
 from app.models.transaction import Transaction, ReferralIndex
 from app.schemas.code_schema import CodeResponse, ActivationRequest, SellerInfoResponse, PaymentSubmission, BuyCodeRequest
 from app.services.activation_service import run_activation_engine
+from decimal import Decimal
 
 router = APIRouter()
 
@@ -137,6 +138,34 @@ def buy_product_code(req: BuyCodeRequest, current_user: User = Depends(get_curre
 
     # Pick one randomly to 'Consume' or 'Register under'
     license_code = random.choice(license_codes)
+    
+    # ─── PAYMENT VERIFICATION ───
+    # 1. Fetch Wallet
+    wallet = db.query(Wallet).filter(Wallet.user_rid == current_user.rid).first()
+    if not wallet:
+        # Provision if missing (though activation service usually does this)
+        wallet = Wallet(user_rid=current_user.rid)
+        db.add(wallet)
+        db.commit()
+    
+    # 2. Check Balance
+    code_price = license_code.price
+    if wallet.balance < code_price:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Insufficient wallet balance. You need {code_price} {license_code.currency} but have {wallet.balance} {wallet.currency}."
+        )
+    
+    # 3. Deduct Funds
+    wallet.balance -= code_price
+    wallet.withdrawable_balance -= code_price # Also reduce withdrawable if applicable
+    
+    db.add(WalletTransaction(
+        user_rid=current_user.rid,
+        type="DEBIT_CODE_PURCHASE",
+        amount=code_price,
+        description=f"Purchased Seasonal Activation Code: {license_code.product_code}"
+    ))
     
     # We capture old_rid for migration before clearing it
     old_rid = current_user.rid

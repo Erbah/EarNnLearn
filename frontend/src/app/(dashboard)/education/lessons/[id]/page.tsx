@@ -203,20 +203,33 @@ export default function LessonPage() {
               <section>
                  <h4 className="text-[10px] font-black text-gray-600 uppercase tracking-[0.2em] mb-4">Module Navigation</h4>
                  <div className="space-y-2">
-                    {lesson.scenes.map((scene, idx) => (
-                      <button
-                        key={scene.id}
-                        onClick={() => setCurrentSceneIndex(idx)}
-                        className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center gap-3 ${
-                          idx === currentSceneIndex
-                            ? "bg-primary/10 border-primary/30"
-                            : "bg-white/5 border-white/5 hover:bg-white/10"
-                        }`}
-                      >
-                        <div className={`w-2 h-2 rounded-full ${scene.completed ? 'bg-emerald-500' : idx === currentSceneIndex ? 'bg-primary' : 'bg-gray-700'}`} />
-                        <span className={`text-xs font-bold ${idx === currentSceneIndex ? 'text-white' : 'text-gray-500'}`}>{scene.title}</span>
-                      </button>
-                    ))}
+                    {lesson.scenes.map((scene, idx) => {
+                      // Smart Title for Navigation
+                      const navTitle = scene.title || (scene.semantic_type === "title" 
+                        ? scene.content.split("\n")[0].replace(/^#+\s*/, "").trim()
+                        : (() => {
+                            const cleanBody = scene.content.replace(/^#+\s*.*$/gm, "").trim();
+                            const firstSentence = cleanBody.split(/[.!?]/)[0].trim();
+                            return firstSentence.length > 2 && firstSentence.length < 50 
+                              ? firstSentence 
+                              : (scene.semantic_type?.replace('_', ' ').toUpperCase() || "Untitled Section");
+                          })());
+
+                      return (
+                        <button
+                          key={scene.id}
+                          onClick={() => setCurrentSceneIndex(idx)}
+                          className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center gap-3 ${
+                            idx === currentSceneIndex
+                              ? "bg-primary/10 border-primary/30"
+                              : "bg-white/5 border-white/5 hover:bg-white/10"
+                          }`}
+                        >
+                          <div className={`w-2 h-2 rounded-full ${scene.completed ? 'bg-emerald-500' : idx === currentSceneIndex ? 'bg-primary' : 'bg-gray-700'}`} />
+                          <span className={`text-xs font-bold ${idx === currentSceneIndex ? 'text-white' : 'text-gray-500'}`}>{navTitle}</span>
+                        </button>
+                      );
+                    })}
                  </div>
               </section>
 

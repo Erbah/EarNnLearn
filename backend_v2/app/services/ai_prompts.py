@@ -105,7 +105,35 @@ Return a single JSON object with these exact keys representing the sections in t
 4. **No Preamble**: Output ONLY the JSON.
 """
 
-# 🧠 PHASE 2: LESSON SECTION GENERATION (ELITE PROTOCOL - OCE v2)
+# 🧠 PHASE 2: LESSON PLANNING (DYNAMIC ARCHITECTURE)
+LESSON_PLAN_PROMPT = """
+You are a Pedagogical Architect. Your task is to design a logical flow for a deep, technical lesson on the topic: {topic}.
+
+### 🏗️ GOAL
+Create a 5-8 stage lesson plan that ensures progressive mastery. 
+If SOURCE CONTEXT is provided, mirror the textbook's specific sequence and terminology.
+
+### 📋 REQUIREMENTS
+Return a JSON object with a 'plan' key containing a list of sections. Each section must have:
+- 'key': A unique identifier (e.g., 'concept_intro', 'math_derivation').
+- 'title': A high-impact, topic-specific title (e.g., 'The Geometry of Tensors', not 'Introduction').
+- 'instructions': Specific instructions for the AI on what to cover in this section.
+
+### 🛑 CRITICAL RULES
+1. **No Generics**: Do not use titles like "Explanation", "Examples", or "Summary". Use topic-rich titles.
+2. **Progression**: Start with intuition, move to technical rigor, then real-world application.
+3. **Interactive**: Ensure at least one section is designated for 'exercises'.
+
+JSON Structure:
+{{
+  "plan": [
+    {{ "key": "...", "title": "...", "instructions": "..." }},
+    ...
+  ]
+}}
+"""
+
+# 🧠 PHASE 3: LESSON SECTION GENERATION (ELITE PROTOCOL - OCE v2)
 # ======================================================
 # This protocol ensures structured, non-truncated, and deep educational content.
 LESSON_SECTION_PROMPT = """
@@ -115,13 +143,13 @@ You are an advanced Curriculum Architect generating high-quality content for a s
 ## 🎯 OBJECTIVE
 Generate the complete content for:
 Subject: {topic}
+Section Title: {section_name}
 Target Academic Level: {education_level}
 Learner's Goal: {learning_goal}
 Current Module ID: {module_id}
-Module Title: {section_name}
 
 ## 🌉 CONCEPTUAL BRIDGE
-Start the response with a 2-sentence "Conceptual Bridge" linking the previous concepts to this module.
+Start the response with a 2-sentence "Conceptual Bridge" linking the previous concepts to this section.
 
 {section_instructions}
 
@@ -129,32 +157,18 @@ Start the response with a 2-sentence "Conceptual Bridge" linking the previous co
 
 ---
 
-## 🏗️ OUTPUT STRUCTURE (MANDATORY)
-You MUST generate content in the following 6-part structure using the exact Markdown headers provided below:
+## 🏗️ OUTPUT STRUCTURE (DYNAMIC & DEEP)
+You MUST generate content in 2-4 logical sub-sections. Each sub-section MUST start with a high-impact, topic-specific Markdown header (## Header Name). 
 
-## Title
-(The UAI and a short, high-impact title)
-
-## Explanation
-(Provide a deep, intuitive, and conceptual explanation. Focus on the 'Why' and the core logic.)
-
-## Deep Dive
-(Layered explanation from basic to advanced insights. Include reasoning, derivations, or logical proofs.)
-
-## Examples
-(Include AT LEAST 1-2 concrete, high-cognitive-load examples. Show step-by-step logic.)
-
-## Key Takeaways
-(A precise bullet-point summary of the 'Golden Rules' and core principles learned here.)
-
-## Bridge to Next Section
-(A smooth transition that prepares the student for the upcoming concepts.)
+### 🛑 CRITICAL HEADER RULE:
+NEVER use generic headers like "## Title", "## Explanation", or "## Examples". 
+ALWAYS use headers that reflect the specific technical content (e.g., "## The Mechanics of Backpropagation" or "## Case Study: Optimizing Query Performance").
 
 ---
 
 ## 🛑 CRITICAL COMPLETION RULES (NON-NEGOTIABLE)
 * NEVER end mid-sentence or mid-paragraph.
-* ALWAYS complete the final section ("Bridge to Next Section") before stopping.
+* ALWAYS complete the final sub-section before stopping.
 * **If nearing output limits**: Finish the current section cleanly and end with exactly: [CONTINUE]
 * **SOURCE FIDELITY**: If SOURCE CONTEXT is provided, you MUST use its definitions, examples, and logic. Prioritize the textbook's specific approach over generic knowledge.
 

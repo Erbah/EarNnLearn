@@ -16,7 +16,9 @@ const API = "/api/v1";
 
 type ForgeState = "INTAKE" | "BLUEPRINT" | "FORGING" | "COMPLETE";
 
-export default function EducationStudio() {
+import { Suspense } from "react";
+
+function EducationStudioContent() {
   const [state, setState] = useState<ForgeState>("INTAKE");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -218,5 +220,13 @@ export default function EducationStudio() {
         </AnimatePresence>
       </main>
     </div>
+  );
+}
+
+export default function EducationStudio() {
+  return (
+    <Suspense fallback={<div>Loading Education Studio...</div>}>
+      <EducationStudioContent />
+    </Suspense>
   );
 }

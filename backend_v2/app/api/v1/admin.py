@@ -973,6 +973,93 @@ def reject_withdrawal(request_id: str, reason: str, current_user: Annotated[User
     return {"status": "success"}
 
 
+class TransactionOut(BaseModel):
+    id: uuid.UUID
+    code_id: uuid.UUID | None
+    buyer_rid: str
+    seller_rid: str
+    amount: Decimal
+    currency: str
+    payment_method: str | None
+    payment_reference: str | None
+    status: str
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+# ═══════════════════════════════════════
+#  TRANSACTION / PAYMENT MANAGEMENT
+# ═══════════════════════════════════════
+@router.get("/payments/pending", response_model=list[TransactionOut])
+def get_pending_payments(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """Retrieve all pending manual payment submissions for review."""
+    return db.query(Transaction).filter(Transaction.status == "pending").order_by(desc(Transaction.created_at)).all()
+
+@router.post("/payments/{transaction_id}/approve")
+def approve_payment(transaction_id: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """
+    Manually approve a MoMo payment reference and trigger activation.
+    """
+    try:
+        t_id = uuid.UUID(transaction_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid transaction ID format")
+
+    tx = db.query(Transaction).filter(Transaction.id == t_id, Transaction.status == "pending").first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Pending transaction not found")
+
+    # Identify user from buyer_rid mapping "PENDING_ACT_{user_id}"
+    if not tx.buyer_rid.startswith("PENDING_ACT_"):
+        raise HTTPException(status_code=400, detail="Invalid transaction mapping for activation")
+        
+    user_id = tx.buyer_rid.replace("PENDING_ACT_", "")
+    user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User associated with this payment not found")
+
+    code = db.query(Code).filter(Code.id == tx.code_id).first()
+    if not code:
+        raise HTTPException(status_code=404, detail="Code associated with this payment not found")
+
+    from app.services.activation_service import run_activation_engine
+    activated_code = run_activation_engine(db, user, code, tx)
+
+    db.add(AdminLog(
+        admin_rid=current_user.rid, 
+        action=f"Approved manual payment: {transaction_id}", 
+        details={"user_id": user_id, "code": activated_code.product_code}
+    ))
+    db.commit()
+
+    return {
+        "status": "success", 
+        "message": "Payment approved. Account activated.",
+        "new_rid": user.rid
+    }
+
+@router.post("/payments/{transaction_id}/reject")
+def reject_payment(transaction_id: str, reason: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """Reject a payment submission if the reference is invalid or fraudulent."""
+    try:
+        t_id = uuid.UUID(transaction_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid transaction ID format")
+
+    tx = db.query(Transaction).filter(Transaction.id == t_id, Transaction.status == "pending").first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Pending transaction not found")
+
+    tx.status = "failed"
+    db.add(AdminLog(
+        admin_rid=current_user.rid, 
+        action=f"Rejected manual payment: {transaction_id}", 
+        details={"reason": reason}
+    ))
+    db.commit()
+    return {"status": "success", "message": "Payment submission rejected."}
+
+
 # ═══════════════════════════════════════
 #  ADMIN ACTIVITY LOGS
 # ═══════════════════════════════════════

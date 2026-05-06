@@ -11,7 +11,8 @@ from app.services.ai_prompts import (
     CORE_PRINCIPLES_FALLBACK,
     FIRST_LESSON_BOOST_PROMPT,
     WHITEBOARD_PROTOCOL,
-    ELITE_DEPTH_RETRY_PROMPT
+    ELITE_DEPTH_RETRY_PROMPT,
+    LESSON_PLAN_PROMPT
 )
 import json
 import re
@@ -527,6 +528,54 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             print(f"Roadmap Generation Error: {str(e)}")
             return {"error": "Failed to generate roadmap", "details": str(e)}
 
+    @classmethod
+    def generate_lesson_plan(cls, db: Session, topic: str, source_id: str = None, timeout: int = 60) -> list:
+        """
+        Phase 2: Generates a dynamic lesson plan (outline) for a specific topic.
+        """
+        active_provider, active_model, active_api_key, active_base_url = cls._get_active_model(db)
+        import litellm
+        
+        source_context = ""
+        if source_id:
+            source_context = cls._get_context_from_source(db, source_id, topic, limit=10)
+
+        prompt = LESSON_PLAN_PROMPT.format(topic=topic)
+        if source_context:
+            prompt = source_context + "\n\n" + prompt
+
+        try:
+            completion_args = {
+                "model": active_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "timeout": timeout
+            }
+            if active_base_url:
+                completion_args["api_base"] = active_base_url
+
+            response = litellm.completion(**completion_args)
+            raw_text = response.choices[0].message.content
+            
+            # Extract JSON
+            import re as _re
+            json_match = _re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
+            if json_match:
+                raw_text = json_match.group(1).strip()
+            
+            plan_data = json.loads(raw_text)
+            return plan_data.get("plan", [])
+        except Exception as e:
+            print(f"Lesson Planning Error: {str(e)}")
+            # Fallback to standard structure
+            return [
+                { "key": "introduction", "title": f"The Foundations of {topic}", "instructions": "Focus on the 'Big Picture' hook and real-world significance." },
+                { "key": "core_concepts", "title": "First Principles Breakdown", "instructions": "Break down the core logic and underlying mechanics." },
+                { "key": "technical_detail", "title": "Advanced Technical Insight", "instructions": "Deep dive into the math or complex logic." },
+                { "key": "examples", "title": "Practical Application", "instructions": "Apply the concepts to real-world scenarios." },
+                { "key": "exercises", "title": "Interactive Mastery Challenge", "instructions": "Test understanding with progressive exercises." },
+                { "key": "summary", "title": "Final Synthesis", "instructions": "Summarize the key takeaways." }
+            ]
+
     @staticmethod
     def validate_depth(section_name: str, content: str) -> list:
         """
@@ -606,6 +655,29 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             ]
         }
         return random.choice(pools["correct"] if correct else pools["incorrect"])
+    
+    @staticmethod
+    def _infer_semantic_type(title: str, index: int, total: int) -> str:
+        """
+        Heuristic to map dynamic headers to semantic types for UI styling.
+        """
+        t = title.lower()
+        if index == 0: return "title"
+        if index == total - 1: return "bridge"
+        
+        if any(k in t for k in ["takeaway", "summary", "point", "conclusion", "rule", "mastery"]):
+            return "key_takeaways"
+        if any(k in t for k in ["example", "case", "scenario", "practice", "demo"]):
+            return "examples"
+        if any(k in t for k in ["deep", "dive", "technical", "detail", "derivation", "proof", "math", "rigor"]):
+            return "deep_dive"
+        if any(k in t for k in ["logic", "why", "intuition", "principles", "concept", "mechanics"]):
+            return "explanation"
+            
+        # Default based on position
+        if index == 1: return "explanation"
+        if index == total - 2: return "key_takeaways"
+        return "explanation"
 
     @staticmethod
     def parse_quiz(content: str) -> list:
@@ -625,53 +697,37 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
     @staticmethod
     def split_micro_scenes(content: str) -> list:
         """
-        Refined Header-Based Segmentation (v16).
-        Parses the Elite Completion Protocol structure (Title, Explanation, etc.)
-        and enforces strict sectional integrity.
+        Dynamic Header-Based Segmentation (v17).
+        Parses any ## Header and splits content into logical scenes.
         """
         import re
         
-        # Strict mapping of headers to semantic types
-        header_map = {
-            "Title": "title",
-            "Explanation": "explanation",
-            "Deep Dive": "deep_dive",
-            "Examples": "examples",
-            "Key Takeaways": "key_takeaways",
-            "Bridge to Next Section": "bridge"
-        }
+        # 1. Find all ## Headers
+        header_patterns = list(re.finditer(fr"^##\s*(.*?)$", content, re.MULTILINE))
         
-        expected_headers = list(header_map.keys())
-        
-        scenes = []
-        
-        # 1. Strict Regex Splitting
-        # We search for ## Header at the start of a line
-        for header, semantic_type in header_map.items():
-            pattern = fr"^## {re.escape(header)}\s*([\s\S]*?)(?=\n## |$)"
-            match = re.search(pattern, content, re.MULTILINE)
-            
-            if match:
-                body = match.group(1).strip()
-                if body:
-                    scenes.append({
-                        "title": header,
-                        "semantic_type": semantic_type,
-                        "content": body
-                    })
-        
-        # 2. Structural Integrity & Order Enforcement
-        # If we didn't find at least 5 of the 6 sections, we consider the structure compromised.
-        is_valid = len(scenes) >= 5
-        
-        if not is_valid:
-            print(f"DEBUG: Elite Structure Compromised ({len(scenes)}/6). Triggering Fallback.")
-            # Fallback: Render as a single unified scene to prevent data loss
+        if not header_patterns:
+            print("DEBUG: No headers found in lesson content. Triggering fallback.")
             return [{
                 "title": "Lesson Content",
                 "semantic_type": "explanation",
                 "content": content
             }]
+
+        scenes = []
+        for i in range(len(header_patterns)):
+            title = header_patterns[i].group(1).strip()
+            start = header_patterns[i].end()
+            next_start = header_patterns[i+1].start() if i + 1 < len(header_patterns) else len(content)
+            
+            body = content[start:next_start].strip()
+            
+            if body:
+                scenes.append({
+                    "title": title,
+                    "semantic_type": AITutorEngine._infer_semantic_type(title, i, len(header_patterns)),
+                    "content": body
+                })
+        
         return scenes
 
     @staticmethod
@@ -738,7 +794,7 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
 
 
     @classmethod
-    def generate_lesson_chapter(cls, db: Session, user_rid: str, topic: str, section_key: str, difficulty: str = "beginner", education_level: str = "Self-Learning", learner_goal: str = "General Mastery", style: str = "balanced", mode: str = "normal", retry_count: int = 0, deficiencies: list = None, uai: str = None, source_id: str = None, timeout: int = 60) -> list:
+    def generate_lesson_chapter(cls, db: Session, user_rid: str, topic: str, section_key: str, custom_instructions: str = None, section_title: str = None, difficulty: str = "beginner", education_level: str = "Self-Learning", learner_goal: str = "General Mastery", style: str = "balanced", mode: str = "normal", retry_count: int = 0, deficiencies: list = None, uai: str = None, source_id: str = None, timeout: int = 60) -> list:
         """
         Generates a modular chapter of a lesson using the OCE (Omni-Curriculum Engine) Protocol.
         """
@@ -813,8 +869,8 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 reinf_instr = "\n🚨 CHALLENGE MODE: Higher cognitive load. Use advanced questions and less scaffolding."
                 diff_constraint = "3 Hard questions."
 
-            section_name = section_key.replace("_", " ").title()
-            instr = SECTION_INSTRUCTIONS.get(section_key, "Provide detailed content.")
+            section_name = section_title or section_key.replace("_", " ").title()
+            instr = custom_instructions or SECTION_INSTRUCTIONS.get(section_key, "Provide detailed content.")
             
             # 2. RAG Context Injection
             source_context = ""
@@ -937,6 +993,8 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
 
                 return cls.generate_lesson_chapter(
                     db, user_rid, topic, section_key, 
+                    custom_instructions=custom_instructions,
+                    section_title=section_title,
                     difficulty=difficulty,
                     education_level=education_level,
                     learner_goal=learner_goal,
