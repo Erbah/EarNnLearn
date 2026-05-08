@@ -157,15 +157,21 @@ def list_roadmaps(current_user: User = Depends(get_current_user), db: Session = 
 def generate_subject_roadmap(
     subject: str,
     source_id: str | None = None,
+    force: bool = False,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Phase 1: Generate or retrieve a subject roadmap."""
-    roadmap = ai_tutor_engine.generate_roadmap(db, current_user.rid, subject, source_id=source_id)
+    roadmap = ai_tutor_engine.generate_roadmap(db, current_user.rid, subject, source_id=source_id, force=force, timeout=180)
     # Handle error dict if generation failed
     if isinstance(roadmap, dict) and "error" in roadmap:
-        return roadmap
-    return roadmap.roadmap_data
+        raise HTTPException(status_code=500, detail=roadmap.get("details", roadmap["error"]))
+    
+    return {
+        "id": roadmap.id,
+        "subject": roadmap.subject,
+        "roadmap_data": roadmap.roadmap_data
+    }
 
 @router.get("/roadmaps/{roadmap_id}")
 def get_roadmap_details(

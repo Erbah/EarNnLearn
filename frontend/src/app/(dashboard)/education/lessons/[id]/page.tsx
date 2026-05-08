@@ -64,6 +64,20 @@ export default function LessonPage() {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isAudioPaused, setIsAudioPaused] = useState(false);
   const [volume, setVolume] = useState(1);
+  const [readingMode, setReadingMode] = useState<'ai' | 'self'>('ai');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('lesson_reading_mode');
+    if (saved === 'ai' || saved === 'self') {
+      setReadingMode(saved as 'ai' | 'self');
+    }
+  }, []);
+
+  const toggleReadingMode = () => {
+    const newMode = readingMode === 'ai' ? 'self' : 'ai';
+    setReadingMode(newMode);
+    localStorage.setItem('lesson_reading_mode', newMode);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -164,6 +178,7 @@ export default function LessonPage() {
                     setIsAudioPlaying={setIsAudioPlaying}
                     isAudioPaused={isAudioPaused}
                     volume={volume}
+                    readingMode={readingMode}
                     onSceneComplete={() => {
                       if (currentSceneIndex < lesson.scenes.length - 1) {
                         setCurrentSceneIndex(currentSceneIndex + 1);
@@ -181,9 +196,18 @@ export default function LessonPage() {
            <div className="p-6 border-b border-white/5">
               <div className="flex items-center justify-between mb-6">
                  <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Mastery HUD</h3>
-                 <button onClick={() => setShowSyllabus(true)} className="p-2 hover:bg-white/5 rounded-lg text-primary transition-colors">
-                    <GraduationCap className="w-4 h-4" />
-                 </button>
+                 <div className="flex items-center gap-2">
+                   <button 
+                     onClick={toggleReadingMode}
+                     className={`p-2 rounded-lg transition-all ${readingMode === 'ai' ? 'bg-primary/20 text-primary' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                     title={readingMode === 'ai' ? "AI Guided Mode" : "Self Paced Mode"}
+                   >
+                     {readingMode === 'ai' ? <Cpu className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+                   </button>
+                   <button onClick={() => setShowSyllabus(true)} className="p-2 hover:bg-white/5 rounded-lg text-primary transition-colors">
+                      <GraduationCap className="w-4 h-4" />
+                   </button>
+                 </div>
               </div>
 
               <div className="space-y-4">

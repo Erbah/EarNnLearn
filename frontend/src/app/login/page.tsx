@@ -34,6 +34,8 @@ export default function LoginPage() {
       if (res.status === 200) {
         const data = res.data;
         localStorage.setItem("access_token", data.access_token);
+        // Set cookie for middleware
+        document.cookie = `access_token=${data.access_token}; path=/; max-age=86400; SameSite=Lax`;
 
         // Fetch profile to determine redirect
         const profileRes = await api.get(`${API}/auth/me`);
@@ -63,7 +65,10 @@ export default function LoginPage() {
       let errorMessage = "An unexpected error occurred. Please try again.";
       
       if (err.message === "Network Error") {
-        errorMessage = `Connection refused. Backend server at ${API_BASE_URL} might be down or unreachable. Please ensure the backend is running on port 8000 and that CORS is configured for your origin.`;
+        errorMessage = `Cannot connect to the backend server at ${API_BASE_URL}. 
+        
+        Please ensure the backend is running. 
+        TIP: Use "npm run dev" from the project root to start both services together.`;
       } else if (responseStatus === 422) {
         // Specifically handle FastAPI validation errors (e.g. JSON vs Form mismatch)
         errorMessage = "Backend validation error (422). Possible data format mismatch.";

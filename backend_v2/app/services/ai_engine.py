@@ -136,6 +136,9 @@ class AITutorEngine:
         """
         user_level = (context or {}).get("understanding_level", "medium")
         student_state = (context or {}).get("student_state", "Normal")
+        preferred_style = (context or {}).get("preferred_style", "Balanced")
+        learning_goal = (context or {}).get("learning_goal", "General Exploration")
+        is_first_session = (context or {}).get("is_first_session", False)
         
         # Consistent Identity Traits (v9)
         persona_base = f"""
@@ -155,6 +158,13 @@ IDENTITY TRAITS: Encouraging but precise, highly intelligent, scholarly yet supp
 - If 'Excelling': Be more concise, use advanced terminology, challenge with deep insights.
 - **DO NOT** overuse the name "Aria" in every message. Keep it natural.
 
+## 📏 MATH & SYMBOLS (MANDATORY FORMAT)
+- Use LaTeX for complex equations: `\[ equation \]` for blocks, `\( equation \)` for inline.
+- ALWAYS use `\[ ... \]` for the main formula when asked for an equation.
+- Example: `\[ R = \frac{{V}}{{I}} \]`
+- **DO NOT** use HTML tags (like <p>, <ul>). Use Standard Markdown (**bold**, *italic*, - lists).
+- Keep explanations clear and academically rigorous.
+
 ## 🎨 LIVE WHITEBOARD CAPABILITIES
 Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tags.
 1. DRAW PATH: `[WHITEBOARD: {{"action": "drawPath", "points": [{{ "x": X, "y": Y }}, ...], "color": "#hex", "width": N, "duration": 300}}]`
@@ -168,14 +178,11 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
 - Role: {role.upper()}
 - Current Topic: {topic}
 - Student Level: {user_level}
-- **Style Preferences**: {(context or {}).get("preferred_style", "Balanced")}
-- **Goal**: {(context or {}).get("learning_goal", "General Exploration")}
+- **Style Preferences**: {preferred_style}
+- **Goal**: {learning_goal}
 
 ## 🔬 PERSONALIZATION OVERRIDE (v12):
 """
-        preferred_style = (context or {}).get("preferred_style", "Balanced")
-        learning_goal = (context or {}).get("learning_goal", "General Exploration")
-        is_first_session = (context or {}).get("is_first_session", False)
 
         if preferred_style == "Practical":
             persona_base += "\n- **PRACTICAL MODE**: Prioritize real-world scenarios. Use fewer abstract definitions. Show HOW it's used before WHY it works."
@@ -410,7 +417,7 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
         return context_str
 
     @classmethod
-    def generate_roadmap(cls, db: Session, user_rid: str, subject: str, source_id: str = None, timeout: int = 60) -> dict:
+    def generate_roadmap(cls, db: Session, user_rid: str, subject: str, source_id: str = None, timeout: int = 60, force: bool = False) -> dict:
         """
         Phase 1: Generates a complete structured curriculum for a subject.
         Persists it to the subject_roadmaps table.
@@ -437,12 +444,13 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
 
         try:
             # Check for existing valid roadmap with same subject
-            existing = db.query(SubjectRoadmap).filter(
-                SubjectRoadmap.user_rid == user_rid,
-                SubjectRoadmap.subject.ilike(subject)
-            ).first()
-            if existing:
-                return existing
+            if not force:
+                existing = db.query(SubjectRoadmap).filter(
+                    SubjectRoadmap.user_rid == user_rid,
+                    SubjectRoadmap.subject.ilike(subject)
+                ).first()
+                if existing:
+                    return existing
 
             # 2. RAG Context Injection
             source_context = ""
@@ -465,11 +473,13 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             completion_args = {
                 "model": active_model,
                 "messages": [{"role": "user", "content": prompt}],
-                "timeout": timeout
+                "timeout": timeout,
+                "num_retries": 2
             }
             if active_base_url:
                 completion_args["api_base"] = active_base_url
 
+            print(f"DEBUG: [OCE] Generating roadmap for '{subject}' (Timeout: {timeout}s, Model: {active_model})")
             response = litellm.completion(**completion_args)
             raw_text = response.choices[0].message.content
             # Extract JSON from response (handle markdown code blocks)
@@ -479,24 +489,98 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 raw_text = json_match.group(1).strip()
             roadmap_json = json.loads(raw_text)
             
-            # --- 🛡️ Elite: Flatten Unit Logic for Backward Compatibility (v17) ---
-            if "section_b" in roadmap_json:
-                flattened_units = []
-                for part in roadmap_json["section_b"].get("parts", []):
-                    for unit in part.get("units", []):
-                        unit_copy = {
-                            "title": f"{part.get('title')}: {unit.get('title')}",
-                            "description": unit.get("description", ""),
-                            "topics": []
-                        }
-                        for chapter in unit.get("chapters", []):
-                            for lesson in chapter.get("lessons", []):
-                                unit_copy["topics"].extend(lesson.get("topics", []))
-                        flattened_units.append(unit_copy)
+            # --- 🛡️ Elite: Flatten Unit Logic for Robustness (v20: Deep Recursion) ---
+            def extract_topics(obj):
+                """Recursively find anything that looks like a topic or lesson."""
+                topics = []
+                if isinstance(obj, dict):
+                    # Check if it's a topic (has title but no nested containers)
+                    is_container = any(k in obj for k in ["units", "chapters", "lessons", "parts", "topics"])
+                    if "title" in obj and not is_container:
+                         topics.append({
+                            "id": str(obj.get("id") or obj.get("uai") or random.randint(100000, 999999)),
+                            "title": str(obj.get("title")),
+                            "difficulty": str(obj.get("difficulty", "intermediate"))
+                         })
+                         return topics
+                    
+                    # Otherwise, search all values
+                    for k, v in obj.items():
+                        # Special case: if key is 'topics' or 'lessons' and value is a list of strings
+                        if k in ["topics", "lessons", "chapters"] and isinstance(v, list):
+                            for item in v:
+                                if isinstance(item, str):
+                                    topics.append({
+                                        "id": str(random.randint(100000, 999999)),
+                                        "title": item,
+                                        "difficulty": "intermediate"
+                                    })
+                                else:
+                                    topics.extend(extract_topics(item))
+                        else:
+                            topics.extend(extract_topics(v))
+                elif isinstance(obj, list):
+                    for item in obj:
+                        topics.extend(extract_topics(item))
+                return topics
+
+            def find_units(obj):
+                """Find all unit-like objects in the hierarchy."""
+                units = []
+                # Unit synonyms to look for
+                unit_keys = ["units", "chapters", "lessons", "parts", "topics", "modules", "sections"]
                 
-                # Only overwrite if empty or explicitly migrating
-                if not roadmap_json.get("units"):
-                    roadmap_json["units"] = flattened_units
+                if isinstance(obj, dict):
+                    found_any = False
+                    for k in unit_keys:
+                        if k in obj and isinstance(obj[k], list) and len(obj[k]) > 0:
+                            units.extend(obj[k])
+                            found_any = True
+                    
+                    if not found_any:
+                        for v in obj.values():
+                            units.extend(find_units(v))
+                elif isinstance(obj, list):
+                    for item in obj:
+                        units.extend(find_units(item))
+                return units
+
+            flattened_units = []
+            if "section_b" in roadmap_json:
+                raw_units = find_units(roadmap_json["section_b"])
+                if not raw_units:
+                    raw_units = roadmap_json.get("units", [])
+
+                for u in raw_units:
+                    if not isinstance(u, dict): continue
+                    unit_topics = extract_topics(u)
+                    print(f"DEBUG: Unit '{u.get('title')}' found with {len(unit_topics)} topics.")
+                    
+                    flattened_units.append({
+                        "id": str(u.get("id") or u.get("uai") or random.randint(1000, 9999)),
+                        "title": str(u.get("title", "Untitled Unit")),
+                        "description": str(u.get("description", "")),
+                        "topics": unit_topics
+                    })
+
+            # --- 🚨 Hardening: Overwrite existing units ---
+            flattened_topics_count = sum(len(u.get("topics", [])) for u in flattened_units)
+            if flattened_topics_count > 0:
+                print(f"DEBUG: [OCE v21] Overwriting units with {flattened_topics_count} extracted topics.")
+                roadmap_json["units"] = flattened_units
+            else:
+                print("DEBUG: [OCE v21] No topics found during recursive extraction. Applying fail-safe.")
+                # --- 🛡️ Fail-safe: Foundational Unit ---
+                fallback_unit = {
+                    "id": str(random.randint(1000, 9999)),
+                    "title": "Foundational Principles",
+                    "description": f"Core concepts and first principles of {subject}.",
+                    "topics": [
+                        { "id": "t_fallback_1", "title": f"Introduction to {subject}", "difficulty": "beginner" },
+                        { "id": "t_fallback_2", "title": f"Core Mechanics of {subject}", "difficulty": "intermediate" }
+                    ]
+                }
+                roadmap_json["units"] = [fallback_unit]
 
             # --- 🚨 Hardening: Dependency Graph Generation ---
             # If the AI didn't provide a graph, generate a default linear one
@@ -513,11 +597,27 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 roadmap_json["dependency_graph"] = graph
 
             # 3. Persist
+            if force:
+                existing = db.query(SubjectRoadmap).filter(
+                    SubjectRoadmap.user_rid == user_rid,
+                    SubjectRoadmap.subject.ilike(subject)
+                ).first()
+                if existing:
+                    from sqlalchemy.orm.attributes import flag_modified
+                    existing.roadmap_data = roadmap_json
+                    existing.dependency_graph = roadmap_json.get("dependency_graph", {})
+                    existing.updated_at = datetime.utcnow()
+                    flag_modified(existing, "roadmap_data")
+                    db.commit()
+                    db.refresh(existing)
+                    return existing
+
             new_roadmap = SubjectRoadmap(
                 user_rid=user_rid,
                 subject=subject,
                 roadmap_data=roadmap_json,
-                dependency_graph=roadmap_json.get("dependency_graph", {})
+                dependency_graph=roadmap_json.get("dependency_graph", {}),
+                difficulty_level=roadmap_json.get("section_a", {}).get("academic_level", "intermediate")
             )
             db.add(new_roadmap)
             db.commit()
@@ -526,7 +626,71 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             return new_roadmap
         except Exception as e:
             print(f"Roadmap Generation Error: {str(e)}")
-            return {"error": "Failed to generate roadmap", "details": str(e)}
+            
+            # --- 🛡️ Elite: Safety Roadmap Fallback (v22) ---
+            print(f"CRITICAL: AI Roadmap generation failed for '{subject}'. Triggering Safety Fallback.")
+            
+            fallback_json = {
+                "section_a": {
+                    "subject": subject,
+                    "academic_level": "Intermediate",
+                    "learning_path_style": "Structured Mastery"
+                },
+                "units": [
+                    {
+                        "id": "safety_u1",
+                        "title": f"Foundations of {subject}",
+                        "description": f"Core principles and introductory concepts of {subject}.",
+                        "topics": [
+                            { "id": "safety_t1", "title": f"Introduction to {subject}", "difficulty": "beginner" },
+                            { "id": "safety_t2", "title": f"First Principles of {subject}", "difficulty": "beginner" },
+                            { "id": "safety_t3", "title": f"The Evolution of {subject}", "difficulty": "intermediate" }
+                        ]
+                    },
+                    {
+                        "id": "safety_u2",
+                        "title": f"Mastering {subject} Mechanics",
+                        "description": f"Diving deeper into the operational logic and advanced frameworks of {subject}.",
+                        "topics": [
+                            { "id": "safety_t4", "title": f"Core Mechanics Breakdown", "difficulty": "intermediate" },
+                            { "id": "safety_t5", "title": f"Advanced {subject} Strategies", "difficulty": "advanced" },
+                            { "id": "safety_t6", "title": f"Practical Application & Synthesis", "difficulty": "advanced" }
+                        ]
+                    }
+                ],
+                "dependency_graph": {
+                    "safety_t2": ["safety_t1"],
+                    "safety_t3": ["safety_t2"],
+                    "safety_t4": ["safety_t3"],
+                    "safety_t5": ["safety_t4"],
+                    "safety_t6": ["safety_t5"]
+                }
+            }
+            
+            # Check for existing valid roadmap with same subject before creating a new one
+            existing = db.query(SubjectRoadmap).filter(
+                SubjectRoadmap.user_rid == user_rid,
+                SubjectRoadmap.subject.ilike(subject)
+            ).first()
+            
+            if existing:
+                existing.roadmap_data = fallback_json
+                existing.dependency_graph = fallback_json["dependency_graph"]
+                db.commit()
+                db.refresh(existing)
+                return existing
+
+            new_roadmap = SubjectRoadmap(
+                user_rid=user_rid,
+                subject=subject,
+                roadmap_data=fallback_json,
+                dependency_graph=fallback_json["dependency_graph"],
+                difficulty_level="Intermediate"
+            )
+            db.add(new_roadmap)
+            db.commit()
+            db.refresh(new_roadmap)
+            return new_roadmap
 
     @classmethod
     def generate_lesson_plan(cls, db: Session, topic: str, source_id: str = None, timeout: int = 60) -> list:

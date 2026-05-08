@@ -106,6 +106,7 @@ export function AdminSidebar() {
         <button
           onClick={() => {
             localStorage.removeItem("access_token");
+            document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
             sessionStorage.removeItem("admin_unlocked");
             window.location.href = "/login";
           }}

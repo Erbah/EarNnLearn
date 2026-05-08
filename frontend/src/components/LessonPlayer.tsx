@@ -25,6 +25,7 @@ interface LessonPlayerProps {
   setIsAudioPlaying: (val: boolean) => void;
   isAudioPaused: boolean;
   volume: number;
+  readingMode: 'ai' | 'self';
   onSceneComplete: () => void;
   onTutorHelp: () => void;
 }
@@ -40,6 +41,7 @@ export default function LessonPlayer({
   setIsAudioPlaying,
   isAudioPaused,
   volume,
+  readingMode,
   onSceneComplete,
   onTutorHelp,
 }: LessonPlayerProps) {
@@ -131,6 +133,16 @@ export default function LessonPlayer({
 
   // Execute scene actions if provided and not yet playing
   useEffect(() => {
+    // If in self-reading mode, mark slide as complete immediately and don't play audio
+    if (readingMode === 'self') {
+      if (scene.type === 'slide' && !completed) {
+        setCompleted(true);
+        // We don't call onSceneComplete automatically to let user read at their pace
+        // but we ensure the "CONTINUE" button is visible
+      }
+      return; // Skip action execution in self-mode
+    }
+
     // Only run if we have actions, the orchestrator is ready, and we haven't run them for this scene instance
     if (scene.actions && scene.actions.length > 0 && !isAudioPlaying && lastActionSceneRef.current !== scene.id && orchestratorRef.current) {
       const executeSceneActions = async () => {
@@ -181,7 +193,7 @@ export default function LessonPlayer({
 
       executeSceneActions();
     }
-  }, [scene.actions, isAudioPlaying, setIsAudioPlaying, completed, onTutorHelp, scene.id, lessonId, onSceneComplete]);
+  }, [scene.actions, isAudioPlaying, setIsAudioPlaying, completed, onTutorHelp, scene.id, lessonId, onSceneComplete, readingMode, scene.type]);
 
   // Mark slide as complete after 5 seconds (only if no actions)
   useEffect(() => {

@@ -50,7 +50,7 @@ export async function middleware(request: NextRequest) {
     if (isEducationRoute) {
       // Allow users to access their generated lessons and roadmaps from the AI Studio
       const isPublicEducationRoute = pathname.startsWith('/education/lessons') || pathname.startsWith('/education/roadmap');
-      if (!isPublicEducationRoute && !ACCESS_LEVELS.EDUCATION_ADMIN_LEVEL.includes(userRole as any)) {
+      if (!isPublicEducationRoute && !ACCESS_LEVELS.USER_LEVEL.includes(userRole as any)) {
         console.warn(`Unauthorized access attempt to ${pathname} by role ${userRole}`);
         return NextResponse.redirect(new URL('/dashboard', request.url));
       }

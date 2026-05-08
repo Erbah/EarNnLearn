@@ -47,33 +47,46 @@ export default function BlueprintPreview({ roadmap, onApprove, onCancel }: Bluep
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {roadmap.units.map((unit, idx) => (
-          <motion.div
-            key={unit.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="group relative"
-          >
-            <div className="relative z-10 p-6 rounded-3xl bg-white/5 border border-white/10 group-hover:border-primary/30 transition-all h-full glass">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <span className="text-xs font-black text-primary">{idx + 1}</span>
+        {roadmap.units && roadmap.units.length > 0 ? (
+          roadmap.units.map((unit, idx) => (
+            <motion.div
+              key={unit.id || idx}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              className="group relative"
+            >
+              <div className="relative z-10 p-6 rounded-3xl bg-white/5 border border-white/10 group-hover:border-primary/30 transition-all h-full glass">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+                    <span className="text-xs font-black text-primary">{idx + 1}</span>
+                  </div>
+                  <h3 className="font-bold text-white group-hover:text-primary transition-colors">{unit.title}</h3>
                 </div>
-                <h3 className="font-bold text-white group-hover:text-primary transition-colors">{unit.title}</h3>
+                
+                <ul className="space-y-3">
+                  {unit.topics?.map((topic, tIdx) => (
+                    <li key={topic.id || tIdx} className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white/20 mt-1.5 shrink-0" />
+                      <span className="text-sm text-gray-400 leading-tight">{topic.title || (typeof topic === 'string' ? topic : '')}</span>
+                    </li>
+                  )) || (
+                    <li className="text-xs text-gray-600 italic">No topics defined</li>
+                  )}
+                </ul>
               </div>
-              
-              <ul className="space-y-3">
-                {unit.topics.map((topic, tIdx) => (
-                  <li key={topic.id} className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white/20 mt-1.5 shrink-0" />
-                    <span className="text-sm text-gray-400 leading-tight">{topic.title}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          ))
+        ) : (
+          <div className="col-span-full py-20 text-center rounded-[32px] bg-white/5 border border-dashed border-white/10">
+             <Layers className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+             <h3 className="text-xl font-bold text-gray-400">Structural Failure</h3>
+             <p className="text-sm text-gray-600 mt-2 max-w-sm mx-auto">
+               The architect failed to extract a viable curriculum from the response. 
+               Please try a more specific subject or re-architect.
+             </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-16 p-8 rounded-[32px] bg-primary/5 border border-primary/20 flex flex-col md:flex-row items-center gap-8">

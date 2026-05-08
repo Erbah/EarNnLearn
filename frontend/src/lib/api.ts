@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -49,6 +49,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('access_token');
+        document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         // Avoid redirect loop if already on login
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/login';

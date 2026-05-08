@@ -43,6 +43,24 @@ export default function RoadmapPage() {
     setExpandedUnits(prev => ({ ...prev, [title]: !prev[title] }));
   };
 
+  const handleRegenerate = async () => {
+    if (!roadmap) return;
+    try {
+      setLoading(true);
+      // Use the subject and source if available to re-generate
+      const res = await api.post(`/api/v1/education/roadmaps/generate?subject=${encodeURIComponent(roadmap.subject)}&force=true`);
+      if (res.data) {
+        // Refresh the page or reload data
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error("Regeneration failed:", err);
+      setError("Failed to re-generate framework. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
       <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -61,7 +79,7 @@ export default function RoadmapPage() {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#0a0e14] -mt-8 -mx-8">
+    <div className="min-h-screen bg-[#0a0e14] flex flex-col">
       {/* Navigation */}
       <button 
         onClick={() => router.push("/education")}
@@ -94,7 +112,7 @@ export default function RoadmapPage() {
             <div className="flex-1">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-400 font-medium">Overall Progress</span>
-                <span className="text-primary font-bold">{roadmap.progress_percent}%</span>
+                <span className="text-primary font-bold">{roadmap.progress_percent || 0}%</span>
               </div>
               <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden border border-white/5">
                 <motion.div 
@@ -159,97 +177,120 @@ export default function RoadmapPage() {
           >
             {/* Course Content (Units) */}
             <div className="space-y-6">
-              {roadmap.roadmap_data?.units?.map((unit: any, uIdx: number) => (
-                <div key={uIdx} className="bg-card/20 border border-white/5 rounded-3xl overflow-hidden transition-all hover:bg-card/30">
-                  <button 
-                    onClick={() => toggleUnit(unit.title)}
-                    className="w-full flex items-center justify-between p-6 md:p-8 text-left"
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-gray-500 border border-white/10">
-                        {uIdx + 1}
+              {roadmap.roadmap_data?.units?.length > 0 ? (
+                roadmap.roadmap_data.units.map((unit: any, uIdx: number) => (
+                  <div key={uIdx} className="bg-card/20 border border-white/5 rounded-3xl overflow-hidden transition-all hover:bg-card/30">
+                    <button 
+                      onClick={() => toggleUnit(unit.title)}
+                      className="w-full flex items-center justify-between p-6 md:p-8 text-left"
+                    >
+                      <div className="flex items-center gap-5">
+                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-gray-500 border border-white/10">
+                          {uIdx + 1}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-white tracking-tight">{unit.title}</h3>
+                          <p className="text-sm text-gray-500">
+                            {unit.topics?.length || 0} Chapters • {unit.description || "Foundational concepts"}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-white tracking-tight">{unit.title}</h3>
-                        <p className="text-sm text-gray-500">
-                          {unit.topics?.length} Chapters • {unit.description || "Foundational concepts"}
-                        </p>
-                      </div>
-                    </div>
-                    {expandedUnits[unit.title] ? <ChevronUp className="w-6 h-6 text-gray-600" /> : <ChevronDown className="w-6 h-6 text-gray-600" />}
-                  </button>
+                      {expandedUnits[unit.title] ? <ChevronUp className="w-6 h-6 text-gray-600" /> : <ChevronDown className="w-6 h-6 text-gray-600" />}
+                    </button>
 
-                  <AnimatePresence>
-                    {expandedUnits[unit.title] && (
-                      <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="border-t border-white/5 bg-black/20"
-                      >
-                        <div className="p-4 md:p-6 space-y-3">
-                          {unit.topics?.map((topic: any, tIdx: number) => {
-                            const progress = roadmap.progress_data?.[topic.id] || {};
-                            const isCompleted = progress.status === "completed" || progress.verified;
-                            const isLocked = roadmap.guided_mode && tIdx > 0 && !(roadmap.progress_data?.[unit.topics[tIdx-1].id]?.status === "completed");
-                            
-                            return (
-                              <div 
-                                key={topic.id}
-                                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                                  isLocked 
-                                    ? "bg-transparent border-transparent opacity-40 grayscale pointer-events-none" 
-                                    : "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/[0.07] group"
-                                }`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
-                                    isCompleted 
-                                      ? "bg-green-500/20 border-green-500/40 text-green-500" 
-                                      : "bg-white/5 border-white/10 text-gray-500"
-                                  }`}>
-                                    {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isLocked ? <Lock className="w-4 h-4" /> : <Circle className="w-2 h-2 fill-current" />}
-                                  </div>
-                                  <div>
-                                    <h4 className="font-bold text-white group-hover:text-primary transition-colors">
-                                      {topic.title}
-                                    </h4>
-                                    <div className="flex items-center gap-3 text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">
-                                      <span className={topic.difficulty === 'advanced' ? 'text-red-400' : 'text-gray-500'}>
-                                        {topic.difficulty}
-                                      </span>
-                                      {isCompleted && progress.score && (
-                                        <span className="text-green-500">Score: {progress.score}%</span>
+                    <AnimatePresence>
+                      {expandedUnits[unit.title] && (
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="border-t border-white/5 bg-black/20"
+                        >
+                          <div className="p-4 md:p-6 space-y-3">
+                            {unit.topics?.length > 0 ? (
+                              unit.topics.map((topic: any, tIdx: number) => {
+                                const progress = roadmap.progress_data?.[topic.id] || {};
+                                const isCompleted = progress.status === "completed" || progress.verified;
+                                const isLocked = roadmap.guided_mode && tIdx > 0 && !(roadmap.progress_data?.[unit.topics[tIdx-1].id]?.status === "completed");
+                                
+                                return (
+                                  <div 
+                                    key={topic.id}
+                                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                                      isLocked 
+                                        ? "bg-transparent border-transparent opacity-40 grayscale pointer-events-none" 
+                                        : "bg-white/5 border-white/5 hover:border-primary/30 hover:bg-white/[0.07] group"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
+                                        isCompleted 
+                                          ? "bg-green-500/20 border-green-500/40 text-green-500" 
+                                          : "bg-white/5 border-white/10 text-gray-500"
+                                      }`}>
+                                        {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isLocked ? <Lock className="w-4 h-4" /> : <Circle className="w-2 h-2 fill-current" />}
+                                      </div>
+                                      <div>
+                                        <h4 className="font-bold text-white group-hover:text-primary transition-colors">
+                                          {topic.title}
+                                        </h4>
+                                        <div className="flex items-center gap-3 text-[10px] text-gray-500 uppercase tracking-widest font-bold mt-1">
+                                          <span className={topic.difficulty === 'advanced' ? 'text-red-400' : 'text-gray-500'}>
+                                            {topic.difficulty}
+                                          </span>
+                                          {isCompleted && progress.score && (
+                                            <span className="text-green-500">Score: {progress.score}%</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-4">
+                                      {!isCompleted && !isLocked && (
+                                         <Link 
+                                           href={`/education/studio?topic=${encodeURIComponent(topic.title)}&subject=${encodeURIComponent(roadmap.subject)}`}
+                                           className="flex items-center gap-2 px-4 py-2 bg-primary text-background text-xs font-black rounded-lg hover:scale-105 transition-transform"
+                                         >
+                                           <Play className="w-3 h-3 fill-current" />
+                                           Start Lesson
+                                         </Link>
+                                      )}
+                                      {isCompleted && (
+                                         <button className="text-[10px] text-gray-500 font-bold uppercase tracking-widest hover:text-white transition-colors">
+                                           Review
+                                         </button>
                                       )}
                                     </div>
                                   </div>
-                                </div>
-
-                                <div className="flex items-center gap-4">
-                                  {!isCompleted && !isLocked && (
-                                     <Link 
-                                       href={`/education/studio?topic=${encodeURIComponent(topic.title)}&subject=${encodeURIComponent(roadmap.subject)}`}
-                                       className="flex items-center gap-2 px-4 py-2 bg-primary text-background text-xs font-black rounded-lg hover:scale-105 transition-transform"
-                                     >
-                                       <Play className="w-3 h-3 fill-current" />
-                                       Start Lesson
-                                     </Link>
-                                  )}
-                                  {isCompleted && (
-                                     <button className="text-[10px] text-gray-500 font-bold uppercase tracking-widest hover:text-white transition-colors">
-                                       Review
-                                     </button>
-                                  )}
-                                </div>
+                                );
+                              })
+                            ) : (
+                              <div className="p-8 text-center bg-white/5 rounded-2xl border border-white/5">
+                                <Cpu className="w-8 h-8 text-gray-600 mx-auto mb-3" />
+                                <p className="text-sm text-gray-500">No lessons synthesized for this unit yet.</p>
+                                <button 
+                                  onClick={handleRegenerate}
+                                  className="mt-4 text-xs text-primary font-bold underline hover:text-primary/80 transition-colors"
+                                >
+                                  Re-generate Framework
+                                </button>
                               </div>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))
+              ) : (
+                <div className="py-20 text-center">
+                  <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/10">
+                    <Zap className="w-10 h-10 text-primary animate-pulse" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-2">Architecting Framework</h3>
+                  <p className="text-gray-500 max-w-sm mx-auto">This course is still being structured by Aria. Please check back in a few moments.</p>
                 </div>
-              ))}
+              )}
             </div>
           </motion.div>
         )}

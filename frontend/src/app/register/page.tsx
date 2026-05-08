@@ -165,6 +165,7 @@ function RegisterForm() {
         const data = res.data;
         const token = data.token.access_token;
         localStorage.setItem("access_token", token);
+        document.cookie = `access_token=${token}; path=/; max-age=86400; SameSite=Lax`;
 
         if (data.user.status === "pending") {
           setIsActivating(true);
@@ -202,6 +203,7 @@ function RegisterForm() {
             clearInterval(interval);
             setActivationStatus("Account activated! Redirecting...");
             localStorage.setItem("access_token", token);
+            document.cookie = `access_token=${token}; path=/; max-age=86400; SameSite=Lax`;
             // Shorter delay - bootstrap will load faster with token cached
             setTimeout(() => router.push("/dashboard"), 800);
           }

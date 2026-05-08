@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
-import { BookOpen, Check } from "lucide-react";
+import { BookOpen, Check, Cpu } from "lucide-react";
 import Link from "next/link";
 
 // New Components
@@ -28,6 +28,15 @@ function EducationStudioContent() {
   const [generatedLessonId, setGeneratedLessonId] = useState<string | null>(null);
   const [generatedRoadmapId, setGeneratedRoadmapId] = useState<string | null>(null);
   const [sourceId, setSourceId] = useState<string | null>(null);
+  const [loadingStep, setLoadingStep] = useState(0);
+  const [isRearchitecting, setIsRearchitecting] = useState(false);
+
+  const steps = [
+    "Consulting Curriculum Architect...",
+    "Parsing Knowledge Layers...",
+    "Extracting Mastery Nodes...",
+    "Validating Structural Integrity..."
+  ];
 
   const searchParams = useSearchParams();
 
@@ -49,20 +58,46 @@ function EducationStudioContent() {
     }
     setLoading(true);
     setError(null);
+    setLoadingStep(0);
+
+    // Progress Simulation for UX
+    const stepInterval = setInterval(() => {
+      setLoadingStep(prev => (prev < steps.length - 1 ? prev + 1 : prev));
+    }, 1500);
+
     try {
       // Stage 1: Generate Roadmap
       let url = `${API}/education/roadmaps/generate?subject=${encodeURIComponent(data.topic)}`;
       if (data.source_id) {
         url += `&source_id=${data.source_id}`;
       }
+      if (isRearchitecting) {
+        url += `&force=true`;
+      }
       const res = await api.post(url);
+      setIsRearchitecting(false); // Reset after use
+      clearInterval(stepInterval);
+      setLoadingStep(3); // Complete
       if (res.status === 200 || res.status === 201) {
-        // roadmap data is often wrapped in roadmap_data or directly
+        // roadmap data is now structured with an ID
+        const roadmapId = res.data.id;
         const roadmapData = res.data.roadmap_data || res.data;
+        const rawUnits = roadmapData.units || res.data.units || [];
+        
+        setGeneratedRoadmapId(roadmapId);
+        
+        // Ensure every unit has a topics array to prevent BlueprintPreview crashes
+        const validatedUnits = rawUnits.map((unit: any) => ({
+          ...unit,
+          id: unit.id || Math.random().toString(36).substr(2, 9),
+          topics: Array.isArray(unit.topics) ? unit.topics : []
+        }));
+
         setRoadmap({
           ...res.data,
+          id: roadmapId,
           roadmap_data: roadmapData,
-          units: roadmapData.units || []
+          units: validatedUnits
         });
         setState("BLUEPRINT");
       }
@@ -142,10 +177,20 @@ function EducationStudioContent() {
                 </div>
               )}
               {loading && (
-                <div className="text-center mt-8">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold animate-pulse">
-                     Architecting Blueprint...
-                  </div>
+                <div className="text-center mt-12">
+                   <div className="flex flex-col items-center gap-4">
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold animate-pulse">
+                         <Cpu className="w-4 h-4 animate-spin" />
+                         {steps[loadingStep]}
+                      </div>
+                      <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+                         <motion.div 
+                            className="h-full bg-primary"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${((loadingStep + 1) / steps.length) * 100}%` }}
+                         />
+                      </div>
+                   </div>
                 </div>
               )}
             </motion.div>
@@ -164,7 +209,10 @@ function EducationStudioContent() {
                   units: roadmap.units
                 }} 
                 onApprove={handleLaunchForge}
-                onCancel={() => setState("INTAKE")}
+                onCancel={() => {
+                  setIsRearchitecting(true);
+                  setState("INTAKE");
+                }}
               />
             </motion.div>
           )}
@@ -200,9 +248,9 @@ function EducationStudioContent() {
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
-                  href={generatedRoadmapId 
-                    ? `/education/roadmap/${generatedRoadmapId}`
-                    : `/education/lessons/${generatedLessonId}`
+                  href={generatedLessonId
+                    ? `/education/lessons/${generatedLessonId}`
+                    : `/education/roadmap/${generatedRoadmapId}`
                   }
                   className="px-12 py-5 bg-primary text-background font-black rounded-2xl hover:bg-primary/90 transition-all text-xl shadow-[0_0_30px_rgba(0,224,255,0.4)]"
                 >

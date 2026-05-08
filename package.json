@@ -1,0 +1,30 @@
+{
+  "name": "learnnearn",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "npx concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend_v2 && ..\\venv_v2\\Scripts\\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000",
+    "frontend": "cd frontend && npm run dev",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Erbah/EarNnLearn.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Erbah/EarNnLearn/issues"
+  },
+  "homepage": "https://github.com/Erbah/EarNnLearn#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

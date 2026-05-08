@@ -1,0 +1,670 @@
+{
+  "subject": "Getting Started",
+  "section_a": {
+    "title": "Basic Electronics: Foundations for the Absolute Beginner",
+    "academic_level": "Beginner / Introductory",
+    "purpose": "To provide a complete, hands-on introduction to the fundamental concepts of electronics for individuals with no prior experience. The course prioritizes practical understanding, circuit construction, and troubleshooting over abstract mathematics, following the pedagogical approach of the source material by Colin Mitchell. The ultimate goal is to enable learners to build, test, and understand simple electrical and electronic circuits.",
+    "outcomes": [
+      "Define and differentiate between voltage, current, resistance, power, and energy in a DC circuit.",
+      "Identify and interpret the schematic symbols for basic components: battery, resistor, LED, diode, switch, motor, and globe.",
+      "Describe the function and proper usage of a multimeter (both analogue and digital) for measuring voltage, current, and resistance.",
+      "Explain the principles of series and parallel circuits, including the behavior of resistors, LEDs, and cells in these configurations.",
+      "Calculate using Ohm\u2019s Law (V=IR) to determine voltage, current, or resistance in a simple circuit.",
+      "Construct and test a basic circuit on a breadboard from a schematic diagram.",
+      "Identify and explain the role of a current-limiting resistor for an LED.",
+      "Describe the concept of internal resistance in a cell and its practical effects.",
+      "Solder components onto a PCB with correct technique (conceptual, if not hands-on in this module)."
+    ],
+    "competency_goals": [
+      "Read and draw simple circuit diagrams using standard symbols.",
+      "Use a multimeter to measure voltage, current, and resistance safely and accurately.",
+      "Select an appropriate resistor for an LED using its color code.",
+      "Identify the cathode (k) and anode of an LED and connect it correctly.",
+      "Construct a working circuit with a switch, battery, and load (globe, motor, LED).",
+      "Test and verify a circuit's operation by measuring voltage drops and current flow."
+    ],
+    "prerequisites": [
+      "No prior electronics experience required.",
+      "Basic arithmetic skills (addition, subtraction, multiplication, division).",
+      "Familiarity with using simple tools (screwdriver, wire strippers) is beneficial but not mandatory."
+    ],
+    "study_duration": "8 Weeks (approximately 4-6 hours per week, including hands-on practice)",
+    "weekly_structure": "Week 1: Introduction to Circuits, Voltage, and Current. Week 2: Resistors, Ohm's Law, and Power. Week 3: The Multimeter and the LED. Week 4: Diodes and Their Applications. Week 5: Capacitors and Timing Concepts. Week 6: The Transistor as a Switch. Week 7: Introduction to Integrated Circuits (555 Timer). Week 8: Project Construction and Capstone Review.",
+    "skill_objectives": [
+      "Schematic Comprehension: Translate a circuit diagram into a physical circuit.",
+      "Component Identification: Recognize components by their schematic symbol and physical appearance.",
+      "Debugging: Use a multimeter to diagnose why a circuit is not working (e.g., open circuit, short circuit).",
+      "Fundamental Calculation: Apply Ohm\u2019s Law to solve for unknown values.",
+      "Soldering (Introductory): Understand the process and safety of soldering (as covered in source material)."
+    ],
+    "real_world_path": "This course is the entry point for a career as a: Hobbyist Maker, Electronics Technician, Repair Technician, Robotics Enthusiast, or Engineering Student. The practical skills learned are directly applicable to building and repairing consumer electronics, automotive electrical systems, and creating custom electronic projects."
+  },
+  "section_b": {
+    "parts": [
+      {
+        "title": "Part 1: Electrical Fundamentals & DC Circuits",
+        "units": [
+          {
+            "title": "Unit 1: The Circuit and Its Elements",
+            "chapters": [
+              {
+                "title": "Chapter 1: What is a Circuit?",
+                "uai": "UAI-ELEC-1.1",
+                "lessons": [
+                  {
+                    "title": "Lesson 1.1: The Complete Path",
+                    "topics": [
+                      {
+                        "id": "t_circuit_path",
+                        "uai": "UAI-ELEC-1.1.1",
+                        "title": "The Complete Path: Battery, Wire, and Globe",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_schematic_intro",
+                        "uai": "UAI-ELEC-1.1.2",
+                        "title": "Schematic Diagrams: Lines, Connections, and Crossings",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_switch_operation",
+                        "uai": "UAI-ELEC-1.1.3",
+                        "title": "Control: The Switch (Open and Closed Circuit)",
+                        "difficulty": "beginner"
+                      }
+                    ]
+                  },
+                  {
+                    "title": "Lesson 1.2: Naming the Rails",
+                    "topics": [
+                      {
+                        "id": "t_power_rail",
+                        "uai": "UAI-ELEC-1.1.4",
+                        "title": "Supply Rail and 0v (Earth) Rail",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_short_circuit",
+                        "uai": "UAI-ELEC-1.1.5",
+                        "title": "The Short Circuit: Danger and Definition",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_earth_return",
+                        "uai": "UAI-ELEC-1.1.6",
+                        "title": "Earth, Chassis, and Current Return",
+                        "difficulty": "beginner"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "title": "Chapter 2: Voltage, Current, and Resistance",
+                "uai": "UAI-ELEC-1.2",
+                "lessons": [
+                  {
+                    "title": "Lesson 2.1: The Three Fundamental Quantities",
+                    "topics": [
+                      {
+                        "id": "t_voltage_dc",
+                        "uai": "UAI-ELEC-1.2.1",
+                        "title": "Voltage (V): The Electrical Pressure",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_current_dc",
+                        "uai": "UAI-ELEC-1.2.2",
+                        "title": "Current (I): The Flow of Electrons",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_resistance_ohms",
+                        "uai": "UAI-ELEC-1.2.3",
+                        "title": "Resistance (R): The Opposition to Flow",
+                        "difficulty": "beginner"
+                      }
+                    ]
+                  },
+                  {
+                    "title": "Lesson 2.2: Ohm's Law and Power",
+                    "topics": [
+                      {
+                        "id": "t_ohms_law_formula",
+                        "uai": "UAI-ELEC-1.2.4",
+                        "title": "Ohm's Law: The Fundamental Relationship (V=IR)",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_power_wattage",
+                        "uai": "UAI-ELEC-1.2.5",
+                        "title": "Power and Energy: Watts and Watt-Hours",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_resistor_wattage_rating",
+                        "uai": "UAI-ELEC-1.2.6",
+                        "title": "Resistor Wattage: Size, Dissipation, and Safety",
+                        "difficulty": "beginner"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "title": "Chapter 3: Working with Resistors",
+                "uai": "UAI-ELEC-1.3",
+                "lessons": [
+                  {
+                    "title": "Lesson 3.1: Identifying and Using Resistors",
+                    "topics": [
+                      {
+                        "id": "t_resistor_colour_codes",
+                        "uai": "UAI-ELEC-1.3.1",
+                        "title": "Resistor Colour Code: Reading Values and Tolerance",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_resistor_values_range",
+                        "uai": "UAI-ELEC-1.3.2",
+                        "title": "Standard Resistor Values (k, M, R notation)",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_resistors_series",
+                        "uai": "UAI-ELEC-1.3.3",
+                        "title": "Resistors in Series",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_resistors_parallel",
+                        "uai": "UAI-ELEC-1.3.4",
+                        "title": "Resistors in Parallel",
+                        "difficulty": "beginner"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "title": "Unit 2: Power Sources and Batteries",
+            "chapters": [
+              {
+                "title": "Chapter 4: The Battery and its Behavior",
+                "uai": "UAI-ELEC-2.1",
+                "lessons": [
+                  {
+                    "title": "Lesson 4.1: Battery Fundamentals",
+                    "topics": [
+                      {
+                        "id": "t_cells_batteries",
+                        "uai": "UAI-ELEC-2.1.1",
+                        "title": "Cells, Batteries, and Series Connections",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_battery_symbol_voltage",
+                        "uai": "UAI-ELEC-2.1.2",
+                        "title": "Schematic Symbol and Adding Voltage Labels",
+                        "difficulty": "beginner"
+                      }
+                    ]
+                  },
+                  {
+                    "title": "Lesson 4.2: Advanced Battery Concepts",
+                    "topics": [
+                      {
+                        "id": "t_internal_resistance",
+                        "uai": "UAI-ELEC-2.1.3",
+                        "title": "Internal Resistance: The Hidden Resistance of a Cell",
+                        "difficulty": "intermediate"
+                      },
+                      {
+                        "id": "t_parallel_batteries",
+                        "uai": "UAI-ELEC-2.1.4",
+                        "title": "Batteries in Parallel: The Booster Case Study",
+                        "difficulty": "intermediate"
+                      },
+                      {
+                        "id": "t_weak_cells_series",
+                        "uai": "UAI-ELEC-2.1.5",
+                        "title": "Effects of a Weak Cell in Series",
+                        "difficulty": "intermediate"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Part 2: Electronic Components & Circuits",
+        "units": [
+          {
+            "title": "Unit 3: Diodes and LEDs",
+            "chapters": [
+              {
+                "title": "Chapter 5: The Diode Family",
+                "uai": "UAI-ELEC-3.1",
+                "lessons": [
+                  {
+                    "title": "Lesson 5.1: The Diode",
+                    "topics": [
+                      {
+                        "id": "t_diode_operation",
+                        "uai": "UAI-ELEC-3.1.1",
+                        "title": "How a Diode Works: One-Way Conduction",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_diode_types_uses",
+                        "uai": "UAI-ELEC-3.1.2",
+                        "title": "Types: Blocking, Protection, Bypass, and Rectifier Diodes",
+                        "difficulty": "intermediate"
+                      }
+                    ]
+                  },
+                  {
+                    "title": "Lesson 5.2: The Light Emitting Diode (LED)",
+                    "topics": [
+                      {
+                        "id": "t_led_basics",
+                        "uai": "UAI-ELEC-3.1.3",
+                        "title": "LED Basics: Polarity, Cathode (k), and Flat Spot",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_led_voltage_drop",
+                        "uai": "UAI-ELEC-3.1.4",
+                        "title": "Characteristic Voltage Drop (Forward Voltage) for Different Colors",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_current_limiting_resistor",
+                        "uai": "UAI-ELEC-3.1.5",
+                        "title": "The Current Limiting Resistor: Why and How to Choose It",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_led_testing_damage",
+                        "uai": "UAI-ELEC-3.1.6",
+                        "title": "Testing an LED and Preventing Damage",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_led_series_parallel",
+                        "uai": "UAI-ELEC-3.1.7",
+                        "title": "Connecting LEDs in Series and Parallel",
+                        "difficulty": "intermediate"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "title": "Unit 4: The Transistor",
+            "chapters": [
+              {
+                "title": "Chapter 6: The Transistor as a Switch",
+                "uai": "UAI-ELEC-4.1",
+                "lessons": [
+                  {
+                    "title": "Lesson 6.1: Introduction to Transistors",
+                    "topics": [
+                      {
+                        "id": "t_transistor_types",
+                        "uai": "UAI-ELEC-4.1.1",
+                        "title": "PNP and NPN Transistors: Basic Differences",
+                        "difficulty": "intermediate"
+                      },
+                      {
+                        "id": "t_cutoff_saturation",
+                        "uai": "UAI-ELEC-4.1.2",
+                        "title": "Cutoff and Saturation: The Switch States",
+                        "difficulty": "intermediate"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "title": "Unit 5: Practical Tools and Techniques",
+            "chapters": [
+              {
+                "title": "Chapter 7: Using the Multimeter",
+                "uai": "UAI-ELEC-5.1",
+                "lessons": [
+                  {
+                    "title": "Lesson 7.1: Multimeter Operation",
+                    "topics": [
+                      {
+                        "id": "t_meter_types",
+                        "uai": "UAI-ELEC-5.1.1",
+                        "title": "Analogue vs. Digital Multimeters (DMM)",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_voltage_measurement",
+                        "uai": "UAI-ELEC-5.1.2",
+                        "title": "Measuring DC Voltage",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_current_measurement",
+                        "uai": "UAI-ELEC-5.1.3",
+                        "title": "Measuring DC Current",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_resistance_measurement",
+                        "uai": "UAI-ELEC-5.1.4",
+                        "title": "Measuring Resistance (Power Off!)",
+                        "difficulty": "beginner"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "title": "Chapter 8: Construction and Debugging",
+                "uai": "UAI-ELEC-5.2",
+                "lessons": [
+                  {
+                    "title": "Lesson 8.1: Building Circuits",
+                    "topics": [
+                      {
+                        "id": "t_breadboard_use",
+                        "uai": "UAI-ELEC-5.2.1",
+                        "title": "Using a Breadboard for Prototyping",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_soldering_basics",
+                        "uai": "UAI-ELEC-5.2.2",
+                        "title": "Introduction to Soldering Technique",
+                        "difficulty": "intermediate"
+                      },
+                      {
+                        "id": "t_troubleshooting",
+                        "uai": "UAI-ELEC-5.2.3",
+                        "title": "Troubleshooting: Finding Shorts and Open Circuits",
+                        "difficulty": "intermediate"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Part 3: Applications and Projects",
+        "units": [
+          {
+            "title": "Unit 6: Building Your First Projects",
+            "chapters": [
+              {
+                "title": "Chapter 9: Simple Circuits and Blocks",
+                "uai": "UAI-ELEC-6.1",
+                "lessons": [
+                  {
+                    "title": "Lesson 9.1: Building Blocks and Simple Schematics",
+                    "topics": [
+                      {
+                        "id": "t_project_1_led",
+                        "uai": "UAI-ELEC-6.1.1",
+                        "title": "Project 1: Illuminating an LED with a Switch",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_project_2_motor",
+                        "uai": "UAI-ELEC-6.1.2",
+                        "title": "Project 2: Controlling a DC Motor (Forward/Reverse)",
+                        "difficulty": "beginner"
+                      },
+                      {
+                        "id": "t_project_3_flasher",
+                        "uai": "UAI-ELEC-6.1.3",
+                        "title": "Project 3: Simple Flashing LED (using RC time constant)",
+                        "difficulty": "intermediate"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "section_c": {
+    "phases": [
+      {
+        "phase": "Beginner",
+        "learned": "Define basic quantities (voltage, current, resistance). Read simple schematics with batteries, resistors, switches, and globes. Understand the function of a multimeter for measuring resistance and voltage. Know the difference between a series and parallel circuit.",
+        "importance": "This phase establishes the absolute foundation. A learner cannot proceed without a concrete understanding of a circuit as a closed loop and the roles of V, I, and R.",
+        "competencies": "Identify resistor values by color code. Build a simple circuit on a breadboard. Use a multimeter to measure battery voltage and resistor value. Distinguish between AC and DC.",
+        "assessment": "Diagnostic Quiz: Identify schematic symbols. Practical Task: Build a circuit from a diagram to light an LED. Short Quiz: Ohm's Law calculations."
+      },
+      {
+        "phase": "Intermediate",
+        "learned": "Explain the characteristics of a diode (including LEDs). Select a current-limiting resistor for an LED. Describe the effect of a transistor as a switch. Understand the concept of a voltage drop. Use a multimeter to measure current and voltage drops in a working circuit.",
+        "importance": "This phase moves from 'electrical' to 'electronic' concepts. The learner begins to understand how active components control current, which is the basis for all advanced circuits.",
+        "competencies": "Test and identify the polarity of an LED. Design a simple LED circuit with a resistor. Measure the characteristic voltage drop of an LED. Build a circuit that uses a transistor to turn a motor on/off from a sensor (e.g., a touch switch).",
+        "assessment": "Practical Exam: Given a bag of resistors and LEDs, build a circuit with specific brightness requirements and measure the voltage across each component. Written Exam: Explain why a current-limiting resistor is needed."
+      },
+      {
+        "phase": "Advanced",
+        "learned": "Analyze more complex circuits involving capacitors (charging/discharging, RC time constants). Understand the operation of a 555 timer IC in astable and monostable modes. Begin to use datasheets for components. Understand the concept of internal resistance and its impact on circuit performance.",
+        "importance": "This phase introduces timing and integrated circuits, allowing for the creation of more sophisticated projects like oscillators, timers, and pulse-width modulation. It bridges the gap between discrete components and system-level design.",
+        "competencies": "Calculate the time constant of an RC circuit. Build an astable multivibrator (flashing LED) using a 555 timer. Use a datasheet to find the pinout for a 555 IC. Identify components by their part numbers.",
+        "assessment": "Design Project: Design and build a circuit that generates a specific frequency (e.g., 1kHz buzzer). Lab Report: Measure the charge/discharge curve of a capacitor and calculate its time constant. Intermediate Exam."
+      },
+      {
+        "phase": "Mastery",
+        "learned": "Independently design, prototype, and debug a complete electronic system. Integrate multiple sub-circuits (e.g., sensor -> transistor -> 555 timer -> output). Solder a PCB from a schematic. Interpret complex schematics containing multiple ICs and discrete components.",
+        "importance": "Mastery represents full independence. The learner can move from a problem statement to a working solution. This is the level of a competent technician or hobbyist capable of complex builds and repairs.",
+        "competencies": "Independently troubleshoot a non-working project using a systematic approach. Modify an existing circuit to change its behavior. Select appropriate components for a given application (e.g., correct transistor for a motor driver).",
+        "assessment": "Capstone Project: Design and build a project of moderate complexity (e.g., a plant watering indicator, a light-controlled switch, a simple audio amplifier) from a provided or self-drawn schematic. 100-question comprehensive final exam."
+      }
+    ]
+  },
+  "section_d": {
+    "assessment_plan": [
+      "Diagnostic: Pre-course quiz on basic math and concepts of electricity to gauge starting point.",
+      "Quizzes: Weekly short quizzes (5-10 questions) on the week's topics (Ohm's Law, color codes, symbols).",
+      "Exams: A mid-term exam covering Parts 1 and 2, and a comprehensive final exam covering the entire course.",
+      "Capstone: A final practical project where students must build, test, and present a circuit (e.g., a 555 timer flasher or a transistor switch) with a written report of its operation."
+    ]
+  },
+  "section_e": {
+    "practice_system": [
+      "Daily exercises: Component identification (color code drills, symbol quizzes).",
+      "Weekly assignments: Building one new circuit each week on a breadboard, taking measurements.",
+      "Simulations: Use a free online simulator (e.g., Falstad's Circuit Simulator) to explore circuit behavior before building."
+    ]
+  },
+  "section_f": {
+    "mastery_definition": "Mastery is defined as the ability to independently interpret a schematic diagram, construct the corresponding physical circuit on a breadboard or protoboard, measure key parameters (voltage, current, resistance) to verify operation, and successfully debug any faults without external assistance.",
+    "measurement": "Measured by the successful completion of the Capstone Project, a perfect score on the practical debugging exam (diagnosing faults in a pre-built faulty circuit), and a score of 90% or higher on the comprehensive final exam.",
+    "weakness_detection": "Weaknesses are detected via early-stage quizzes on Ohm's Law and color codes, and mid-term exam performance. Struggles with the practical mid-term project (e.g., LED not lighting, motor not running) will immediately identify gaps in component identification or circuit assembly skills. Follow-up assessments target those specific areas."
+  },
+  "section_g": {
+    "resources": [
+      "Core textbooks: \"Basic Electronics\" by Colin Mitchell (source material), \"Getting Started in Electronics\" by Forrest Mims III.",
+      "Reference tools: Resistor color code calculator (online), standard component datasheet databases (e.g., Digi-Key, Mouser).",
+      "Software: Falstad's Circuit Simulator (free), Fritzing (for PCB layout and breadboard views)."
+    ]
+  },
+  "section_h": {
+    "career_path": "This course provides the foundational electronic literacy required for careers in: Electronics Technician (repair of consumer goods), Field Service Technician, Robotics Technician, Audio/Visual Installer, Automation Technician, or as a precursor to a degree in Electrical/Electronics Engineering. Immediate job roles include: Assembly Technician, Bench Technician, or Hobbyist turning professional."
+  },
+  "section_i": {
+    "academic_map": "FOUNDATION \u2192 CORE \u2192 APPLICATION \u2192 ANALYSIS \u2192 MASTERY \u2192 PROFESSIONAL"
+  },
+  "units": [
+    {
+      "title": "Unit 1: The Circuit and Its Elements",
+      "description": "Introduction to the complete circuit, schematic diagrams, and the naming of supply and earth rails. Introduces the concept of a switch."
+    },
+    {
+      "title": "Unit 2: Power Sources and Batteries",
+      "description": "Detailed look at cells, batteries, series/parallel connections, and the hidden concept of internal resistance."
+    },
+    {
+      "title": "Unit 3: Diodes and LEDs",
+      "description": "Covers the diode's one-way function and the LED's characteristics, voltage drops, and current-limiting resistor requirements."
+    },
+    {
+      "title": "Unit 4: The Transistor",
+      "description": "Introduction to NPN/PNP transistors, focusing on their use as a simple electronic switch (cutoff and saturation)."
+    },
+    {
+      "title": "Unit 5: Practical Tools and Techniques",
+      "description": "Hands-on use of the multimeter and introduction to breadboarding and soldering techniques."
+    },
+    {
+      "title": "Unit 6: Building Your First Projects",
+      "description": "Guided project building (LED flasher, motor control) to cement theoretical knowledge into practical skill."
+    }
+  ],
+  "dependency_graph": {
+    "t_circuit_path": [],
+    "t_schematic_intro": [
+      "t_circuit_path"
+    ],
+    "t_switch_operation": [
+      "t_circuit_path"
+    ],
+    "t_power_rail": [
+      "t_circuit_path"
+    ],
+    "t_short_circuit": [
+      "t_power_rail"
+    ],
+    "t_earth_return": [
+      "t_power_rail"
+    ],
+    "t_voltage_dc": [
+      "t_circuit_path"
+    ],
+    "t_current_dc": [
+      "t_voltage_dc"
+    ],
+    "t_resistance_ohms": [
+      "t_voltage_dc",
+      "t_current_dc"
+    ],
+    "t_ohms_law_formula": [
+      "t_voltage_dc",
+      "t_current_dc",
+      "t_resistance_ohms"
+    ],
+    "t_power_wattage": [
+      "t_ohms_law_formula"
+    ],
+    "t_resistor_wattage_rating": [
+      "t_power_wattage"
+    ],
+    "t_resistor_colour_codes": [],
+    "t_resistor_values_range": [
+      "t_resistor_colour_codes"
+    ],
+    "t_resistors_series": [
+      "t_ohms_law_formula"
+    ],
+    "t_resistors_parallel": [
+      "t_ohms_law_formula"
+    ],
+    "t_cells_batteries": [],
+    "t_battery_symbol_voltage": [
+      "t_cells_batteries"
+    ],
+    "t_internal_resistance": [
+      "t_cells_batteries",
+      "t_ohms_law_formula"
+    ],
+    "t_parallel_batteries": [
+      "t_internal_resistance"
+    ],
+    "t_weak_cells_series": [
+      "t_internal_resistance"
+    ],
+    "t_diode_operation": [
+      "t_circuit_path"
+    ],
+    "t_diode_types_uses": [
+      "t_diode_operation"
+    ],
+    "t_led_basics": [
+      "t_diode_operation"
+    ],
+    "t_led_voltage_drop": [
+      "t_led_basics"
+    ],
+    "t_current_limiting_resistor": [
+      "t_led_basics",
+      "t_ohms_law_formula"
+    ],
+    "t_led_testing_damage": [
+      "t_led_voltage_drop"
+    ],
+    "t_led_series_parallel": [
+      "t_led_voltage_drop",
+      "t_ohms_law_formula"
+    ],
+    "t_transistor_types": [
+      "t_diode_operation"
+    ],
+    "t_cutoff_saturation": [
+      "t_transistor_types"
+    ],
+    "t_meter_types": [],
+    "t_voltage_measurement": [
+      "t_meter_types",
+      "t_voltage_dc"
+    ],
+    "t_current_measurement": [
+      "t_meter_types",
+      "t_current_dc"
+    ],
+    "t_resistance_measurement": [
+      "t_meter_types",
+      "t_resistance_ohms"
+    ],
+    "t_breadboard_use": [],
+    "t_soldering_basics": [
+      "t_breadboard_use"
+    ],
+    "t_troubleshooting": [
+      "t_voltage_measurement",
+      "t_current_measurement",
+      "t_resistance_measurement"
+    ],
+    "t_project_1_led": [
+      "t_led_basics",
+      "t_current_limiting_resistor",
+      "t_breadboard_use"
+    ],
+    "t_project_2_motor": [
+      "t_switch_operation",
+      "t_breadboard_use"
+    ],
+    "t_project_3_flasher": [
+      "t_led_basics",
+      "t_current_limiting_resistor",
+      "t_resistors_series",
+      "t_resistors_parallel"
+    ]
+  }
+}
