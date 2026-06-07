@@ -7,6 +7,7 @@ import {
   Star, Users, BookOpen, PlayCircle, ChevronDown, ChevronRight,
   Award, Clock, Zap, ArrowLeft, CheckCircle, Lock, ArrowUpRight, HelpCircle
 } from "lucide-react";
+import axios from "axios";
 
 import { API_BASE_URL, api } from "@/lib/api";
 
@@ -33,7 +34,9 @@ export default function CourseDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    api.get(`${API}/courses/${id}`)
+    const controller = new AbortController();
+
+    api.get(`${API}/courses/${id}`, { signal: controller.signal })
       .then(res => {
         const data = res.data;
         setCourse(data.course);
@@ -41,14 +44,22 @@ export default function CourseDetailPage() {
         setReviews(Array.isArray(data.reviews) ? data.reviews : []);
         if (Array.isArray(data.modules) && data.modules.length > 0) setExpandedModule(data.modules[0].id);
       })
-      .catch(() => {
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
         setModules([]);
         setReviews([]);
       });
+
     // Check if already enrolled
-    api.get(`${API}/learn/status/${id}`)
+    api.get(`${API}/learn/status/${id}`, { signal: controller.signal })
       .then(res => setPaymentStatus(res.data))
-      .catch(() => {});
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      });
+
+    return () => {
+      controller.abort();
+    };
   }, [id]);
 
   async function checkFeasibility() {

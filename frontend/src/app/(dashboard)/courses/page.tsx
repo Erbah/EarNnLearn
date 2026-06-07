@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -41,32 +41,50 @@ export default function CoursesPage() {
   const debouncedSearch = useDebounce(search, 300);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch(`${API}/courses/categories`)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) setCategories(data);
-        else setCategories([]);
-      })
-      .catch(() => setCategories([]));
-    loadCourses();
-  }, []);
-
-  useEffect(() => { loadCourses(); }, [activeCategory, activeLevel, sort]);
-
-  async function loadCourses() {
+  const loadCourses = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     const params = new URLSearchParams({ sort });
     if (activeCategory) params.set("category", activeCategory);
     if (activeLevel) params.set("skill_level", activeLevel);
     try {
-      const r = await fetch(`${API}/courses/browse?${params}`);
+      const r = await fetch(`${API}/courses/browse?${params}`, { signal });
       const data = await r.json();
       if (Array.isArray(data)) setCourses(data);
       else setCourses([]);
-    } catch { setCourses([]); }
-    setLoading(false);
-  }
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      setCourses([]);
+    } finally {
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [activeCategory, activeLevel, sort]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${API}/courses/categories`, { signal: controller.signal })
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setCategories(data);
+        else setCategories([]);
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
+        setCategories([]);
+      });
+    return () => {
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    loadCourses(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [loadCourses]);
 
   const filtered = useMemo(() => {
     return debouncedSearch && Array.isArray(courses)

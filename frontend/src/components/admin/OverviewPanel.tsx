@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Stat } from './Stat';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -26,9 +27,13 @@ export const OverviewPanel = React.memo(function OverviewPanel() {
   const [data, setData] = useState<AnalyticsData | null>(null);
 
   useEffect(() => {
-    api.get(`${API}/analytics`)
+    const controller = new AbortController();
+    api.get(`${API}/analytics`, { signal: controller.signal })
       .then(res => setData(res.data && typeof res.data === 'object' ? res.data : null))
-      .catch(() => { });
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      });
+    return () => controller.abort();
   }, []);
 
   if (!data) return <div style={ANALYTICS_LOADING_STYLE}>Loading analytics...</div>;

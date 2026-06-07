@@ -103,7 +103,7 @@ class EffectsManager {
 
 export const effectsManager = new EffectsManager();
 
-export function useEffects() {
+export function getEffects() {
   return {
     showSpotlight: (elementId?: string) => effectsManager.showSpotlight(elementId),
     hideSpotlight: () => effectsManager.hideSpotlight(),

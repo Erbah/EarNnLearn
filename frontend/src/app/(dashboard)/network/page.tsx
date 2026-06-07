@@ -1,6 +1,12 @@
 'use client';
 import { motion } from 'framer-motion';
-import NetworkTree from '@/components/NetworkTree';
+import dynamic from 'next/dynamic';
+import { NetworkTreeSkeleton } from '@/components/Skeletons';
+
+const NetworkTree = dynamic(() => import('@/components/NetworkTree'), {
+  loading: () => <NetworkTreeSkeleton />,
+  ssr: false
+});
 
 export default function NetworkPage() {
   return (

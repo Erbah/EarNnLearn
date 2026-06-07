@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CheckCircle2, ExternalLink, Zap, Sparkles } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -120,16 +121,20 @@ export const CourseReviewPanel = React.memo(function CourseReviewPanel() {
   const [aiReviews, setAiReviews] = useState<Record<string, any>>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
 
-  const loadPending = useCallback(() => {
+  const loadPending = useCallback((signal?: AbortSignal) => {
     setLoading(true);
-    api.get(`${API}/courses/pending`)
+    api.get(`${API}/courses/pending`, { signal })
       .then(res => setCourses(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {})
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    loadPending();
+    const controller = new AbortController();
+    loadPending(controller.signal);
+    return () => controller.abort();
   }, [loadPending]);
 
   const handleAIReview = useCallback(async (id: string) => {

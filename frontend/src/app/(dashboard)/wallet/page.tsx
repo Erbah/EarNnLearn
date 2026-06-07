@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Wallet,
@@ -14,6 +14,7 @@ import {
   X,
   Plus
 } from "lucide-react";
+import axios from "axios";
 
 import { API_BASE_URL, api } from "@/lib/api";
 
@@ -56,30 +57,38 @@ export default function WalletPage() {
   const [payoutMethod, setPayoutMethod] = useState("Mobile Money (MTN)");
   const [payoutDetails, setPayoutDetails] = useState("");
 
-  useEffect(() => {
-    fetchWalletData();
-  }, []);
-
-  async function fetchWalletData() {
+  const fetchWalletData = useCallback(async (signal?: any) => {
+    const abortSignal = signal instanceof AbortSignal ? signal : undefined;
     setLoading(true);
     setError(null);
     try {
       const [wRes, tRes, wdRes] = await Promise.all([
-        api.get(`${API}/wallet/`),
-        api.get(`${API}/wallet/transactions`),
-        api.get(`${API}/wallet/withdrawals/my`)
+        api.get(`${API}/wallet/`, { signal: abortSignal }),
+        api.get(`${API}/wallet/transactions`, { signal: abortSignal }),
+        api.get(`${API}/wallet/withdrawals/my`, { signal: abortSignal })
       ]);
 
       setWallet(wRes.data);
       setTransactions(tRes.data);
       setWithdrawals(wdRes.data);
     } catch (err) {
+      if (axios.isCancel(err)) return;
       setError("Failed to load wallet. Please ensure you have activated your account.");
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!abortSignal?.aborted) {
+        setLoading(false);
+      }
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchWalletData(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [fetchWalletData]);
 
   async function handleDeposit() {
     try {

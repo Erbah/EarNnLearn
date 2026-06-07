@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -24,9 +25,13 @@ export const LogsPanel = React.memo(function LogsPanel() {
   const [logs, setLogs] = useState<any[]>([]);
 
   useEffect(() => { 
-    api.get(`${API}/logs`)
+    const controller = new AbortController();
+    api.get(`${API}/logs`, { signal: controller.signal })
       .then(res => setLogs(Array.isArray(res.data) ? res.data : []))
-      .catch(() => { }); 
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      }); 
+    return () => controller.abort();
   }, []);
 
   return (

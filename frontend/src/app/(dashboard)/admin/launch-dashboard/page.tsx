@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useRouter } from 'next/navigation';
 import { 
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
+import axios from 'axios';
 
 interface LaunchMetrics {
   onboarding: {
@@ -48,25 +49,31 @@ export default function LaunchDashboard() {
     }
   }, [user, loading, router]);
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async (signal?: any) => {
+    const abortSignal = signal instanceof AbortSignal ? signal : undefined;
     setIsRefreshing(true);
     try {
-      const response = await api.get('/api/v1/users/analytics/launch-metrics');
+      const response = await api.get('/api/v1/users/analytics/launch-metrics', { signal: abortSignal });
       setMetrics(response.data);
     } catch (error) {
+      if (axios.isCancel(error)) return;
       console.error('Failed to fetch metrics:', error);
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (user?.role === 'SUPER_ADMIN') {
-      fetchMetrics();
-      const interval = setInterval(fetchMetrics, 30000); // 30s auto-refresh
-      return () => clearInterval(interval);
+      const controller = new AbortController();
+      fetchMetrics(controller.signal);
+      const interval = setInterval(() => fetchMetrics(controller.signal), 30000); // 30s auto-refresh
+      return () => {
+        controller.abort();
+        clearInterval(interval);
+      };
     }
-  }, [user]);
+  }, [user, fetchMetrics]);
 
   if (loading || !user || user.role !== 'SUPER_ADMIN') {
     return <div className="p-8 text-white/50 animate-pulse">Authenticating Elite Access...</div>;

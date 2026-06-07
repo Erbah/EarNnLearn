@@ -12,6 +12,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import axios from 'axios';
+
 /* ───── Static Style Constants ───── */
 const LOADER_CONTAINER_STYLE = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', color: '#00E0FF' };
 const TEXT_CENTER_STYLE = { textAlign: 'center' as const };
@@ -120,10 +122,11 @@ export const NetworkTree = React.memo(function NetworkTree() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
     let activeWorker: Worker | null = null;
     async function fetchTree() {
       try {
-        const res = await api.get('/api/v1/network/tree-view');
+        const res = await api.get('/api/v1/network/tree-view', { signal: controller.signal });
         const tree: TreeData = res.data;
 
         if (typeof window !== 'undefined' && window.Worker) {
@@ -153,12 +156,14 @@ export const NetworkTree = React.memo(function NetworkTree() {
           setLoading(false);
         }
       } catch (err) {
+        if (axios.isCancel(err)) return;
         setError('Failed to load network tree');
         setLoading(false);
       }
     }
     fetchTree();
     return () => {
+      controller.abort();
       if (activeWorker) {
         activeWorker.terminate();
       }

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, X, Settings, Zap, ShieldCheck, Globe, CheckCircle, AlertCircle } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -27,20 +28,24 @@ export const AIStrategyPanel = React.memo(function AIStrategyPanel() {
     { id: 'mock', name: 'Mock / Simulation', models: ['mock'] }
   ], []);
 
-  const fetchSettings = useCallback(() => {
+  const fetchSettings = useCallback((signal?: AbortSignal) => {
     setLoading(true);
-    api.get(`${API}/ai-settings`)
+    api.get(`${API}/ai-settings`, { signal })
       .then(res => {
         setProvider(res.data.active_provider);
         setModel(res.data.active_model);
         setBaseUrl(res.data.active_base_url || '');
       })
-      .catch(() => { })
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    fetchSettings();
+    const controller = new AbortController();
+    fetchSettings(controller.signal);
+    return () => controller.abort();
   }, [fetchSettings]);
 
   const handleSave = useCallback(async () => {

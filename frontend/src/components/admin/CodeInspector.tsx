@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Eye, Smile, CheckCircle2, Zap, ShoppingBag, Trash2, Loader2 } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 import { AdminStatCard } from './AdminStatCard';
 import { ShareModal } from './ShareModal';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -80,16 +81,17 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deletingBulk, setDeletingBulk] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (signal?: AbortSignal) => {
     try {
       const [codesRes, statsRes] = await Promise.all([
-        api.get(`${API}/codes?search=${debouncedSearch}`),
-        api.get(`${API}/codes/stats`)
+        api.get(`${API}/codes?search=${debouncedSearch}`, { signal }),
+        api.get(`${API}/codes/stats`, { signal })
       ]);
       setCodes(codesRes.data);
       setStats(statsRes.data);
       setLoading(false);
     } catch (e: any) {
+      if (axios.isCancel(e)) return;
       if (e.response?.status === 401) {
         alert("Admin Token Expired! Please log out and unlock the gateway again.");
         window.location.href = '/admin-login';
@@ -98,7 +100,9 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
   }, [debouncedSearch]);
 
   useEffect(() => {
-    loadData();
+    const controller = new AbortController();
+    loadData(controller.signal);
+    return () => controller.abort();
   }, [loadData]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

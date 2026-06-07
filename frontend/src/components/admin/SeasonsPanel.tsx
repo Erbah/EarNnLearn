@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Globe, X, Loader2 } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -44,14 +45,18 @@ export const SeasonsPanel = React.memo(function SeasonsPanel() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const loadSeasons = useCallback(() => {
-    api.get(`${API}/seasons`)
+  const loadSeasons = useCallback((signal?: AbortSignal) => {
+    api.get(`${API}/seasons`, { signal })
       .then(res => setSeasons(Array.isArray(res.data) ? res.data : []))
-      .catch(() => { });
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      });
   }, []);
 
   useEffect(() => {
-    loadSeasons();
+    const controller = new AbortController();
+    loadSeasons(controller.signal);
+    return () => controller.abort();
   }, [loadSeasons]);
 
   const createSeason = useCallback(async () => {
@@ -249,7 +254,7 @@ export const SeasonsPanel = React.memo(function SeasonsPanel() {
               You are about to delete ALL unused RID codes for this season. This cannot be undone.
             </p>
             <div className="space-y-2">
-              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Type "DELETE RID SEASON" to confirm</label>
+              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">{'Type "DELETE RID SEASON" to confirm'}</label>
               <input
                 value={confirmPhrase}
                 onChange={handleConfirmPhraseChange}

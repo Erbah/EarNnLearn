@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { X, Database, Table, Zap, Loader2 } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -41,7 +42,13 @@ export const RealDatabaseInspector = React.memo(function RealDatabaseInspector({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get(`${API}/tables`).then(res => setTables(res.data)).catch(() => {});
+    const controller = new AbortController();
+    api.get(`${API}/tables`, { signal: controller.signal })
+      .then(res => setTables(res.data))
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      });
+    return () => controller.abort();
   }, []);
 
   const loadTable = useCallback(async (name: string) => {

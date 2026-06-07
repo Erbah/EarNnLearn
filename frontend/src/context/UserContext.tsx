@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
+import axios from "axios";
 
 const API = "/api/v1";
 
@@ -35,7 +36,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchUser = useCallback(async () => {
+  const fetchUser = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
@@ -50,9 +51,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      const res = await api.get(`${API}/auth/me`);
+      const res = await api.get(`${API}/auth/me`, { signal });
       setUser(res.data);
     } catch (err: any) {
+      if (axios.isCancel(err)) return;
       // Handle validation errors (arrays) and detail objects
       let errorMsg = "Failed to fetch user";
       const detail = err.response?.data?.detail;
@@ -77,7 +79,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchUser();
+    const controller = new AbortController();
+    fetchUser(controller.signal);
+    return () => {
+      controller.abort();
+    };
   }, [fetchUser]);
 
   const refetchUser = useCallback(async () => {

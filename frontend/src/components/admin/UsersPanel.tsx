@@ -5,6 +5,8 @@ import { Search } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
 import { InspectUserModal } from './InspectUserModal';
 
+import axios from 'axios';
+
 const API = `${API_BASE_URL}/api/v1/admin`;
 
 /* ───── Static Style Constants ───── */
@@ -62,9 +64,13 @@ export const UsersPanel = React.memo(function UsersPanel() {
   const [inspectingRid, setInspectingRid] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get(`${API}/users`)
+    const controller = new AbortController();
+    api.get(`${API}/users`, { signal: controller.signal })
       .then(res => setUsers(Array.isArray(res.data) ? res.data : []))
-      .catch(() => { });
+      .catch(err => {
+        if (axios.isCancel(err)) return;
+      });
+    return () => controller.abort();
   }, []);
 
   const handleInspect = useCallback((rid: string) => {

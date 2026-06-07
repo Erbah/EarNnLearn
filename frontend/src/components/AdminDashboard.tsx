@@ -3,18 +3,22 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Zap, LogOut } from 'lucide-react';
 
-import OverviewPanel from './admin/OverviewPanel';
-import NotificationsPanel from './admin/NotificationsPanel';
-import CourseReviewPanel from './admin/CourseReviewPanel';
-import SeasonsPanel from './admin/SeasonsPanel';
-import SettingsPanel from './admin/SettingsPanel';
-import UsersPanel from './admin/UsersPanel';
-import PayoutsPanel from './admin/PayoutsPanel';
-import CodesPanel from './admin/CodesPanel';
-import DatabasePanel from './admin/DatabasePanel';
-import AIStrategyPanel from './admin/AIStrategyPanel';
-import LogsPanel from './admin/LogsPanel';
+import dynamic from 'next/dynamic';
+import { PanelSkeleton } from './Skeletons';
+
 import Tab from './admin/Tab';
+
+const OverviewPanel = dynamic(() => import('./admin/OverviewPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const NotificationsPanel = dynamic(() => import('./admin/NotificationsPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const CourseReviewPanel = dynamic(() => import('./admin/CourseReviewPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const SeasonsPanel = dynamic(() => import('./admin/SeasonsPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const SettingsPanel = dynamic(() => import('./admin/SettingsPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const UsersPanel = dynamic(() => import('./admin/UsersPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const PayoutsPanel = dynamic(() => import('./admin/PayoutsPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const CodesPanel = dynamic(() => import('./admin/CodesPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const DatabasePanel = dynamic(() => import('./admin/DatabasePanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const AIStrategyPanel = dynamic(() => import('./admin/AIStrategyPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const LogsPanel = dynamic(() => import('./admin/LogsPanel'), { loading: () => <PanelSkeleton />, ssr: false });
 
 export const AdminDashboard = React.memo(function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');

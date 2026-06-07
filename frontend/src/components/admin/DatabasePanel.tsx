@@ -3,7 +3,16 @@ import React, { useState, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Database } from 'lucide-react';
 import { Stat } from './Stat';
-import { RealDatabaseInspector } from './RealDatabaseInspector';
+import dynamic from 'next/dynamic';
+import { RealDatabaseInspectorSkeleton } from '../Skeletons';
+
+const RealDatabaseInspector = dynamic(
+  () => import('./RealDatabaseInspector').then(mod => mod.RealDatabaseInspector),
+  {
+    loading: () => <RealDatabaseInspectorSkeleton />,
+    ssr: false
+  }
+);
 
 export const DatabasePanel = React.memo(function DatabasePanel() {
   const [showInspector, setShowInspector] = useState(false);

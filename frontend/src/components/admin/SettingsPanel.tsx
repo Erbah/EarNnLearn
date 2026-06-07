@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -88,12 +89,16 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
   const [newPw, setNewPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
 
-  const loadSettings = useCallback(() => {
-    api.get(`${API}/settings`).then(res => setSettings(res.data)).catch(() => { });
+  const loadSettings = useCallback((signal?: AbortSignal) => {
+    api.get(`${API}/settings`, { signal }).then(res => setSettings(res.data)).catch((err) => {
+      if (axios.isCancel(err)) return;
+    });
   }, []);
 
   useEffect(() => {
-    loadSettings();
+    const controller = new AbortController();
+    loadSettings(controller.signal);
+    return () => controller.abort();
   }, [loadSettings]);
 
   const save = useCallback(async (key: string) => {

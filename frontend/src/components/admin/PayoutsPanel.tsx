@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -57,15 +58,19 @@ export const PayoutsPanel = React.memo(function PayoutsPanel() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadRequests = useCallback(() => {
-    api.get(`${API}/withdrawals/pending`)
+  const loadRequests = useCallback((signal?: AbortSignal) => {
+    api.get(`${API}/withdrawals/pending`, { signal })
       .then(res => setRequests(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {})
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    loadRequests();
+    const controller = new AbortController();
+    loadRequests(controller.signal);
+    return () => controller.abort();
   }, [loadRequests]);
 
   const handleAction = useCallback(async (id: string, action: 'approve' | 'reject') => {

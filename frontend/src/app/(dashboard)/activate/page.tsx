@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,6 +19,7 @@ import {
   CheckCircle,
   Share2
 } from "lucide-react";
+import axios from "axios";
 import { api } from "@/lib/api";
 
 const API = "/api/v1";
@@ -41,17 +42,28 @@ export default function ActivateCodePage() {
   const [currency, setCurrency] = useState("GHS");
   const [userCodes, setUserCodes] = useState<any[]>([]);
 
-  useEffect(() => {
-    loadUserCodes();
-    api.get(`${API}/wallet/`).then(res => setWalletBalance(Number(res.data.balance) || 0)).catch(() => { });
+  const loadUserCodes = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const resp = await api.get(`${API}/codes/my-codes`, { signal });
+      setUserCodes(resp.data);
+    } catch (err: any) {
+      if (axios.isCancel(err)) return;
+      setUserCodes([]);
+    }
   }, []);
 
-  async function loadUserCodes() {
-    try {
-      const resp = await api.get(`${API}/codes/my-codes`);
-      setUserCodes(resp.data);
-    } catch { setUserCodes([]); }
-  }
+  useEffect(() => {
+    const controller = new AbortController();
+    loadUserCodes(controller.signal);
+    api.get(`${API}/wallet/`, { signal: controller.signal })
+      .then(res => setWalletBalance(Number(res.data.balance) || 0))
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [loadUserCodes]);
 
   async function fetchSellerInfo() {
     setLoading(true);

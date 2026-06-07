@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Lock, Mail, User, KeyRound, Globe, ShoppingCart, ChevronDown, CheckCircle, CreditCard, Smartphone, ShieldCheck, ChevronLeft, Loader2, RefreshCw, Info, Zap, Eye, EyeOff } from "lucide-react";
+import axios from "axios";
 import { API_BASE_URL, api } from "@/lib/api";
 
 const API = "/api/v1";
@@ -62,10 +63,44 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const loadCurrencies = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await api.get(`${API}/marketplace/currencies`, { signal });
+      const data = res.data;
+      setCurrencies(data.currencies);
+      setExchangeRates(data.rates);
+    } catch (e) {
+      if (axios.isCancel(e)) return;
+    }
+  }, []);
+
+  const loadPool = useCallback(async (type: "rid" | "product_code", signal?: AbortSignal) => {
+    setLoadingPool(true);
+    try {
+      const endpoint = type === "rid" ? "rids" : "product-codes";
+      const url = `${API}/marketplace/${endpoint}`;
+      console.log("Fetching pool from:", url);
+      const res = await api.get(url, { signal });
+      console.log("Pool data received:", res.data);
+      setPool(res.data);
+    } catch (e) {
+      if (axios.isCancel(e)) return;
+      console.error("Pool fetch failed:", e);
+    } finally {
+      if (!signal?.aborted) {
+        setLoadingPool(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    loadPool(entryMethod);
-    loadCurrencies();
-  }, [entryMethod]);
+    const controller = new AbortController();
+    loadPool(entryMethod, controller.signal);
+    loadCurrencies(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [entryMethod, loadPool, loadCurrencies]);
 
   // Auto-fill from Shareable Link
   useEffect(() => {
@@ -78,14 +113,21 @@ function RegisterForm() {
       setFormData(prev => ({ ...prev, manualCode: codeParam }));
       setReferralApplied(true);
 
-      api.get(`${API}/marketplace/check?code=${codeParam}`)
+      const controller = new AbortController();
+      api.get(`${API}/marketplace/check?code=${codeParam}`, { signal: controller.signal })
         .then(res => {
           const meta = res.data;
           if (meta.valid) {
             setCodeMetadata(meta);
           }
         })
-        .catch(console.error);
+        .catch((err) => {
+          if (axios.isCancel(err)) return;
+          console.error(err);
+        });
+      return () => {
+        controller.abort();
+      };
     }
   }, [searchParams]);
 
@@ -99,7 +141,7 @@ function RegisterForm() {
         setFormData(prev => ({ ...prev, purchaseAmount: converted.toFixed(2) }));
       }
     }
-  }, [codeMetadata, exchangeRates, formData.preferredCurrency]);
+  }, [codeMetadata, exchangeRates, formData.preferredCurrency, formData.purchaseAmount]);
 
   // Robust Sync Logic: Keep payout in sync with payment if toggle is on
   useEffect(() => {
@@ -112,31 +154,6 @@ function RegisterForm() {
       }));
     }
   }, [formData.syncPayout, formData.paymentMethod, formData.paymentProvider, formData.paymentNumber]);
-
-  async function loadCurrencies() {
-    try {
-      const res = await api.get(`${API}/marketplace/currencies`);
-      const data = res.data;
-      setCurrencies(data.currencies);
-      setExchangeRates(data.rates);
-    } catch (e) { }
-  }
-
-  async function loadPool(type: "rid" | "product_code") {
-    setLoadingPool(true);
-    try {
-      const endpoint = type === "rid" ? "rids" : "product-codes";
-      const url = `${API}/marketplace/${endpoint}`;
-      console.log("Fetching pool from:", url);
-      const res = await api.get(url);
-      console.log("Pool data received:", res.data);
-      setPool(res.data);
-    } catch (e) {
-      console.error("Pool fetch failed:", e);
-    } finally {
-      setLoadingPool(false);
-    }
-  }
 
   async function handleRegister() {
     setLoading(true);

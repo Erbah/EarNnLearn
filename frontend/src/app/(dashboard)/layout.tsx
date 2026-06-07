@@ -5,7 +5,7 @@ import { AdminSidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import { useUser } from "@/context/UserContext";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useCallback } from "react";
+import { useCallback } from "react";
 
 export default function DashboardLayout({
   children,
@@ -24,7 +24,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-
+  const handleSupportClick = useCallback(() => {
+    window.location.href = 'mailto:support@learnnearn.com';
+  }, []);
 
   // --- 🚨 Elite Hardening: Beta Access Gate ---
   const isBetaAuthorized = user?.is_beta_user || user?.role === 'SUPER_ADMIN';
@@ -37,10 +39,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  const handleSupportClick = useCallback(() => {
-    window.location.href = 'mailto:support@learnnearn.com';
-  }, []);
 
   // Final Hardening: Launch Gate Screen
   if (!loading && user && !isBetaAuthorized) {

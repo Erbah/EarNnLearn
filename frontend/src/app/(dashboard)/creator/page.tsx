@@ -6,6 +6,7 @@ import {
   BookOpen, Users, Star, TrendingUp, Plus, Upload, Eye,
   BarChart3, Award, CheckCircle, XCircle, HelpCircle, Trash2, Save, MessageSquare
 } from "lucide-react";
+import axios from "axios";
 import { API_BASE_URL, api } from "@/lib/api";
 
 const API = "/api/v1";
@@ -43,12 +44,27 @@ export default function CreatorPage() {
   });
 
   useEffect(() => {
-    api.get(`${API}/courses/categories`).then(res => setCategories(res.data)).catch(() => {});
-    api.get(`${API}/courses/creator/analytics`).then(res => {
-      const data = res.data;
-      setAnalytics(data);
-      setMyCourses(data.courses || []);
-    }).catch(() => {});
+    const controller = new AbortController();
+
+    api.get(`${API}/courses/categories`, { signal: controller.signal })
+      .then(res => setCategories(res.data))
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      });
+
+    api.get(`${API}/courses/creator/analytics`, { signal: controller.signal })
+      .then(res => {
+        const data = res.data;
+        setAnalytics(data);
+        setMyCourses(data.courses || []);
+      })
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      });
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   async function createCourse() {

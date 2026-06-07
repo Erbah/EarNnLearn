@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -15,17 +16,20 @@ export const InspectUserModal = React.memo(function InspectUserModal({ rid, onCl
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadUser = useCallback(async () => {
-    try {
-      const res = await api.get(`${API}/users/${rid}`);
-      setData(res.data);
-    } catch (e) {}
-    setLoading(false);
-  }, [rid]);
-
   useEffect(() => {
-    loadUser();
-  }, [loadUser]);
+    const controller = new AbortController();
+    setLoading(true);
+    api.get(`${API}/users/${rid}`, { signal: controller.signal })
+      .then(res => {
+        setData(res.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+        setLoading(false);
+      });
+    return () => controller.abort();
+  }, [rid]);
 
   const adjustWallet = useCallback(async () => {
     const amt = prompt("Enter adjustment amount (can be negative):");

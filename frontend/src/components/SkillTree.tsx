@@ -18,12 +18,13 @@ import { Lock, CheckCircle2, Play, Sparkles } from 'lucide-react';
 const ForestNode = React.memo(function ForestNode({ data }: any) {
   const isLocked = data.status === "LOCKED";
   const isCompleted = data.status === "COMPLETED";
+  const { onNodeClick, id, course_id, label, xp } = data;
   
   const handleClick = React.useCallback(() => {
     if (!isLocked) {
-      data.onNodeClick?.(data.id, data.course_id);
+      onNodeClick?.(id, course_id);
     }
-  }, [isLocked, data.onNodeClick, data.id, data.course_id]);
+  }, [isLocked, onNodeClick, id, course_id]);
 
   return (
     <div 
@@ -54,7 +55,7 @@ const ForestNode = React.memo(function ForestNode({ data }: any) {
       {/* Label */}
       <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
         <p className={`text-xs font-black tracking-widest uppercase transition-colors ${isLocked ? 'text-gray-600' : 'text-white'}`}>
-          {data.label}
+          {label}
         </p>
         {!isLocked && (
           <motion.div 
@@ -63,7 +64,7 @@ const ForestNode = React.memo(function ForestNode({ data }: any) {
             className="flex items-center justify-center gap-1 mt-1"
           >
             <Sparkles className="w-3 h-3 text-primary" />
-            <span className="text-[10px] text-primary font-bold">{data.xp || 100} XP</span>
+            <span className="text-[10px] text-primary font-bold">{xp || 100} XP</span>
           </motion.div>
         )}
       </div>

@@ -1,9 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
-import AdminDashboard from '@/components/AdminDashboard';
+import dynamic from 'next/dynamic';
+import { AdminDashboardSkeleton } from '@/components/Skeletons';
 import { UserProvider } from '@/context/UserContext';
 import { AdminSidebar } from '@/components/Sidebar';
 import { Topbar } from '@/components/Topbar';
+
+const AdminDashboard = dynamic(() => import('@/components/AdminDashboard'), {
+  loading: () => <AdminDashboardSkeleton />,
+  ssr: false
+});
 
 export default function AdminDashboardPage() {
   const [unlocked, setUnlocked] = useState(false);

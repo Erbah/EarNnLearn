@@ -5,7 +5,7 @@
 
 import type { AgentAction, LessonSceneWithActions } from '@/types/lesson';
 import { speak, stopSpeech } from './tts';
-import { useEffects } from './effects';
+import { getEffects } from './effects';
 // import { whiteboardManager } from './whiteboard';
 
 export interface OrchestrationEvent {
@@ -29,7 +29,7 @@ export class LessonOrchestrator {
   private isPlaying = false;
   private currentTimeout: NodeJS.Timeout | null = null;
   private options: OrchestratorOptions;
-  private effects = useEffects();
+  private effects = getEffects();
 
   constructor(options: OrchestratorOptions = {}) {
     this.options = {

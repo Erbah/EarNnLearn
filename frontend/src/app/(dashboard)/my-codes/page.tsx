@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QrCode, Copy, CheckCircle, Share2, MessageCircle, Send, Plus, CreditCard } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
@@ -16,23 +16,43 @@ export default function MyCodesPage() {
   const [walletBalance, setWalletBalance] = useState(0);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-  const headers: any = token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : {};
+  const headers = useMemo<HeadersInit>(() => {
+    const h: Record<string, string> = {};
+    if (token) {
+      h["Authorization"] = `Bearer ${token}`;
+      h["Content-Type"] = "application/json";
+    }
+    return h;
+  }, [token]);
+
+  const loadCodes = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/codes/my-codes`, { headers, signal });
+      setCodes(await r.json());
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      setCodes([]);
+    } finally {
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [headers]);
 
   useEffect(() => {
     if (token) {
-      loadCodes();
-      fetch(`${API}/wallet/`, { headers }).then(r => r.json()).then(data => setWalletBalance(Number(data.balance) || 0)).catch(() => { });
+      const controller = new AbortController();
+      loadCodes(controller.signal);
+      fetch(`${API}/wallet/`, { headers, signal: controller.signal })
+        .then(r => r.json())
+        .then(data => setWalletBalance(Number(data.balance) || 0))
+        .catch(() => { });
+      return () => {
+        controller.abort();
+      };
     }
-  }, []);
-
-  async function loadCodes() {
-    setLoading(true);
-    try {
-      const r = await fetch(`${API}/codes/my-codes`, { headers });
-      setCodes(await r.json());
-    } catch { setCodes([]); }
-    setLoading(false);
-  }
+  }, [token, headers, loadCodes]);
 
   async function buyCode() {
     setBuying(true);

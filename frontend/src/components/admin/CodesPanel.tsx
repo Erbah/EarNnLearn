@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { X, Hash, Sparkles, Eye, Trash2, Loader2 } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 import { CodeInspector } from './CodeInspector';
 import { AIAdvisorModal } from './AIAdvisorModal';
 
@@ -116,15 +117,19 @@ export const CodesPanel = React.memo(function CodesPanel() {
   const [advisorData, setAdvisorData] = useState<any>(null);
   const [advisorLoading, setAdvisorLoading] = useState(false);
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (signal?: AbortSignal) => {
     try {
-      const resp = await api.get(`${API}/codes/sessions`);
+      const resp = await api.get(`${API}/codes/sessions`, { signal });
       setHistory(resp.data);
-    } catch (e) {}
+    } catch (e) {
+      if (axios.isCancel(e)) return;
+    }
   }, []);
 
   useEffect(() => {
-    loadHistory();
+    const controller = new AbortController();
+    loadHistory(controller.signal);
+    return () => controller.abort();
   }, [loadHistory]);
 
   const fetchStrategy = useCallback(async () => {

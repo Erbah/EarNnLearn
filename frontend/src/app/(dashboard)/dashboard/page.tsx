@@ -1,13 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useUser } from "@/context/UserContext";
 import { StatCard } from "@/components/StatCard";
-import { EarningsChart } from "@/components/EarningsChart";
+import dynamic from "next/dynamic";
+import { EarningsChartSkeleton } from "@/components/Skeletons";
 import { NetworkPreview } from "@/components/NetworkPreview";
 import { ActivityFeed } from "@/components/ActivityFeed";
+
+const EarningsChart = dynamic(
+  () => import("@/components/EarningsChart").then(mod => mod.EarningsChart),
+  {
+    loading: () => <EarningsChartSkeleton />,
+    ssr: false
+  }
+);
 import { Wallet, Users, KeyRound, DollarSign, Share2, Copy, MessageCircle, Twitter, MessageSquare, BookOpen } from "lucide-react";
+import axios from "axios";
 import { API_BASE_URL, api } from "@/lib/api";
 
 
@@ -20,52 +30,65 @@ export default function DashboardPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!userLoading) {
-      fetchDashboardData();
-    }
-  }, [userLoading]);
-
-  async function fetchDashboardData() {
+  const fetchDashboardData = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       // Only fetch wallet, network, and transactions - NOT user profile
       const results = await Promise.allSettled([
-        api.get(`${API}/wallet/`),
-        api.get(`${API}/network/tree-view`),
-        api.get(`${API}/wallet/transactions`)
+        api.get(`${API}/wallet/`, { signal }),
+        api.get(`${API}/network/tree-view`, { signal }),
+        api.get(`${API}/wallet/transactions`, { signal })
       ]);
       
       // Handle each result separately so one failure doesn't block all
       if (results[0].status === 'fulfilled') {
         setWallet(results[0].value.data);
       } else {
-        console.debug("Wallet fetch failed:", results[0].reason?.response?.status);
-        setWallet(null);
+        if (!axios.isCancel(results[0].reason)) {
+          console.debug("Wallet fetch failed:", results[0].reason?.response?.status);
+          setWallet(null);
+        }
       }
       
       if (results[1].status === 'fulfilled') {
         setNetwork(results[1].value.data);
       } else {
-        console.debug("Network fetch failed:", results[1].reason?.response?.status);
-        setNetwork(null);
+        if (!axios.isCancel(results[1].reason)) {
+          console.debug("Network fetch failed:", results[1].reason?.response?.status);
+          setNetwork(null);
+        }
       }
       
       if (results[2].status === 'fulfilled') {
         setTransactions(results[2].value.data);
       } else {
-        console.debug("Transactions fetch failed:", results[2].reason?.response?.status);
-        setTransactions([]);
+        if (!axios.isCancel(results[2].reason)) {
+          console.debug("Transactions fetch failed:", results[2].reason?.response?.status);
+          setTransactions([]);
+        }
       }
     } catch (e: any) {
+      if (axios.isCancel(e)) return;
       console.debug("Dashboard data fetch error:", e.message);
       setWallet(null);
       setNetwork(null);
       setTransactions([]);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!userLoading) {
+      const controller = new AbortController();
+      fetchDashboardData(controller.signal);
+      return () => {
+        controller.abort();
+      };
+    }
+  }, [userLoading, fetchDashboardData]);
 
   return (
     <div className="flex flex-col gap-8 pb-12 pt-4">

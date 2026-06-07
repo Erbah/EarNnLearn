@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { API_BASE_URL, api } from '@/lib/api';
+import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -48,15 +49,20 @@ export const NotificationsPanel = React.memo(function NotificationsPanel() {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadNotes = useCallback(() => {
-    api.get(`${API}/notifications`)
+  const loadNotes = useCallback((signal?: any) => {
+    const abortSignal = signal instanceof AbortSignal ? signal : undefined;
+    api.get(`${API}/notifications`, { signal: abortSignal })
       .then(res => setNotes(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {})
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+      })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    loadNotes();
+    const controller = new AbortController();
+    loadNotes(controller.signal);
+    return () => controller.abort();
   }, [loadNotes]);
 
   const markRead = useCallback(async (id: string) => {

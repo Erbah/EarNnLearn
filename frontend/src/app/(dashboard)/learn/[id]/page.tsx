@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import YouTube, { YouTubeEvent, YouTubePlayer } from "react-youtube";
@@ -10,6 +10,7 @@ import {
   HelpCircle, MessageSquare, Send, FileText, CheckSquare, XCircle, User
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
+import axios from "axios";
 import { API_BASE_URL, api } from "@/lib/api";
 
 const API = `${API_BASE_URL}/api/v1`;
@@ -64,15 +65,26 @@ export default function LearnPage() {
   const headers: any = { "Content-Type": "application/json" };
 
   // Find the exact video object logic
-  const getAllVideos = (mods: ModuleItem[] = modules) => {
+  const getAllVideos = useCallback((mods: ModuleItem[]) => {
     let all: VideoItem[] = [];
     mods.forEach(m => all = [...all, ...m.videos]);
     return all;
-  };
+  }, []);
+
+  const refreshStatus = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const res = await api.get(`${API}/learn/status/${courseId}`, { signal });
+      setPaymentStatus(res.data);
+    } catch (err: any) {
+      if (axios.isCancel(err)) return;
+    }
+  }, [courseId]);
 
   useEffect(() => {
     if (!courseId) return;
-    api.get(`${API}/courses/${courseId}`)
+    const controller = new AbortController();
+
+    api.get(`${API}/courses/${courseId}`, { signal: controller.signal })
       .then(res => {
         const data = res.data;
         setCourse(data.course);
@@ -98,21 +110,32 @@ export default function LearnPage() {
         } else if (targetTab === "qa") {
           setActiveTab("qa");
         }
+      })
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
       });
     
     // Fetch Engagement Data
-    api.get(`/api/v1/engagement/quizzes/course/${courseId}`).then(res => {
+    api.get(`/api/v1/engagement/quizzes/course/${courseId}`, { signal: controller.signal }).then(res => {
       setCourseQuizzes(res.data);
       // Auto-open quiz if deep linked
       if (targetQuizId && res.data) {
         const q = res.data.find((qz: any) => qz.id === targetQuizId);
         if (q) setActiveQuiz(q);
       }
-    }).catch(() => {});
-    api.get(`/api/v1/engagement/discussions/course/${courseId}`).then(res => setDiscussions(res.data)).catch(() => {});
+    }).catch((err) => {
+      if (axios.isCancel(err)) return;
+    });
+    api.get(`/api/v1/engagement/discussions/course/${courseId}`, { signal: controller.signal }).then(res => setDiscussions(res.data)).catch((err) => {
+      if (axios.isCancel(err)) return;
+    });
     
-    refreshStatus();
-  }, [courseId, targetVideoId]);
+    refreshStatus(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [courseId, targetVideoId, targetTab, targetQuizId, getAllVideos, refreshStatus]);
 
   async function postQuestion() {
     if (!newQuestionTitle || !newQuestionContent) return;
@@ -163,12 +186,7 @@ export default function LearnPage() {
     setSubmittingQuiz(false);
   }
 
-  async function refreshStatus() {
-    try {
-      const res = await api.get(`${API}/learn/status/${courseId}`);
-      setPaymentStatus(res.data);
-    } catch {}
-  }
+
 
   // Handle YouTube Player Events
   const onPlayerReady = (event: YouTubeEvent) => {
@@ -251,7 +269,7 @@ export default function LearnPage() {
     if (activeVideo?.id === video.id) return;
     
     // Sequential enforce frontend-side too
-    const all = getAllVideos();
+    const all = getAllVideos(modules);
     const idx = all.findIndex(v => v.id === video.id);
     
     if (idx > 0) {
@@ -309,7 +327,7 @@ export default function LearnPage() {
     }
   }
 
-  const allVids = getAllVideos();
+  const allVids = getAllVideos(modules);
   const totalVideos = allVids.length;
   const progressPct = totalVideos > 0 ? Math.round((watchedIds.size / totalVideos) * 100) : 0;
   const isPaused = paymentStatus?.status === "paused";
