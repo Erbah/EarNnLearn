@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, Bell, User, Home } from "lucide-react";
@@ -11,11 +11,19 @@ import { API_BASE_URL } from "@/lib/api";
 
 const API = `${API_BASE_URL}/api/v1`;
 
-export function Topbar() {
+export const Topbar = React.memo(function Topbar() {
   const router = useRouter();
   const SHOW_HEARTS = false; // Set to true to re-enable heart system UI
   const { hud, loading: hudLoading } = useGamification();
   const { user } = useUser();
+
+  const handleNotificationsClick = useCallback(() => {
+    alert("Notifications coming soon!");
+  }, []);
+
+  const handleProfileClick = useCallback(() => {
+    router.push("/settings");
+  }, [router]);
 
   return (
     <header className="h-20 w-full flex items-center justify-between px-8 bg-background/80 backdrop-blur-md sticky top-0 z-40 border-b border-white/5">
@@ -45,21 +53,6 @@ export function Topbar() {
               </motion.div>
 
               <div className="w-[1px] h-3 bg-white/10" />
-
-              {/* {SHOW_HEARTS && (
-                <>
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    className="flex items-center gap-1.5 cursor-help"
-                    title="Hearts (Energy)"
-                  >
-                    <span className="text-red-500 font-bold text-sm drop-shadow-[0_0_5px_rgba(239,68,68,0.3)]">❤️</span>
-                    <span className="text-white text-xs font-black tracking-tight">{hud.hearts}</span>
-                  </motion.div>
-    
-                  <div className="w-[1px] h-3 bg-white/10" />
-                </>
-              )} */}
 
               <div className="flex flex-col gap-0.5 min-w-[70px]" title={`XP: ${hud.total_xp} / ${hud.xp_to_next_level}`}>
                 <div className="flex justify-between items-center text-[9px] font-black text-primary uppercase tracking-tighter">
@@ -91,7 +84,7 @@ export function Topbar() {
         </Link>
 
         <button
-          onClick={() => alert("Notifications coming soon!")}
+          onClick={handleNotificationsClick}
           className="relative p-2 rounded-full hover:bg-white/5 transition-colors group cursor-pointer"
           aria-label="Notifications"
           title="Notifications"
@@ -101,7 +94,7 @@ export function Topbar() {
         </button>
         <div className="h-8 w-[1px] bg-white/10"></div>
         <button
-          onClick={() => router.push("/settings")}
+          onClick={handleProfileClick}
           className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer"
           aria-label="User Profile"
           title="User Profile"
@@ -123,4 +116,4 @@ export function Topbar() {
       </div>
     </header>
   );
-}
+});

@@ -1,10 +1,11 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 import { Users, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-export function NetworkPreview({ count = 0 }: { count?: number }) {
+export const NetworkPreview = React.memo(function NetworkPreview({ count = 0 }: { count?: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -75,4 +76,4 @@ export function NetworkPreview({ count = 0 }: { count?: number }) {
       </Link>
     </motion.div>
   );
-}
+});

@@ -15,13 +15,19 @@ import { motion } from 'framer-motion';
 import { Lock, CheckCircle2, Play, Sparkles } from 'lucide-react';
 
 // Custom Node Component
-const ForestNode = ({ data }: any) => {
+const ForestNode = React.memo(function ForestNode({ data }: any) {
   const isLocked = data.status === "LOCKED";
   const isCompleted = data.status === "COMPLETED";
   
+  const handleClick = React.useCallback(() => {
+    if (!isLocked) {
+      data.onNodeClick?.(data.id, data.course_id);
+    }
+  }, [isLocked, data.onNodeClick, data.id, data.course_id]);
+
   return (
     <div 
-      onClick={() => !isLocked && data.onNodeClick?.(data.id, data.course_id)}
+      onClick={handleClick}
       className={`relative group p-1 rounded-full transition-all duration-500 ${isLocked ? 'grayscale opacity-60 cursor-not-allowed' : 'hover:scale-110 shadow-[0_0_30px_rgba(0,224,255,0.2)] cursor-pointer'}`}
     >
       <Handle type="target" position={Position.Top} className="opacity-0" />
@@ -65,7 +71,7 @@ const ForestNode = ({ data }: any) => {
       <Handle type="source" position={Position.Bottom} className="opacity-0" />
     </div>
   );
-};
+});
 
 const nodeTypes = {
   forestNode: ForestNode,
@@ -77,7 +83,7 @@ interface SkillTreeProps {
   onNodeClick: (nodeId: string, courseId: string) => void;
 }
 
-export function SkillTree({ nodes, edges, onNodeClick }: SkillTreeProps) {
+export const SkillTree = React.memo(function SkillTree({ nodes, edges, onNodeClick }: SkillTreeProps) {
   const nodesWithClick = useMemo(() => 
     nodes.map(n => ({
       ...n,
@@ -105,4 +111,4 @@ export function SkillTree({ nodes, edges, onNodeClick }: SkillTreeProps) {
       </ReactFlow>
     </div>
   );
-}
+});

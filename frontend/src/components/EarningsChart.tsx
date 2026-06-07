@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import Link from "next/link";
@@ -14,7 +15,11 @@ const data = [
   { name: "Week 7", earnings: 349 },
 ];
 
-export function EarningsChart() {
+const CHART_MARGIN = { top: 10, right: 10, left: -20, bottom: 0 };
+const TOOLTIP_CONTENT_STYLE = { backgroundColor: "#1B2433", borderColor: "rgba(255,255,255,0.1)", borderRadius: "12px", color: "#fff" };
+const TOOLTIP_ITEM_STYLE = { color: "#00E0FF" };
+
+export const EarningsChart = React.memo(function EarningsChart() {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -41,7 +46,7 @@ export function EarningsChart() {
 
       <div className="h-[300px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <AreaChart data={data} margin={CHART_MARGIN}>
             <defs>
               <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#00E0FF" stopOpacity={0.3} />
@@ -51,8 +56,8 @@ export function EarningsChart() {
             <XAxis dataKey="name" stroke="#4B5563" fontSize={12} tickLine={false} axisLine={false} />
             <YAxis stroke="#4B5563" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
             <Tooltip
-              contentStyle={{ backgroundColor: "#1B2433", borderColor: "rgba(255,255,255,0.1)", borderRadius: "12px", color: "#fff" }}
-              itemStyle={{ color: "#00E0FF" }}
+              contentStyle={TOOLTIP_CONTENT_STYLE}
+              itemStyle={TOOLTIP_ITEM_STYLE}
             />
             <Area
               type="monotone"
@@ -67,4 +72,4 @@ export function EarningsChart() {
       </div>
     </motion.div>
   );
-}
+});

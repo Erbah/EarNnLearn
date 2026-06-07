@@ -5,7 +5,7 @@ import { AdminSidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import { useUser } from "@/context/UserContext";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 
 export default function DashboardLayout({
   children,
@@ -38,7 +38,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-
+  const handleSupportClick = useCallback(() => {
+    window.location.href = 'mailto:support@learnnearn.com';
+  }, []);
 
   // Final Hardening: Launch Gate Screen
   if (!loading && user && !isBetaAuthorized) {
@@ -57,7 +59,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             Your spot on the waitlist is secured.
           </div>
           <button 
-            onClick={() => window.location.href = 'mailto:support@learnnearn.com'}
+            onClick={handleSupportClick}
             className="text-gray-500 text-xs hover:text-white transition-colors"
           >
             Have a Beta invite? Contact Support

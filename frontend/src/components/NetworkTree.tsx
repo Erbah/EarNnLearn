@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { API_BASE_URL, api } from '@/lib/api';
 import {
   ReactFlow,
@@ -12,8 +12,19 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+/* ───── Static Style Constants ───── */
+const LOADER_CONTAINER_STYLE = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', color: '#00E0FF' };
+const TEXT_CENTER_STYLE = { textAlign: 'center' as const };
+const LOADER_ICON_STYLE = { fontSize: '32px', marginBottom: '12px' };
+
+const ERROR_CONTAINER_STYLE = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', color: '#E5E7EB' };
+const ERROR_BOX_STYLE = { textAlign: 'center' as const, padding: '40px', background: 'rgba(27,36,51,0.6)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' };
+
+const CONTROLS_STYLE = { background: '#121826', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' };
+const MINIMAP_STYLE = { background: '#0B0F19', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' };
+
 /* ───── Custom Node Component ───── */
-function TreeNodeCard({ data }: { data: any }) {
+const TreeNodeCard = React.memo(function TreeNodeCard({ data }: { data: any }) {
   return (
     <div
       className={`bg-card/85 backdrop-blur-xl rounded-[14px] p-5 px-6 min-w-[180px] text-gray-200 transition-all duration-300 ${
@@ -44,7 +55,7 @@ function TreeNodeCard({ data }: { data: any }) {
       </div>
     </div>
   );
-}
+});
 
 const nodeTypes = { treeNode: TreeNodeCard };
 
@@ -102,7 +113,7 @@ function layoutTree(tree: TreeData, x = 0, y = 0, depth = 0, spacing = { x: 250,
 }
 
 /* ───── Main Component ───── */
-export default function NetworkTree() {
+export const NetworkTree = React.memo(function NetworkTree() {
   const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
   const [loading, setLoading] = useState(true);
@@ -127,9 +138,9 @@ export default function NetworkTree() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', color: '#00E0FF' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🌳</div>
+      <div style={LOADER_CONTAINER_STYLE}>
+        <div style={TEXT_CENTER_STYLE}>
+          <div style={LOADER_ICON_STYLE}>🌳</div>
           <div>Loading your network...</div>
         </div>
       </div>
@@ -139,9 +150,9 @@ export default function NetworkTree() {
   if (error) {
     const errorMessage = error;
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '500px', color: '#E5E7EB' }}>
-        <div style={{ textAlign: 'center', padding: '40px', background: 'rgba(27,36,51,0.6)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚠️</div>
+      <div style={ERROR_CONTAINER_STYLE}>
+        <div style={ERROR_BOX_STYLE}>
+          <div style={LOADER_ICON_STYLE}>⚠️</div>
           <div>{errorMessage}</div>
         </div>
       </div>
@@ -162,14 +173,16 @@ export default function NetworkTree() {
       >
         <Background color="#1B2433" gap={20} />
         <Controls
-          style={{ background: '#121826', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+          style={CONTROLS_STYLE}
         />
         <MiniMap
-          style={{ background: '#0B0F19', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+          style={MINIMAP_STYLE}
           nodeColor="#1B2433"
           maskColor="rgba(11, 15, 25, 0.8)"
         />
       </ReactFlow>
     </div>
   );
-}
+});
+
+export default NetworkTree;

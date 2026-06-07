@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { motion } from "framer-motion";
 import { LucideIcon } from "lucide-react";
 import Link from "next/link";
@@ -14,7 +15,7 @@ interface StatCardProps {
   href?: string;
 }
 
-export function StatCard({ title, value, trend, isPositive, icon: Icon, delay = 0, href }: StatCardProps) {
+export const StatCard = React.memo(function StatCard({ title, value, trend, isPositive, icon: Icon, delay = 0, href }: StatCardProps) {
   const content = (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -47,4 +48,4 @@ export function StatCard({ title, value, trend, isPositive, icon: Icon, delay = 
   }
 
   return content;
-}
+});

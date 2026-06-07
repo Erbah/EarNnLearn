@@ -1,22 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface LessonSkeletonProps {
   topic: string;
 }
 
-export const LessonSkeleton: React.FC<LessonSkeletonProps> = ({ topic }) => {
+export const LessonSkeleton = React.memo(function LessonSkeleton({ topic }: LessonSkeletonProps) {
   const [statusIndex, setStatusIndex] = useState(0);
   
-  const statuses = [
+  const statuses = useMemo(() => [
     "I'm preparing your lesson...",
     `Structuring key ideas for ${topic}...`,
     "Fine-tuning examples for your style...",
     "Almost ready...",
     "Just adding the finishing touches..."
-  ];
+  ], [topic]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -68,4 +68,4 @@ export const LessonSkeleton: React.FC<LessonSkeletonProps> = ({ topic }) => {
       </div>
     </div>
   );
-};
+});

@@ -10,7 +10,23 @@ interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children"> {
   loading?: boolean;
 }
 
-export const Button: React.FC<ButtonProps> = ({
+const baseStyles = "inline-flex items-center justify-center rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:pointer-events-none active:scale-95";
+
+const variants = {
+  primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20",
+  secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+  outline: "border border-border bg-transparent hover:bg-secondary/50",
+  ghost: "bg-transparent hover:bg-secondary/50",
+};
+
+const sizes = {
+  sm: "h-9 px-4 text-sm",
+  md: "h-11 px-6 text-base",
+  lg: "h-14 px-10 text-lg",
+  icon: "h-11 w-11",
+};
+
+export const Button = React.memo(function Button({
   children,
   variant = "primary",
   size = "md",
@@ -18,23 +34,7 @@ export const Button: React.FC<ButtonProps> = ({
   className = "",
   disabled,
   ...props
-}) => {
-  const baseStyles = "inline-flex items-center justify-center rounded-xl font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:pointer-events-none active:scale-95";
-  
-  const variants = {
-    primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20",
-    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-    outline: "border border-border bg-transparent hover:bg-secondary/50",
-    ghost: "bg-transparent hover:bg-secondary/50",
-  };
-
-  const sizes = {
-    sm: "h-9 px-4 text-sm",
-    md: "h-11 px-6 text-base",
-    lg: "h-14 px-10 text-lg",
-    icon: "h-11 w-11",
-  };
-
+}: ButtonProps) {
   return (
     <motion.button
       whileHover={{ y: -1 }}
@@ -49,4 +49,4 @@ export const Button: React.FC<ButtonProps> = ({
       {children}
     </motion.button>
   );
-};
+});

@@ -1,18 +1,22 @@
 "use client";
 
+import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Plus, UserPlus, ArrowUpRight, KeyRound } from "lucide-react";
 import Link from "next/link";
 
-export function ActivityFeed({ activities }: { activities?: any[] }) {
-  const displayActivities = activities?.map((a, i) => ({
-    id: a.id || i,
-    title: a.description || a.type,
-    time: new Date(a.created_at).toLocaleTimeString() || "Just now",
-    icon: a.type?.includes("CREDIT") ? Plus : a.type?.includes("DEBIT") ? ArrowUpRight : KeyRound,
-    color: a.type?.includes("CREDIT") ? "text-green-400" : "text-primary",
-    bg: a.type?.includes("CREDIT") ? "bg-green-500/10" : "bg-primary/10",
-  })).slice(0, 5) || [];
+export const ActivityFeed = React.memo(function ActivityFeed({ activities }: { activities?: any[] }) {
+  const displayActivities = useMemo(() => {
+    return activities?.map((a, i) => ({
+      id: a.id || i,
+      title: a.description || a.type,
+      time: new Date(a.created_at).toLocaleTimeString() || "Just now",
+      icon: a.type?.includes("CREDIT") ? Plus : a.type?.includes("DEBIT") ? ArrowUpRight : KeyRound,
+      color: a.type?.includes("CREDIT") ? "text-green-400" : "text-primary",
+      bg: a.type?.includes("CREDIT") ? "bg-green-500/10" : "bg-primary/10",
+    })).slice(0, 5) || [];
+  }, [activities]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -52,4 +56,4 @@ export function ActivityFeed({ activities }: { activities?: any[] }) {
       </div>
     </motion.div>
   );
-}
+});

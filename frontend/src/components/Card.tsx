@@ -10,12 +10,16 @@ interface CardProps {
   hoverable?: boolean;
 }
 
-export const Card: React.FC<CardProps> = ({
+const CARD_BG_STYLE = {
+  background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)"
+};
+
+export const Card = React.memo(function Card({
   children,
   className = "",
   onClick,
   hoverable = true,
-}) => {
+}: CardProps) {
   const isClickable = !!onClick;
 
   return (
@@ -28,9 +32,7 @@ export const Card: React.FC<CardProps> = ({
         ${isClickable ? "cursor-pointer active:scale-[0.98]" : ""}
         ${className}
       `}
-      style={{
-        background: "linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%)"
-      }}
+      style={CARD_BG_STYLE}
     >
       {/* Subtle Inner Glow */}
       <div className="absolute inset-px rounded-[22px] bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
@@ -38,4 +40,4 @@ export const Card: React.FC<CardProps> = ({
       <div className="relative z-10">{children}</div>
     </motion.div>
   );
-};
+});

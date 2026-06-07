@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   whiteboardManager,
   WhiteboardState,
@@ -9,7 +9,25 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Cpu } from "lucide-react";
 
-export function WhiteboardView() {
+// Default Color Protocol
+const COLORS = {
+  circle: "#22d3ee", // Electric Cyan
+  line: "rgba(255, 255, 255, 0.7)",
+  arrow: "rgba(255, 255, 255, 0.8)",
+  text: "#ffffff",
+};
+
+const BLUEPRINT_GRID_STYLE = {
+  backgroundImage: `
+    linear-gradient(to right, #ffffff 1px, transparent 1px),
+    linear-gradient(to bottom, #ffffff 1px, transparent 1px)
+  `,
+  backgroundSize: '40px 40px'
+};
+
+const TEXT_SHADOW_STYLE = { textShadow: "0 2px 4px rgba(0,0,0,0.5)" };
+
+export const WhiteboardView = React.memo(function WhiteboardView() {
   const [state, setState] = useState<WhiteboardState>(
     whiteboardManager.getState()
   );
@@ -22,26 +40,12 @@ export function WhiteboardView() {
   const isEmpty = state.elements.length === 0;
   const { currentStep, totalSteps, label, isActive } = state.sequenceStatus || {};
 
-  // Default Color Protocol
-  const COLORS = {
-    circle: "#22d3ee", // Electric Cyan
-    line: "rgba(255, 255, 255, 0.7)",
-    arrow: "rgba(255, 255, 255, 0.8)",
-    text: "#ffffff",
-  };
-
   return (
     <div className="relative w-full h-full bg-slate-950/40 overflow-hidden group">
       {/* 🧪 Laboratory Blueprint Grid */}
       <div 
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{
-          backgroundImage: `
-            linear-gradient(to right, #ffffff 1px, transparent 1px),
-            linear-gradient(to bottom, #ffffff 1px, transparent 1px)
-          `,
-          backgroundSize: '40px 40px'
-        }}
+        style={BLUEPRINT_GRID_STYLE}
       />
       
       {/* 🎬 Sequence Progress Overlay */}
@@ -195,7 +199,7 @@ export function WhiteboardView() {
                   fontSize={command.fontSize || "20"}
                   textAnchor="middle"
                   className="font-mono font-bold tracking-tight"
-                  style={{ textShadow: "0 2px 4px rgba(0,0,0,0.5)" }}
+                  style={TEXT_SHADOW_STYLE}
                   initial={{ opacity: 0, y: command.y + 10 }}
                   animate={{ opacity: baseOpacity, y: command.y }}
                   transition={{ duration: 0.4 }}
@@ -221,4 +225,4 @@ export function WhiteboardView() {
       </div>
     </div>
   );
-}
+});

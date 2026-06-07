@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 
 const API = "/api/v1";
@@ -84,8 +84,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     await fetchUser();
   }, [fetchUser]);
 
+  const contextValue = useMemo(() => ({
+    user,
+    loading,
+    error,
+    refetchUser
+  }), [user, loading, error, refetchUser]);
+
   return (
-    <UserContext.Provider value={{ user, loading, error, refetchUser }}>
+    <UserContext.Provider value={contextValue}>
       {children}
     </UserContext.Provider>
   );

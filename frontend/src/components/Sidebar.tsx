@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -33,7 +33,7 @@ const navItems = [
   { name: "Platform Admin", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN", "EDUCATION_ADMIN"] },
 ];
 
-export function AdminSidebar() {
+export const AdminSidebar = React.memo(function AdminSidebar() {
   const pathname = usePathname();
   const { user, loading } = useUser();
   const [mounted, setMounted] = useState(false);
@@ -42,10 +42,19 @@ export function AdminSidebar() {
     setMounted(true);
   }, []);
 
-  const filteredItems = navItems.filter(item => {
-    if (!user) return !item.roles || item.roles.includes("USER");
-    return item.roles.includes(user.role || "USER");
-  });
+  const filteredItems = useMemo(() => {
+    return navItems.filter(item => {
+      if (!user) return !item.roles || item.roles.includes("USER");
+      return item.roles.includes(user.role || "USER");
+    });
+  }, [user]);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("access_token");
+    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    sessionStorage.removeItem("admin_unlocked");
+    window.location.href = "/login";
+  }, []);
 
   return (
     <aside 
@@ -101,12 +110,7 @@ export function AdminSidebar() {
 
       <div className="p-4 border-t border-white/5">
         <button
-          onClick={() => {
-            localStorage.removeItem("access_token");
-            document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-            sessionStorage.removeItem("admin_unlocked");
-            window.location.href = "/login";
-          }}
+          onClick={handleLogout}
           className="flex items-center space-x-3 px-4 py-3 rounded-xl w-full text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all mt-2"
         >
           <LogOut className="w-5 h-5" />
@@ -115,6 +119,6 @@ export function AdminSidebar() {
       </div>
     </aside>
   );
-}
+});
 
 export default AdminSidebar;

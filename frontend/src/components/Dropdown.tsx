@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { ChevronDown, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -19,7 +19,38 @@ interface DropdownProps {
   buttonClassName?: string;
 }
 
-export default function Dropdown({
+interface DropdownItemProps {
+  option: DropdownOption;
+  isSelected: boolean;
+  onSelect: (value: string) => void;
+}
+
+const DropdownItem = React.memo(function DropdownItem({
+  option,
+  isSelected,
+  onSelect,
+}: DropdownItemProps) {
+  const handleItemClick = useCallback(() => {
+    onSelect(option.value);
+  }, [option.value, onSelect]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleItemClick}
+      className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-primary/10 group ${
+        isSelected ? "bg-primary/5 text-primary" : "text-gray-300"
+      }`}
+    >
+      <span>{option.label}</span>
+      {isSelected && (
+        <Check className="w-4 h-4 text-primary" />
+      )}
+    </button>
+  );
+});
+
+export const Dropdown = React.memo(function Dropdown({
   options,
   value,
   onChange,
@@ -42,18 +73,31 @@ export default function Dropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const normalizedOptions: DropdownOption[] = options.map((opt) =>
-    typeof opt === "string" ? { value: opt, label: opt } : opt
-  );
+  const normalizedOptions: DropdownOption[] = useMemo(() => {
+    return options.map((opt) =>
+      typeof opt === "string" ? { value: opt, label: opt } : opt
+    );
+  }, [options]);
 
-  const selectedOption = normalizedOptions.find((opt) => opt.value === value);
+  const selectedOption = useMemo(() => {
+    return normalizedOptions.find((opt) => opt.value === value);
+  }, [normalizedOptions, value]);
+
+  const toggleOpen = useCallback(() => {
+    setIsOpen((prev) => !prev);
+  }, []);
+
+  const handleSelect = useCallback((val: string) => {
+    onChange(val);
+    setIsOpen(false);
+  }, [onChange]);
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         className={`w-full flex items-center justify-between bg-background/50 border border-white/10 rounded-xl py-3 pl-4 pr-10 text-left text-white focus:outline-none focus:border-primary transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${buttonClassName}`}
       >
         <span className={!selectedOption ? "text-gray-500" : ""}>
@@ -79,31 +123,20 @@ export default function Dropdown({
             className="absolute z-[100] w-full mt-2 py-2 bg-[#0f172a]/95 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden"
           >
             <div className="max-h-60 overflow-y-auto custom-scrollbar">
-              {normalizedOptions.map((option) => {
-                const isSelected = option.value === value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      onChange(option.value);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-primary/10 group ${
-                      isSelected ? "bg-primary/5 text-primary" : "text-gray-300"
-                    }`}
-                  >
-                    <span>{option.label}</span>
-                    {isSelected && (
-                      <Check className="w-4 h-4 text-primary" />
-                    )}
-                  </button>
-                );
-              })}
+              {normalizedOptions.map((option) => (
+                <DropdownItem
+                  key={option.value}
+                  option={option}
+                  isSelected={option.value === value}
+                  onSelect={handleSelect}
+                />
+              ))}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
-}
+});
+
+export default Dropdown;
