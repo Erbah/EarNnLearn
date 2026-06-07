@@ -120,20 +120,49 @@ export const NetworkTree = React.memo(function NetworkTree() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let activeWorker: Worker | null = null;
     async function fetchTree() {
       try {
         const res = await api.get('/api/v1/network/tree-view');
         const tree: TreeData = res.data;
-        const { nodes: layoutNodes, edges: layoutEdges } = layoutTree(tree);
-        setNodes(layoutNodes);
-        setEdges(layoutEdges);
+
+        if (typeof window !== 'undefined' && window.Worker) {
+          activeWorker = new Worker(new URL('../workers/layout.worker.ts', import.meta.url));
+          activeWorker.onmessage = (e) => {
+            if (e.data.error) {
+              const { nodes: fallbackNodes, edges: fallbackEdges } = layoutTree(tree);
+              setNodes(fallbackNodes);
+              setEdges(fallbackEdges);
+            } else {
+              setNodes(e.data.nodes);
+              setEdges(e.data.edges);
+            }
+            setLoading(false);
+          };
+          activeWorker.onerror = () => {
+            const { nodes: fallbackNodes, edges: fallbackEdges } = layoutTree(tree);
+            setNodes(fallbackNodes);
+            setEdges(fallbackEdges);
+            setLoading(false);
+          };
+          activeWorker.postMessage({ tree });
+        } else {
+          const { nodes: layoutNodes, edges: layoutEdges } = layoutTree(tree);
+          setNodes(layoutNodes);
+          setEdges(layoutEdges);
+          setLoading(false);
+        }
       } catch (err) {
         setError('Failed to load network tree');
-      } finally {
         setLoading(false);
       }
     }
     fetchTree();
+    return () => {
+      if (activeWorker) {
+        activeWorker.terminate();
+      }
+    };
   }, [setNodes, setEdges]);
 
   if (loading) {

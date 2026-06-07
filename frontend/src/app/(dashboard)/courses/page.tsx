@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -8,6 +8,7 @@ import {
   Sparkles, TrendingUp, Clock
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const API = `${API_BASE_URL}/api/v1`;
 
@@ -37,6 +38,7 @@ export default function CoursesPage() {
   const [activeLevel, setActiveLevel] = useState<string | null>(null);
   const [sort, setSort] = useState("popular");
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -66,9 +68,11 @@ export default function CoursesPage() {
     setLoading(false);
   }
 
-  const filtered = search && Array.isArray(courses)
-    ? courses.filter(c => c.title.toLowerCase().includes(search.toLowerCase()))
-    : (Array.isArray(courses) ? courses : []);
+  const filtered = useMemo(() => {
+    return debouncedSearch && Array.isArray(courses)
+      ? courses.filter(c => c.title.toLowerCase().includes(debouncedSearch.toLowerCase()))
+      : (Array.isArray(courses) ? courses : []);
+  }, [courses, debouncedSearch]);
 
   const levels = ["Beginner", "Intermediate", "Advanced"];
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QrCode, Copy, CheckCircle, Share2, MessageCircle, Send, Plus, CreditCard } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
@@ -74,8 +74,8 @@ export default function MyCodesPage() {
   }
 
   // Split codes into unused vs used
-  const unusedCodes = codes.filter(c => c.status === "active");
-  const usedCodes = codes.filter(c => c.status === "used");
+  const unusedCodes = useMemo(() => codes.filter(c => c.status === "active"), [codes]);
+  const usedCodes = useMemo(() => codes.filter(c => c.status === "used"), [codes]);
 
   return (
     <div className="flex flex-col gap-8 pb-12 pt-4 max-w-5xl">

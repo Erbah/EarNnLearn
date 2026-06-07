@@ -37,6 +37,7 @@ export const RealDatabaseInspector = React.memo(function RealDatabaseInspector({
   const [tables, setTables] = useState<string[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [tableData, setTableData] = useState<any>(null);
+  const [formattedRows, setFormattedRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -48,8 +49,50 @@ export const RealDatabaseInspector = React.memo(function RealDatabaseInspector({
     setSelectedTable(name);
     try {
       const res = await api.get(`${API}/tables/${name}`);
+      const columns = res.data.columns || [];
+      const data = res.data.data || [];
       setTableData(res.data);
-    } catch (e) { }
+
+      if (data.length >= 1000 && typeof window !== 'undefined' && window.Worker) {
+        const worker = new Worker(new URL('../../workers/db.worker.ts', import.meta.url));
+        worker.onmessage = (e) => {
+          if (e.data.formattedData) {
+            setFormattedRows(e.data.formattedData);
+          } else {
+            setFormattedRows(data.map((row: any) => {
+              const formattedRow: any = {};
+              columns.forEach((col: string) => {
+                formattedRow[col] = String(row[col]);
+              });
+              return formattedRow;
+            }));
+          }
+          worker.terminate();
+        };
+        worker.onerror = () => {
+          setFormattedRows(data.map((row: any) => {
+            const formattedRow: any = {};
+            columns.forEach((col: string) => {
+              formattedRow[col] = String(row[col]);
+            });
+            return formattedRow;
+          }));
+          worker.terminate();
+        };
+        worker.postMessage({ data, columns });
+      } else {
+        const formatted = data.map((row: any) => {
+          const formattedRow: any = {};
+          columns.forEach((col: string) => {
+            formattedRow[col] = String(row[col]);
+          });
+          return formattedRow;
+        });
+        setFormattedRows(formatted);
+      }
+    } catch (e) {
+      setFormattedRows([]);
+    }
     setLoading(false);
   }, []);
 
@@ -118,11 +161,11 @@ export const RealDatabaseInspector = React.memo(function RealDatabaseInspector({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {tableData?.data?.map((row: any, i: number) => (
+                      {formattedRows.map((row: any, i: number) => (
                         <tr key={i} className="hover:bg-white/5 transition-colors">
                           {tableData.columns.map((col: string) => (
-                            <td key={col} className="px-4 py-3 font-mono text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={String(row[col])}>
-                              {String(row[col])}
+                            <td key={col} className="px-4 py-3 font-mono text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={row[col]}>
+                              {row[col]}
                             </td>
                           ))}
                         </tr>

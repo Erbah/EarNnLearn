@@ -5,6 +5,7 @@ import { X, Eye, Smile, CheckCircle2, Zap, ShoppingBag, Trash2, Loader2 } from '
 import { API_BASE_URL, api } from '@/lib/api';
 import { AdminStatCard } from './AdminStatCard';
 import { ShareModal } from './ShareModal';
+import { useDebounce } from '@/hooks/useDebounce';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -73,6 +74,7 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
   const [codes, setCodes] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [loading, setLoading] = useState(true);
   const [sharingCode, setSharingCode] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -81,7 +83,7 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
   const loadData = useCallback(async () => {
     try {
       const [codesRes, statsRes] = await Promise.all([
-        api.get(`${API}/codes?search=${search}`),
+        api.get(`${API}/codes?search=${debouncedSearch}`),
         api.get(`${API}/codes/stats`)
       ]);
       setCodes(codesRes.data);
@@ -93,7 +95,7 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
         window.location.href = '/admin-login';
       }
     }
-  }, [search]);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     loadData();
