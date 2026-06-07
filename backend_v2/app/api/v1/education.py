@@ -13,11 +13,60 @@ from sqlalchemy import func, desc
 from pydantic import BaseModel
 from typing import Annotated
 from datetime import datetime
-import os, shutil
+import os, shutil, logging
+
+logger = logging.getLogger(__name__)
 from app.core.database import get_db, SessionLocal
 from app.core.security import get_current_user
 from app.core.permissions import require_education_admin, require_super_admin
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+ALLOWED_EXTENSIONS = {".pdf", ".epub", ".docx", ".txt", ".pptx", ".csv"}
+MAX_FILE_SIZE = 15 * 1024 * 1024  # 15 MB
+
+def validate_uploaded_file(file: UploadFile):
+    filename = file.filename or ""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {ext}. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # Validate file size
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds maximum limit of 15 MB (uploaded: {file_size / (1024*1024):.2f} MB)."
+        )
+
+    # Validate magic bytes
+    header = file.file.read(1024)
+    file.file.seek(0)  # Reset pointer
+    
+    is_valid = False
+    if ext == ".pdf":
+        is_valid = header.startswith(b"%PDF")
+    elif ext in [".epub", ".docx", ".pptx"]:
+        is_valid = header.startswith(b"PK\x03\x04")
+    elif ext in [".txt", ".csv"]:
+        try:
+            if b"\x00" in header:
+                is_valid = False
+            else:
+                header.decode("utf-8")
+                is_valid = True
+        except UnicodeDecodeError:
+            is_valid = False
+            
+    if not is_valid:
+        raise HTTPException(
+            status_code=400,
+            detail="File content integrity verification failed (magic bytes mismatch)."
+        )
 from app.models.user import User
 from app.models.course import Course, Module, Video
 from app.models.marketplace import CourseEnrollment, CourseReview
@@ -29,6 +78,11 @@ from app.services.document_service import document_service
 from app.services.ai_prompts import SECTION_INSTRUCTIONS
 
 router = APIRouter()
+
+# 🛡️ Access Control validation helper to prevent IDOR on private lessons
+def check_lesson_access(lesson: AILesson, user: User):
+    if lesson.creator_rid != user.rid and not lesson.is_public and user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        raise HTTPException(status_code=403, detail="Access denied to this lesson")
 
 # ═══════════════════════════════════════
 #  COURSE MANAGEMENT
@@ -147,6 +201,9 @@ class GenerateLessonRequest(BaseModel):
     uai: str | None = None
     roadmap_id: str | None = None
     source_id: str | None = None
+    reuse_level: int = 1
+    force: bool = False
+    include_external_resources: bool = False
 
 @router.get("/roadmaps")
 def list_roadmaps(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -158,14 +215,16 @@ def generate_subject_roadmap(
     subject: str,
     source_id: str | None = None,
     force: bool = False,
+    reuse_level: int = 1,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Phase 1: Generate or retrieve a subject roadmap."""
-    roadmap = ai_tutor_engine.generate_roadmap(db, current_user.rid, subject, source_id=source_id, force=force, timeout=180)
+    roadmap = ai_tutor_engine.generate_roadmap(db, current_user.rid, subject, source_id=source_id, force=force, timeout=180, reuse_level=reuse_level)
     # Handle error dict if generation failed
     if isinstance(roadmap, dict) and "error" in roadmap:
-        raise HTTPException(status_code=500, detail=roadmap.get("details", roadmap["error"]))
+        logger.error("Roadmap generation failed for user %s subject '%s': %s", current_user.rid, subject, roadmap)
+        raise HTTPException(status_code=500, detail="Failed to generate roadmap. Please try again later.")
     
     return {
         "id": roadmap.id,
@@ -229,8 +288,14 @@ def get_roadmap_details(
     progress_map = roadmap.progress or {}
     
     for unit in units:
+        if not isinstance(unit, dict):
+            continue
         for topic in unit.get("topics", []):
+            if not isinstance(topic, dict):
+                continue
             t_id = topic.get("id")
+            if not t_id:
+                continue
             status = progress_map.get(t_id, {}).get("status", "not_started")
             if status != "completed":
                 recommended_topic_id = t_id
@@ -286,15 +351,33 @@ def update_roadmap_config(
     db.commit()
     return {"status": "success", "guided_mode": roadmap.guided_mode}
 
-def generate_deep_lesson_scenes(db: Session, user_rid: str, topic: str, difficulty: str, education_level: str, learner_goal: str, style: str, uai: str | None = None, source_id: str | None = None):
+def generate_deep_lesson_scenes(db: Session, user_rid: str, topic: str, difficulty: str, education_level: str, learner_goal: str, style: str, uai: str | None = None, source_id: str | None = None, reuse_level: int = 1, custom_plan: list | None = None):
     """
     Phase 3: Parallel Assembly Pipeline (Chapter Concurrency).
     Generates textbook-level lesson scenes for a specific topic with depth validation in parallel.
-    Uses a dynamic lesson plan (outline) generated by the AI first.
+    Includes a Reuse-First step to check the global Knowledge Library.
     """
-    # Step 1: Generate a dynamic lesson plan
-    print(f"DEBUG: Generating dynamic lesson plan for topic: {topic}")
-    plan = ai_tutor_engine.generate_lesson_plan(db, topic, source_id=source_id)
+    # 1. Reuse Check
+    if reuse_level > 0:
+        from app.services.knowledge_service import knowledge_service
+        similar_lessons = knowledge_service.find_similar_lessons(db, topic, limit=1)
+        if similar_lessons:
+            print(f"DEBUG: [OCE] Found similar public lesson for '{topic}'. Reusing.")
+            return similar_lessons[0].scenes
+    # Step 1: Generate a dynamic lesson plan or use custom one
+    if custom_plan:
+        print(f"DEBUG: Using custom roadmap plan for topic: {topic}")
+        # Map roadmap units to expected plan format
+        plan = []
+        for unit in custom_plan:
+            plan.append({
+                "key": unit.get("id", "section"),
+                "title": unit.get("title", "Untitled Section"),
+                "instructions": unit.get("description", "Provide detailed content.")
+            })
+    else:
+        print(f"DEBUG: Generating dynamic lesson plan for topic: {topic}")
+        plan = ai_tutor_engine.generate_lesson_plan(db, topic, source_id=source_id)
     
     def generate_chapter(section):
         key = section.get("key", "section")
@@ -363,46 +446,59 @@ def generate_deep_lesson_scenes(db: Session, user_rid: str, topic: str, difficul
 @router.post("/lessons/generate")
 def generate_lesson(
     body: GenerateLessonRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Generate an AI-powered interactive textbook-level lesson"""
     try:
-        # --- 🚀 Parallel Generation: Scenes & Roadmap ---
-        def generate_roadmap_threaded():
-            if body.roadmap_id:
-                r_db = SessionLocal()
-                try:
-                    return r_db.query(SubjectRoadmap).filter(SubjectRoadmap.id == body.roadmap_id).first()
-                finally:
-                    r_db.close()
-
+        # --- 🚀 Serial Roadmap -> Parallel Scenes ---
+        curriculum = None
+        if body.roadmap_id:
             r_db = SessionLocal()
             try:
-                return ai_tutor_engine.generate_roadmap(r_db, current_user.rid, body.topic, source_id=body.source_id, timeout=60)
-            except Exception as e:
-                print(f"WARNING: Roadmap generation failed (non-fatal): {str(e)}")
-                return None
+                curriculum = r_db.query(SubjectRoadmap).filter(SubjectRoadmap.id == body.roadmap_id).first()
             finally:
                 r_db.close()
 
-        with ThreadPoolExecutor(max_workers=2) as outer_executor:
-            scenes_future = outer_executor.submit(
-                generate_deep_lesson_scenes,
-                db=db, 
-                user_rid=current_user.rid, 
-                topic=body.topic,
-                difficulty=body.difficulty,
-                education_level=body.education_level,
-                learner_goal=body.learner_goal,
-                style=body.style,
-                uai=body.uai,
-                source_id=body.source_id
-            )
-            roadmap_future = outer_executor.submit(generate_roadmap_threaded)
-            
-            scenes = scenes_future.result()
-            curriculum = roadmap_future.result()
+        # If we need to generate a roadmap first, do it here
+        if not curriculum and not body.uai:
+             r_db = SessionLocal()
+             try:
+                 curriculum = ai_tutor_engine.generate_roadmap(r_db, current_user.rid, body.topic, source_id=body.source_id, timeout=60)
+             except Exception as e:
+                 print(f"WARNING: Roadmap generation failed: {str(e)}")
+             finally:
+                 r_db.close()
+
+        # Extract plan if available
+        custom_plan = None
+        if curriculum and hasattr(curriculum, 'roadmap_data'):
+            custom_plan = curriculum.roadmap_data.get('units')
+
+        scenes = generate_deep_lesson_scenes(
+            db=db, 
+            user_rid=current_user.rid, 
+            topic=body.topic,
+            difficulty=body.difficulty,
+            education_level=body.education_level,
+            learner_goal=body.learner_goal,
+            style=body.style,
+            uai=body.uai,
+            source_id=body.source_id,
+            reuse_level=body.reuse_level,
+            custom_plan=custom_plan
+        )
+
+        # 🚀 External Resources Integration (v2.1)
+        if body.include_external_resources:
+            try:
+                print(f"DEBUG: Generating external resources for topic: {body.topic}")
+                resource_scene = ai_tutor_engine.generate_external_resources(db, current_user.rid, body.topic)
+                if resource_scene:
+                    scenes.append(resource_scene)
+            except Exception as e:
+                print(f"WARNING: External resource generation failed: {str(e)}")
         
         # 🛡️ Elite: Process curriculum metadata
         roadmap_id = None
@@ -437,6 +533,10 @@ def generate_lesson(
         db.add(lesson)
         db.commit()
         db.refresh(lesson)
+
+        # --- 🧠 Atomize for Library Reusability ---
+        from app.services.knowledge_service import knowledge_service
+        background_tasks.add_task(knowledge_service.atomize_lesson, db, lesson)
         
         return {
             "status": "success",
@@ -448,7 +548,8 @@ def generate_lesson(
             "scenes_count": len(scenes)
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate deep lesson: {str(e)}")
+        logger.error("Failed to generate deep lesson for roadmap %s", roadmap_id, exc_info=e)
+        raise HTTPException(status_code=500, detail="Failed to generate lesson content. Please try again later.")
 
 
 @router.get("/lessons/{lesson_id}")
@@ -461,6 +562,7 @@ def get_lesson(
     lesson = db.query(AILesson).filter(AILesson.id == lesson_id).first()
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
+    check_lesson_access(lesson, current_user)
     
     # --- 🛡️ Elite: Dynamic Metadata Recovery (v17) ---
     # Fallback to Subject Roadmaps if the lesson metadata is missing
@@ -491,27 +593,104 @@ def get_lesson(
 
 @router.get("/lessons")
 def list_lessons(
-    current_user: Annotated[User, Depends(require_education_admin)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 50
 ):
-    """List all lessons (Admin View)"""
-    lessons = db.query(AILesson).offset(skip).limit(limit).all()
-    return {
-        "lessons": [
-            {
-                "id": l.id,
-                "title": l.title,
-                "topic": l.topic,
-                "difficulty": l.difficulty,
-                "created_at": l.created_at
+    """List lessons (Admin sees all, User sees their own) with detailed progress stats"""
+    query = db.query(AILesson)
+    if current_user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        query = query.filter(AILesson.creator_rid == current_user.rid)
+        
+    lessons = query.offset(skip).limit(limit).all()
+    
+    # Fetch progress records for the user in a single query
+    lesson_ids = [l.id for l in lessons]
+    progress_records = db.query(LessonProgress).filter(
+        LessonProgress.lesson_id.in_(lesson_ids),
+        LessonProgress.user_rid == current_user.rid
+    ).all()
+    progress_map = {p.lesson_id: p for p in progress_records}
+    
+    lessons_data = []
+    for l in lessons:
+        p = progress_map.get(l.id)
+        completed_scenes = p.completed_scenes if p else 0
+        total_scenes = p.total_scenes if p else l.total_scenes or 0
+        
+        if p and p.completed:
+            percent = 100
+        elif p and total_scenes > 0:
+            percent = int((completed_scenes / total_scenes) * 100)
+        else:
+            percent = 0
+
+        lessons_data.append({
+            "id": l.id,
+            "title": l.title,
+            "topic": l.topic,
+            "difficulty": l.difficulty,
+            "style": l.style or "interactive",
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "total_duration_minutes": l.target_duration_minutes or 30,
+            "total_scenes": l.total_scenes or 0,
+            "progress": {
+                "completed_scenes": completed_scenes,
+                "total_scenes": total_scenes,
+                "completion_percent": percent
             }
-            for l in lessons
-        ],
-        "total": len(lessons)
+        })
+
+    return {
+        "lessons": lessons_data,
+        "total": len(lessons_data)
     }
 
+
+@router.post("/material/parse")
+async def parse_material(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Parse uploaded material, extract text, and generate a document fingerprint.
+    Equivalent to Express /api/material/parse endpoint from Edupath.
+    """
+    validate_uploaded_file(file)
+    from app.services.document_agent import fingerprint_document, build_text_book_lesson
+    import tempfile
+    
+    # Save the file temporarily
+    suffix = os.path.splitext(file.filename)[1] if file.filename else ""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        temp_path = tmp.name
+        
+    try:
+        pages_text = document_service.extract_text(temp_path, filename=file.filename)
+        raw_content = "\n".join([page.get("content", "") for page in pages_text])
+        page_count = len(pages_text)
+        
+        fingerprint = fingerprint_document(file.filename, raw_content, page_count)
+        
+        # If it's the arduino book, prepopulate lessons based on fingerprint
+        lessons = []
+        if fingerprint.get("detected_profile") == "C Programming for Arduino (Technical Textbook Profile)":
+            l = build_text_book_lesson("Connecting the board and uploading blink", "Standard")
+            if l:
+                lessons.append(l)
+            
+        return {
+            "status": "success",
+            "file_name": file.filename,
+            "fingerprint": fingerprint,
+            "sample_lessons": lessons
+        }
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 from pydantic import BaseModel
 import uuid
@@ -536,6 +715,7 @@ def update_lesson_progress(
     lesson = db.query(AILesson).filter(AILesson.id == lesson_id).first()
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
+    check_lesson_access(lesson, current_user)
         
     scene_id = payload.scene_id
     completed = payload.completed
@@ -592,6 +772,50 @@ def update_lesson_progress(
         if progress.exercise_score >= 60:
             progress.completion_verified = True
             progress.completion_date = datetime.utcnow()
+            
+            # Sync with SubjectRoadmap progress
+            if lesson.module_id:
+                roadmap = db.query(SubjectRoadmap).filter(
+                    SubjectRoadmap.id == lesson.module_id,
+                    SubjectRoadmap.user_rid == current_user.rid
+                ).first()
+                if roadmap:
+                    # Find topic_id matching lesson.topic
+                    topic_id = None
+                    for unit in roadmap.roadmap_data.get("units", []):
+                        for t in unit.get("topics", []):
+                            if t.get("title", "").lower() == lesson.topic.lower() or t.get("id") == lesson.topic:
+                                topic_id = t.get("id")
+                                break
+                        if topic_id: break
+                    
+                    if topic_id:
+                        progress_map = dict(roadmap.progress or {})
+                        if progress_map.get(topic_id, {}).get("status") != "completed":
+                            progress_map[topic_id] = {
+                                "status": "completed",
+                                "score": float(progress.exercise_score),
+                                "verified": True,
+                                "completed_at": datetime.utcnow().isoformat()
+                            }
+                            roadmap.progress = progress_map
+                            
+                            # Also update aggregates
+                            aggregates = dict(roadmap.roadmap_data.get("aggregates", {"learners_count": 0, "avg_score": 0}))
+                            learners = aggregates.get("learners_count", 0) + 1
+                            old_avg = aggregates.get("avg_score", 0)
+                            new_avg = int((old_avg * (learners - 1) + float(progress.exercise_score)) / learners)
+                            
+                            aggregates["learners_count"] = learners
+                            aggregates["avg_score"] = new_avg
+                            
+                            roadmap_data = dict(roadmap.roadmap_data)
+                            roadmap_data["aggregates"] = aggregates
+                            roadmap.roadmap_data = roadmap_data
+                            
+                            from sqlalchemy.orm.attributes import flag_modified
+                            flag_modified(roadmap, "progress")
+                            flag_modified(roadmap, "roadmap_data")
     
     db.commit()
     db.refresh(progress)
@@ -616,6 +840,7 @@ def submit_quiz_answer(
     lesson = db.query(AILesson).filter(AILesson.id == lesson_id).first()
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
+    check_lesson_access(lesson, current_user)
     
     submitted_answers = body.get("answers", {})
     start_time = body.get("start_time") # ISO format from frontend
@@ -731,6 +956,11 @@ def get_chat_history(
     db: Session = Depends(get_db)
 ):
     """Get chat history for lesson"""
+    lesson = db.query(AILesson).filter(AILesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    check_lesson_access(lesson, current_user)
+
     history = db.query(LessonChat).filter(
         LessonChat.user_rid == current_user.rid,
         LessonChat.lesson_id == lesson_id
@@ -760,6 +990,7 @@ def send_chat_message(
     lesson = db.query(AILesson).filter(AILesson.id == lesson_id).first()
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
+    check_lesson_access(lesson, current_user)
     
     user_message = body.get("message", "")
     tutor_role = body.get("tutor_role", "tutor")  # teacher, tutor, or peer
@@ -851,8 +1082,6 @@ def get_resume_state(current_user: User = Depends(get_current_user), db: Session
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "uploads", "knowledge")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-ALLOWED_EXTENSIONS = {".pdf", ".epub", ".docx", ".txt", ".pptx", ".csv"}
-
 
 @router.post("/knowledge/upload")
 async def upload_knowledge_source(
@@ -862,9 +1091,8 @@ async def upload_knowledge_source(
     user: User = Depends(get_current_user)
 ):
     """Upload a book or document to the Global AI Library."""
+    validate_uploaded_file(file)
     ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
     import uuid as _uuid
     safe_name = f"{_uuid.uuid4().hex}{ext}"
@@ -875,6 +1103,27 @@ async def upload_knowledge_source(
 
     file_size = os.path.getsize(file_path)
     title = os.path.splitext(file.filename)[0].replace("_", " ").replace("-", " ").title()
+
+    # 🛡️ Anti-Duplicate Logic: Check if this file already exists
+    existing = db.query(KnowledgeSource).filter(
+        KnowledgeSource.filename == file.filename,
+        KnowledgeSource.file_size_bytes == file_size
+    ).first()
+
+    if existing:
+        # If it exists, just return the existing one instead of creating a duplicate
+        # Optional: delete the temp file we just wrote
+        try: os.remove(file_path)
+        except: pass
+        return {
+            "id": existing.id,
+            "title": existing.title,
+            "filename": existing.filename,
+            "file_type": existing.file_type,
+            "file_size_bytes": existing.file_size_bytes,
+            "status": existing.status,
+            "message": "Source already exists in library. Using existing record."
+        }
 
     source = KnowledgeSource(
         uploader_rid=user.rid,
@@ -968,6 +1217,9 @@ async def get_knowledge_source(
     if not source:
         raise HTTPException(status_code=404, detail="Knowledge source not found")
 
+    if not source.is_shared and source.uploader_rid != user.rid and user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        raise HTTPException(status_code=403, detail="Access denied to this knowledge source")
+
     return {
         "id": source.id,
         "title": source.title,
@@ -1003,6 +1255,9 @@ async def get_source_topics(
     source = db.query(KnowledgeSource).filter(KnowledgeSource.id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Knowledge source not found")
+
+    if not source.is_shared and source.uploader_rid != user.rid and user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        raise HTTPException(status_code=403, detail="Access denied to this knowledge source")
 
     # 1. Check for existing SubjectRoadmap for this specific source/subject
     # (Note: In this implementation, we treat the roadmap as the source of truth for TOC)
@@ -1075,6 +1330,9 @@ async def reindex_knowledge_source(
     if not source:
         raise HTTPException(status_code=404, detail="Knowledge source not found")
 
+    if not source.is_shared and source.uploader_rid != user.rid and user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        raise HTTPException(status_code=403, detail="Access denied to this knowledge source")
+
     from app.core.database import SessionLocal
     def run_indexing(sid):
         new_db = SessionLocal()
@@ -1085,3 +1343,571 @@ async def reindex_knowledge_source(
 
     background_tasks.add_task(run_indexing, source.id)
     return {"message": "Re-indexing started in the background."}
+
+# ═══════════════════════════════════════
+#  KNOWLEDGE LIBRARY & ASSET GOVERNANCE
+# ═══════════════════════════════════════
+
+@router.get("/library/roadmaps")
+def list_public_roadmaps(
+    subject: str | None = Query(None),
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """
+    Search the global Knowledge Library for high-quality subject roadmaps.
+    """
+    query = db.query(SubjectRoadmap).filter(SubjectRoadmap.is_public == True)
+    if subject:
+        query = query.filter(SubjectRoadmap.subject.ilike(f"%{subject}%"))
+    
+    return query.order_by(SubjectRoadmap.popularity_score.desc()).limit(limit).all()
+
+@router.get("/library/lessons")
+def list_public_lessons(
+    topic: str | None = Query(None),
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """
+    Search the global Knowledge Library for high-quality AI lessons.
+    """
+    query = db.query(AILesson).filter(AILesson.is_public == True)
+    if topic:
+        query = query.filter(AILesson.topic.ilike(f"%{topic}%"))
+        
+    return query.order_by(AILesson.popularity_score.desc()).limit(limit).all()
+
+@router.post("/library/roadmaps/{roadmap_id}/remix")
+def remix_roadmap(
+    roadmap_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """
+    Fork an existing roadmap into the user's personal studio.
+    """
+    from app.services.knowledge_service import knowledge_service
+    try:
+        new_roadmap = knowledge_service.clone_roadmap(db, roadmap_id, user.rid)
+        return {
+            "status": "success",
+            "message": "Roadmap remixed successfully",
+            "roadmap_id": new_roadmap.id
+        }
+    except ValueError as e:
+        logger.warning("Roadmap remix failed for roadmap %s: %s", roadmap_id, e)
+        raise HTTPException(status_code=404, detail="Roadmap not found or cannot be remixed.")
+
+@router.post("/library/lessons/{lesson_id}/remix")
+def remix_lesson(
+    lesson_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """
+    Fork an existing lesson into the user's personal studio.
+    """
+    original = db.query(AILesson).filter(AILesson.id == lesson_id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    check_lesson_access(original, user)
+
+    new_lesson = AILesson(
+        creator_rid=user.rid,
+        topic=original.topic,
+        title=original.title,
+        content_markdown=original.content_markdown,
+        scenes=original.scenes,
+        total_scenes=original.total_scenes,
+        difficulty=original.difficulty,
+        education_level=original.education_level,
+        learner_goal=original.learner_goal,
+        style=original.style,
+        uai=original.uai,
+        source_id=original.source_id,
+        parent_id=original.id,
+        version=(original.version or 1) + 1,
+        is_public=False
+    )
+    db.add(new_lesson)
+    original.usage_count = (original.usage_count or 0) + 1
+    db.commit()
+    db.refresh(new_lesson)
+    
+    return {
+        "status": "success",
+        "message": "Lesson remixed successfully",
+        "lesson_id": new_lesson.id
+    }
+
+@router.post("/lessons/{lesson_id}/resources/regenerate")
+def regenerate_resource(
+    lesson_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Regenerate a specific resource in the lesson's resource hub"""
+    resource_index = body.get("resource_index")
+    if resource_index is None:
+        raise HTTPException(status_code=400, detail="resource_index is required")
+        
+    lesson = db.query(AILesson).filter(AILesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+        
+    if lesson.creator_rid != current_user.rid and current_user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        raise HTTPException(status_code=403, detail="Not authorized to modify resources for this lesson")
+        
+    # Find the resource hub scene
+    scenes = list(lesson.scenes)
+    hub_scene = next((s for s in scenes if s.get("semantic_type") == "resource_hub"), None)
+    
+    if not hub_scene:
+        raise HTTPException(status_code=404, detail="Resource hub not found in this lesson")
+        
+    resources = hub_scene.get("resources", [])
+    if resource_index >= len(resources):
+        raise HTTPException(status_code=400, detail="Invalid resource index")
+        
+    old_resource = resources[resource_index]
+    
+    # Regenerate
+    new_resource = ai_tutor_engine.regenerate_single_resource(db, lesson.topic, old_resource)
+    
+    if not new_resource:
+        raise HTTPException(status_code=500, detail="Failed to regenerate resource")
+        
+    # Update structured list
+    resources[resource_index] = new_resource
+    hub_scene["resources"] = resources
+    
+    # Rebuild Markdown content (optional but good for consistency)
+    content = f"To further your mastery of **{lesson.topic}**, I have curated these elite external resources for you. These will provide additional context, visual demonstrations, and technical depth.\n\n"
+    for res in resources:
+        icon = "🎥" if res.get('type') == 'video' else "📄" if res.get('type') == 'documentation' else "🛠️" if res.get('type') == 'tool' else "📚"
+        content += f"### {icon} {res.get('title')}\n"
+        content += f"*{res.get('description')}*\n\n"
+        content += f"🔗 [Access Resource]({res.get('url')})\n\n---\n\n"
+    
+    hub_scene["content"] = content
+    
+    # Persist
+    from sqlalchemy.orm.attributes import flag_modified
+    lesson.scenes = scenes
+    flag_modified(lesson, "scenes")
+    db.commit()
+    db.refresh(lesson)
+    
+    return {
+        "status": "success",
+        "new_resource": new_resource,
+        "updated_scene": hub_scene
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# ─── SUBJECT DISCOVERY AGENT  ─────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+
+class SubjectDiscoverRequest(BaseModel):
+    topic: str
+    intent: str = "Full Course"
+    style: str = "Standard"
+    persist: bool = True  # Auto-save as a SubjectRoadmap for quick start
+
+
+@router.post("/subject/discover")
+def discover_subject(
+    body: SubjectDiscoverRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    SUBJECT DISCOVERY AGENT
+    =======================
+    Classifies, designs, and builds an entire educational curriculum in a single
+    multi-component pass for any topic not yet in the standard catalog.
+
+    Returns five components:
+      A) Classification & Metadata
+      B) Sub-Subjects (4-8 branches)
+      C) Topics per sub-subject (6-10 micro-topics each)
+      D) Phased Roadmap nodes (Beginner → Intermediate → Advanced)
+      E) Seed Lesson (textbook-quality, immediately readable)
+
+    If `persist=True`, the roadmap component is also saved as a SubjectRoadmap
+    and the roadmap_id is returned so the frontend can navigate directly to it.
+    """
+    if not body.topic or not body.topic.strip():
+        raise HTTPException(status_code=400, detail="Topic is required.")
+
+    try:
+        data = ai_tutor_engine.generate_subject_discovery(
+            db=db,
+            topic=body.topic.strip(),
+            intent=body.intent,
+            style=body.style
+        )
+    except Exception as e:
+        logger.error("Subject Discovery Agent error for topic '%s'", getattr(body, 'topic', '?'), exc_info=e)
+        raise HTTPException(status_code=500, detail="Subject discovery failed. Please try again later.")
+
+    # ── Optionally persist the roadmap component ──────────────────────────────
+    persisted_roadmap_id = None
+    if body.persist:
+        try:
+            roadmap_component = data.get("roadmap", {})
+            metadata = data.get("metadata", {})
+            sub_subjects = data.get("sub_subjects", [])
+            topics_map = data.get("topics", {})
+
+            # Build a SubjectRoadmap-compatible `roadmap_data` structure
+            # Convert the EduPath node-based roadmap into the units/topics format
+            # that the existing RoadmapPage frontend understands.
+            units = []
+            for sub in sub_subjects:
+                sub_topics = topics_map.get(sub, [])
+                units.append({
+                    "id": sub.lower().replace(" ", "_").replace("&", "and")[:30],
+                    "title": sub,
+                    "description": f"Core coverage of {sub}",
+                    "topics": [
+                        {
+                            "id": f"t_{i}_{sub[:10].lower().replace(' ', '_')}",
+                            "title": t,
+                            "difficulty": "beginner" if i < 2 else "intermediate" if i < 5 else "advanced"
+                        }
+                        for i, t in enumerate(sub_topics)
+                    ]
+                })
+
+            # Also store the phased nodes as a separate key for the Discovery UI
+            roadmap_data_full = {
+                "section_a": {
+                    "subject": metadata.get("title", body.topic),
+                    "academic_level": metadata.get("difficulty_range", "Beginner to Advanced"),
+                    "source": "subject-discovery-agent",
+                    "estimated_total_hours": metadata.get("estimated_total_hours", 45),
+                    "description": metadata.get("description", ""),
+                    "parent_tags": metadata.get("parent_tags", []),
+                },
+                "units": units,
+                "discovery_nodes": roadmap_component.get("nodes", []),
+                "seed_lesson": data.get("seed_lesson", {}),
+                "classification": data.get("classification", {}),
+                "dependency_graph": {}
+            }
+
+            # Build a simple linear dependency graph from the units
+            flat_topic_ids = []
+            for unit in units:
+                for t in unit.get("topics", []):
+                    flat_topic_ids.append(t["id"])
+            graph = {}
+            for i, tid in enumerate(flat_topic_ids):
+                graph[tid] = [flat_topic_ids[i - 1]] if i > 0 else []
+            roadmap_data_full["dependency_graph"] = graph
+
+            # Check for an existing roadmap with the same subject to avoid duplicates
+            existing = db.query(SubjectRoadmap).filter(
+                SubjectRoadmap.user_rid == current_user.rid,
+                SubjectRoadmap.subject.ilike(metadata.get("title", body.topic))
+            ).first()
+
+            if existing:
+                from sqlalchemy.orm.attributes import flag_modified
+                existing.roadmap_data = roadmap_data_full
+                existing.dependency_graph = graph
+                existing.updated_at = datetime.utcnow()
+                flag_modified(existing, "roadmap_data")
+                db.commit()
+                db.refresh(existing)
+                persisted_roadmap_id = str(existing.id)
+            else:
+                new_roadmap = SubjectRoadmap(
+                    user_rid=current_user.rid,
+                    subject=metadata.get("title", body.topic),
+                    roadmap_data=roadmap_data_full,
+                    dependency_graph=graph,
+                    difficulty_level=metadata.get("difficulty_range", "Beginner to Advanced"),
+                    tags=metadata.get("parent_tags", [])
+                )
+                db.add(new_roadmap)
+                db.commit()
+                db.refresh(new_roadmap)
+                persisted_roadmap_id = str(new_roadmap.id)
+
+        except Exception as persist_err:
+            # Persistence failure is non-fatal; we still return the discovery data
+            print(f"WARNING: [SDA] Failed to persist roadmap for '{body.topic}': {persist_err}")
+
+    return {
+        **data,
+        "roadmap_id": persisted_roadmap_id
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# ─── EDUPATH EXTRA INTEGRATED ENDPOINTS ───────────────────────
+# ═══════════════════════════════════════════════════════════════
+
+class QuizGenerateRequest(BaseModel):
+    phase: str
+    topicName: str
+    style: str = "Standard"
+    completed_nodes: list[str] = []
+
+@router.post("/quiz/generate")
+def generate_phase_quiz(
+    body: QuizGenerateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generates a 4-question phase evaluation quiz.
+    """
+    phase = body.phase
+    topic_name = body.topicName
+    completed_nodes = body.completed_nodes
+
+    # Intercept for C Programming/Arduino topics
+    is_arduino = (topic_name and "arduino" in topic_name.lower()) or any("arduino" in node.lower() for node in completed_nodes)
+    if is_arduino:
+        from app.services.document_agent import build_text_book_quiz
+        return {"quiz": build_text_book_quiz(phase)}
+
+    quiz_data = ai_tutor_engine.generate_phase_quiz(db, phase, topic_name, completed_nodes)
+    return {"quiz": quiz_data}
+
+
+class StudyBuddyChatRequest(BaseModel):
+    message: str
+    completed_nodes: list[str] = []
+    current_node_title: str = ""
+    history: list = []
+    style: str = "Standard"
+
+@router.post("/study-buddy/chat")
+def study_buddy_chat(
+    body: StudyBuddyChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    AI STUDY BUDDY SIDE-CAR CHAT
+    Restricted to completed nodes and current node to prevent spoilers.
+    """
+    message = body.message
+    completed_nodes = body.completed_nodes
+    current_node_title = body.current_node_title
+    history = body.history
+    style = body.style
+
+    completed_str = f"The student has COMPLETED only these milestones: '{', '.join(completed_nodes)}'." if completed_nodes else "The student has not completed any milestones yet."
+    active_str = f"They are currently reading: '{current_node_title}'." if current_node_title else "They are focusing on their primary dashboard."
+
+    system_prompt = f"""You are the AI Study Buddy sidecar counselor in the EduPath application.
+Your goal is to answer study queries and clarify uncertainties.
+CONSTRAINTS:
+- You must ONLY discuss, explain, or answer topics that fall under:
+  1. Completed Milestones: "{', '.join(completed_nodes)}"
+  2. Currently active learning node: "{current_node_title}"
+- CRITICAL: Never spoil, preview, or introduce algorithms, codes, or terms from future milestones of the roadmap that are NOT completed yet! 
+- If the user asks about an upcoming topic, politely decline and let them know: "That milestone is locked until you complete the current sections. Let's master what we have right now first!"
+- Tone: Extremely encouraging, pedagogical, and adaptive to the style: "{style}" (ELIF5, Standard, or Technical).
+- Focus on the content outline. Keep responses to 2 or 3 concise, readable paragraphs maximum."""
+
+    user_content = f"""[STUDENT CONTEXT]
+{completed_str}
+{active_str}
+Current Study Style: {style}
+
+[STUDENT QUESTION]
+"{message}"
+"""
+
+    # We reuse AITutorEngine's LLM connection
+    from app.core.config import Settings
+    import litellm
+    import os
+
+    settings = Settings()
+    active_provider, active_model, active_api_key, active_base_url = ai_tutor_engine._get_active_model(db)
+
+    # Fallback response if mock
+    if active_provider == "mock":
+        fallback_reply = f"Hey! I'm your AI Study Buddy. Currently, we can talk about: {', '.join(completed_nodes) if completed_nodes else 'general goals'}. (Style: {style} Mode)\n\nSince the server is running without an active LLM key, I am in offline sandbox guidelines. Ask me any question, and I'll help you focus on your unlocked prerequisites!"
+        return {"reply": fallback_reply}
+
+    api_keys = {
+        "google": settings.GOOGLE_API_KEY,
+        "openai": settings.OPENAI_API_KEY,
+        "anthropic": settings.ANTHROPIC_API_KEY,
+        "deepseek": settings.DEEPSEEK_API_KEY,
+    }
+    
+    model = active_model or settings.AI_MODEL
+    api_key = active_api_key or api_keys.get(active_provider)
+    
+    env_key_map = {
+        "google": "GEMINI_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY"
+    }
+    if active_provider in env_key_map:
+        os.environ[env_key_map[active_provider]] = api_key or ""
+
+    if not api_key and active_provider not in ["google", "openai", "anthropic", "deepseek"]:
+         api_key = settings.AI_API_KEY
+
+    # Map message history format
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+    for h in history:
+        messages.append({
+            "role": "assistant" if h.get("role") != "user" else "user",
+            "content": h.get("text", "")
+        })
+    messages.append({"role": "user", "content": user_content})
+
+    completion_args = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": 1000
+    }
+    if active_base_url:
+        completion_args["api_base"] = active_base_url
+
+    try:
+        response = litellm.completion(**completion_args)
+        reply = response.choices[0].message.content
+        return {"reply": reply}
+    except Exception as e:
+        print(f"Study Buddy Agent Error: {e}")
+        return {"reply": f"Sorry, I had an issue contacting my thinking core. Let's try again! (Error: {e})"}
+
+
+@router.post("/roadmaps/{roadmap_id}/topics/{topic_id}/complete")
+def complete_roadmap_topic(
+    roadmap_id: str,
+    topic_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Log completion of a roadmap topic and recalculate averages.
+    """
+    roadmap = db.query(SubjectRoadmap).filter(
+        SubjectRoadmap.id == roadmap_id,
+        SubjectRoadmap.user_rid == current_user.rid
+    ).first()
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+
+    score = body.get("score", 100)
+    
+    # Initialize progress map if empty
+    progress_map = dict(roadmap.progress or {})
+    
+    # Check if previously completed
+    prev_status = progress_map.get(topic_id, {}).get("status", "not_started")
+    
+    progress_map[topic_id] = {
+        "status": "completed",
+        "score": score,
+        "verified": True,
+        "completed_at": datetime.utcnow().isoformat()
+    }
+    
+    # If not previously completed, update aggregates
+    aggregates = dict(roadmap.roadmap_data.get("aggregates", {"learners_count": 0, "avg_score": 0}))
+    if prev_status != "completed":
+        learners = aggregates.get("learners_count", 0) + 1
+        old_avg = aggregates.get("avg_score", 0)
+        new_avg = int((old_avg * (learners - 1) + score) / learners)
+        
+        aggregates["learners_count"] = learners
+        aggregates["avg_score"] = new_avg
+        
+        roadmap_data = dict(roadmap.roadmap_data)
+        roadmap_data["aggregates"] = aggregates
+        roadmap.roadmap_data = roadmap_data
+        
+    roadmap.progress = progress_map
+    
+    # Force save
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(roadmap, "progress")
+    flag_modified(roadmap, "roadmap_data")
+    db.commit()
+    db.refresh(roadmap)
+
+    return {"status": "success", "progress": roadmap.progress, "aggregates": aggregates}
+
+
+@router.post("/roadmaps/{roadmap_id}/topics/{topic_id}/review")
+def review_roadmap_topic(
+    roadmap_id: str,
+    topic_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update Spaced Repetition review log for a roadmap topic.
+    """
+    roadmap = db.query(SubjectRoadmap).filter(
+        SubjectRoadmap.id == roadmap_id,
+        SubjectRoadmap.user_rid == current_user.rid
+    ).first()
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+
+    progress_map = dict(roadmap.progress or {})
+    topic_progress = progress_map.get(topic_id, {})
+    
+    if not topic_progress:
+        topic_progress = {"status": "not_started"}
+        
+    spaced_info = topic_progress.get("spaced_repetition", {})
+    if not spaced_info:
+        # Schedule Day 1, 3, 7 review target intervals
+        from datetime import timedelta
+        now = datetime.utcnow()
+        scheduled = [
+            (now + timedelta(days=1)).isoformat()[:10],
+            (now + timedelta(days=3)).isoformat()[:10],
+            (now + timedelta(days=7)).isoformat()[:10]
+        ]
+        spaced_info = {
+            "scheduled_dates": scheduled,
+            "completed_reviews": 0
+        }
+
+    reviews_done = spaced_info.get("completed_reviews", 0)
+    action = body.get("action", "log") # log or reset
+    
+    if action == "log":
+        reviews_done = min(3, reviews_done + 1)
+    elif action == "reset":
+        reviews_done = 0
+        
+    spaced_info["completed_reviews"] = reviews_done
+    topic_progress["spaced_repetition"] = spaced_info
+    progress_map[topic_id] = topic_progress
+    roadmap.progress = progress_map
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(roadmap, "progress")
+    db.commit()
+    db.refresh(roadmap)
+
+    return {"status": "success", "progress": roadmap.progress}
+

@@ -5,7 +5,7 @@ from app.database.session import engine
 from app.models import Base
 
 # Import routers
-from app.routers import auth, activation, wallet, withdrawal, network, dashboard, codes, admin, seasons, marketplace, payments
+from app.routers import auth, activation, wallet, withdrawal, network, dashboard, codes, admin, seasons, marketplace, payments, users, education
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -14,7 +14,12 @@ app = FastAPI(title=settings.PROJECT_NAME)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,6 +52,8 @@ app.include_router(admin.router, prefix="/api/v1")
 app.include_router(seasons.router, prefix="/api/v1")
 app.include_router(marketplace.router, prefix="/api/v1")
 app.include_router(payments.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(education.router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

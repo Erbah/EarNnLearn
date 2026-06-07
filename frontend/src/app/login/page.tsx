@@ -42,10 +42,8 @@ export default function LoginPage() {
 
         if (profileRes.status === 200) {
           const profile = profileRes.data;
-          if (profile.role === "SUPER_ADMIN") {
+          if (profile.role === "SUPER_ADMIN" || profile.role === "EDUCATION_ADMIN") {
             router.push("/admin");
-          } else if (profile.role === "EDUCATION_ADMIN") {
-            router.push("/education");
           } else if (profile.tier_type === "admin") {
             router.push("/admin"); // Fallback for transition
           } else {

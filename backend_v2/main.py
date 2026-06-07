@@ -1,7 +1,11 @@
+import logging
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from sqlalchemy import text
-from app.core.config import settings
+from app.core.config import settings, sanitize_secrets
 from app.core.database import Base, engine
 from app.api.v1 import auth, wallet, codes, referral, admin, marketplace, learning, ai, payments, education, users, engagement
 
@@ -19,11 +23,41 @@ from app.models.marketplace import CourseCategory, CourseEnrollment, CourseRevie
 from app.models.engagement import Quiz, QuizQuestion, QuizOption, QuizAttempt, Discussion, DiscussionReply
 
 def create_app() -> FastAPI:
+    logger = logging.getLogger("uvicorn.error")
+
     app = FastAPI(
         title=settings.PROJECT_NAME,
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
-        debug=True
+        debug=False
     )
+
+    @app.exception_handler(Exception)
+    async def generic_exception_handler(request: Request, exc: Exception):
+        """Catch-all: log full error server-side, return generic 500 to client."""
+        logger.error(
+            "Unhandled exception on %s %s",
+            request.method,
+            request.url.path,
+            exc_info=exc,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "An internal server error occurred."},
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        """Return 422 without leaking internal field names or schema details."""
+        logger.warning(
+            "Validation error on %s %s: %s",
+            request.method,
+            request.url.path,
+            exc.errors(),
+        )
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "Invalid request data."},
+        )
 
     app.add_middleware(
         CORSMiddleware,
@@ -32,6 +66,33 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    if settings.ENFORCE_HTTPS:
+        app.add_middleware(HTTPSRedirectMiddleware)
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        # 1. Strict Content-Security-Policy (allows CDNs for Swagger assets)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; "
+            "object-src 'none'; "
+            "frame-ancestors 'none';"
+        )
+        # 2. Strict-Transport-Security (HSTS)
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        # 3. X-Content-Type-Options
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        # 4. X-Frame-Options
+        response.headers["X-Frame-Options"] = "DENY"
+        # 5. Referrer-Policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # 6. Permissions-Policy
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        return response
 
     def startup_logic():
         from app.core.database import SessionLocal, engine
@@ -45,6 +106,22 @@ def create_app() -> FastAPI:
         
         db = SessionLocal()
         try:
+            # SQLite migration for user lockout columns
+            try:
+                columns = db.execute(text("PRAGMA table_info(users)")).fetchall()
+                existing_cols = {col[1] for col in columns}
+                if "failed_login_attempts" not in existing_cols:
+                    print("Adding column failed_login_attempts to users table")
+                    db.execute(text("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0"))
+                    db.commit()
+                if "locked_until" not in existing_cols:
+                    print("Adding column locked_until to users table")
+                    db.execute(text("ALTER TABLE users ADD COLUMN locked_until DATETIME"))
+                    db.commit()
+            except Exception as e:
+                db.rollback()
+                print(sanitize_secrets(f"Failed to add lockout columns to users table: {e}"))
+
             existing = db.query(User).first()
             if not existing:
                 root_rid = "ACNIRP"
@@ -133,7 +210,7 @@ def create_app() -> FastAPI:
                 print("Seeded 3 Learning Forest nodes")
         except Exception as e:
             db.rollback()
-            print(f"Startup logic failed: {e}")
+            print(sanitize_secrets(f"Startup logic failed: {e}"))
         finally:
             db.close()
 
@@ -145,6 +222,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
     app.include_router(wallet.router, prefix=f"{settings.API_V1_STR}/wallet", tags=["Wallet"])
     app.include_router(codes.router, prefix=f"{settings.API_V1_STR}/codes", tags=["Codes Economy"])
+    app.include_router(codes.legacy_router, prefix=f"{settings.API_V1_STR}", tags=["Legacy Codes"])
     app.include_router(referral.router, prefix=f"{settings.API_V1_STR}/network", tags=["Network"])
     app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Control Center"])
     app.include_router(marketplace.router, prefix=f"{settings.API_V1_STR}/marketplace", tags=["Learning Marketplace"])
@@ -167,7 +245,7 @@ def create_app() -> FastAPI:
             db.execute(text("SELECT 1"))
             db.close()
         except Exception as e:
-            print(f"Health DB error: {e}")
+            print(sanitize_secrets(f"Health DB error: {e}"))
             db_status = "disconnected"
         
         try:

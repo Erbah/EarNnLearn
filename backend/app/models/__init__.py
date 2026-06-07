@@ -15,27 +15,32 @@ def get_now():
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    password_hash = Column(String)
+    rid = Column(String, unique=True, index=True)
+    name = Column(String)
     display_name = Column(String)
+    email = Column(String, unique=True, index=True)
+    phone = Column(String)
+    password_hash = Column(String)
+    product_code = Column(String)
+    referred_by = Column(String)
+    parent_rid = Column(String)
+    tier_type = Column(String, default="standard")
     role = Column(String, default="user")
     is_active = Column(Boolean, default=True)
-    preferred_currency = Column(String, default="GHS")
+    last_login_at = Column(DateTime)
+    total_xp = Column(Integer, default=0)
+    level = Column(Integer, default=1)
+    current_streak = Column(Integer, default=0)
+    last_active_at = Column(DateTime)
+    hearts = Column(Integer, default=5)
+    status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    # Payment (Pay-in)
-    payment_method = Column(String, nullable=True) # momo, paypal, stripe, etc
-    payment_provider = Column(String, nullable=True) # MTN, Vodafone, etc
-    payment_identifier = Column(String, nullable=True) # phone or email
-
-    # Payout (Earnings)
-    payout_method = Column(String, nullable=True)
-    payout_provider = Column(String, nullable=True)
-    payout_identifier = Column(String, nullable=True)
-    payout_name = Column(String, nullable=True)
-
-    paystack_customer_id = Column(String, nullable=True)
+    
+    # Onboarding & Personalization
+    onboarding_completed = Column(Boolean, default=False)
+    learning_goal = Column(String)
+    preferred_style = Column(String)
+    last_onboarding_step = Column(Integer, default=0)
     
     activations = relationship("Activation", back_populates="user", primaryjoin="User.id == Activation.user_id")
     wallet = relationship("Wallet", back_populates="user", uselist=False)
@@ -223,8 +228,7 @@ class Season(Base):
 
 class SystemSettings(Base):
     __tablename__ = "system_settings"
-    id = Column(Integer, primary_key=True)
-    key = Column(String, unique=True, index=True)
+    key = Column(String, primary_key=True, index=True)
     value = Column(String)
     description = Column(String)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

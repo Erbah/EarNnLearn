@@ -58,5 +58,9 @@ class User(Base):
     last_onboarding_step = Column(Integer, default=0)
     is_beta_user = Column(Boolean, default=True)
 
+    # Brute-force protection
+    failed_login_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime, nullable=True)
+
     # Relationships
     codes = relationship("Code", primaryjoin="User.rid == Code.owner_rid", foreign_keys="[Code.owner_rid]", overlaps="codes")

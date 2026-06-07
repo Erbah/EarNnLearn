@@ -51,6 +51,15 @@ class AILesson(Base):
     total_scenes = Column(Integer, default=0)
     completed_scenes = Column(Integer, default=0)
     
+    # 🧠 Persistence & Reusability (Upgrade)
+    is_public = Column(Boolean, default=False, index=True)
+    is_verified = Column(Boolean, default=False, index=True)
+    version = Column(Integer, default=1)
+    parent_id = Column(String, index=True, nullable=True) # ID of the original lesson if forked
+    usage_count = Column(Integer, default=0)
+    popularity_score = Column(Numeric(10, 2), default=0.0)
+    tags = Column(JSON, default=[]) # ["math", "algebra", "verified"]
+
     # Meta
     status = Column(String, default="published")  # draft, published, archived
     is_partially_generated = Column(Boolean, default=False)  # For fail-safe incremental generation
@@ -132,7 +141,16 @@ class SubjectRoadmap(Base):
     difficulty_level = Column(String, default="beginner")
     learning_goal = Column(String, nullable=True)  # exam, career, interest
     teacher_id = Column(String, nullable=True) # Prepare for Teacher/Admin mode
-    
+
+    # 🧠 Persistence & Reusability (Upgrade)
+    is_public = Column(Boolean, default=False, index=True)
+    is_verified = Column(Boolean, default=False, index=True)
+    version = Column(Integer, default=1)
+    parent_id = Column(String, index=True, nullable=True) # ID of the original roadmap if forked
+    usage_count = Column(Integer, default=0)
+    popularity_score = Column(Numeric(10, 2), default=0.0)
+    tags = Column(JSON, default=[])
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -202,3 +220,28 @@ class KnowledgeChunk(Base):
     extra_metadata = Column(JSON, default={})
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AIAsset(Base):
+    """
+    Smallest reusable unit of educational content (Knowledge Atom).
+    Used to assemble lessons without regenerating redundant explanations.
+    """
+    __tablename__ = "ai_assets"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    
+    topic = Column(String, index=True, nullable=False)
+    subtopic = Column(String, index=True, nullable=True)
+    
+    content_type = Column(String) # explanation, diagram_spec, quiz_question, whiteboard_script
+    semantic_depth = Column(String) # beginner, intermediate, advanced
+    
+    body = Column(Text, nullable=False)
+    extra_metadata = Column(JSON, default={}) # { "style": "socratic", "tokens": 450 }
+    
+    is_verified = Column(Boolean, default=False)
+    usage_count = Column(Integer, default=0)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

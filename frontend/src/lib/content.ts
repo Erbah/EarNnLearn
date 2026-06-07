@@ -133,6 +133,9 @@ export function cleanLessonContent(text: string, mode: RenderMode = 'auto'): str
 
   cleaned = cleaned.replace(/\[!!EXPPH!!\]/g, "**");
   
+  // 🔗 LINK SUPPORT (v2.1)
+  cleaned = cleaned.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline font-bold">$1</a>');
+  
   placeholders.forEach((val, i) => {
     cleaned = cleaned.replace(`[!!CODEPH${i}!!]`, val);
   });
@@ -179,7 +182,8 @@ export function cleanLessonContent(text: string, mode: RenderMode = 'auto'): str
     .replace(/&lt;div(.*?)&gt;/gi, "<div$1>")
     .replace(/&lt;\/div&gt;/gi, "</div>")
     .replace(/&lt;h([1-4])(.*?)&gt;/gi, "<h$1$2>")
-    .replace(/&lt;\/h([1-4])&gt;/gi, "</h$1>");
+    .replace(/&lt;\/h([1-4])&gt;/gi, "</h$1>")
+    .replace(/&lt;a(.*?)&gt;(.*?)&lt;\/a&gt;/gi, "<a$1>$2</a>");
 
   // ═══════════════════════════════════════════════════════════════
   // STAGE 6: Math Restoration

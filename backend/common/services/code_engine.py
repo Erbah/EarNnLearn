@@ -13,8 +13,9 @@ import hmac
 import hashlib
 from sqlalchemy.orm import Session
 
+import os
 # In production, this should be in settings/env
-CODE_SECRET_KEY = "CEDI-TREES-SECRET-2026"
+CODE_SECRET_KEY = os.getenv("CODE_SECRET_KEY", "CEDI-TREES-SECRET-2026")
 
 def generate_rid(parent_rid: str, db: Session = None) -> str:
     """

@@ -28,7 +28,7 @@ from app.models.transaction import Transaction, ReferralIndex
 from app.models.code import Code
 from app.models.course import Course, Module, Video
 from app.models.progress import CourseProgress
-from app.models.ai import AIUsage
+from app.models.ai import AIUsage, AILesson, LessonProgress, LessonChat, SubjectRoadmap, AIAsset
 
 # Override the url in alembic.ini with the one from our config
 config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
@@ -57,6 +57,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_as_batch=True
     )
 
     with context.begin_transaction():
@@ -78,7 +79,8 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, target_metadata=target_metadata,
+            render_as_batch=True
         )
 
         with context.begin_transaction():

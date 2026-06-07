@@ -6,7 +6,6 @@ import { Topbar } from "@/components/Topbar";
 import { useUser } from "@/context/UserContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { AriaWelcomeToast } from "@/components/AriaWelcomeToast";
 
 export default function DashboardLayout({
   children,
@@ -25,12 +24,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    // 1. Onboarding Gate
-    if (!loading && user && !user.onboarding_completed && pathname !== "/onboarding") {
-      router.push("/onboarding");
-    }
-  }, [user, loading, pathname, router]);
+
 
   // --- 🚨 Elite Hardening: Beta Access Gate ---
   const isBetaAuthorized = user?.is_beta_user || user?.role === 'SUPER_ADMIN';
@@ -44,16 +38,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // If on onboarding, we might want a different layout (full screen, no sidebar)
-  const isOnboarding = pathname === "/onboarding";
 
-  if (isOnboarding) {
-    return (
-      <div className="flex min-h-screen bg-background text-foreground relative overflow-hidden">
-        <main className="flex-1 w-full z-10">{children}</main>
-      </div>
-    );
-  }
 
   // Final Hardening: Launch Gate Screen
   if (!loading && user && !isBetaAuthorized) {
@@ -66,7 +51,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
           <h1 className="text-4xl font-bold text-white tracking-tight">The Future is Loading</h1>
           <p className="text-gray-400 leading-relaxed">
-            LearNnEarn is currently in a <b>Controlled Soft Launch</b> phase. Aria is fine-tuning the platform for the first 50 explorers.
+            LearNnEarn is currently in a <b>Controlled Soft Launch</b> phase. Our engine is fine-tuning the platform for the first 50 explorers.
           </p>
           <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-primary text-sm font-semibold">
             Your spot on the waitlist is secured.
@@ -87,7 +72,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       <div className="flex-1 ml-64 flex flex-col relative overflow-x-hidden">
         <div className="absolute top-0 left-0 w-full h-[500px] bg-primary/5 rounded-full blur-[120px] -z-10 opacity-50 pointer-events-none" />
         <Topbar />
-        <AriaWelcomeToast />
         <main className="flex-1 px-8 py-8 w-full max-w-7xl mx-auto z-10">
           {children}
         </main>

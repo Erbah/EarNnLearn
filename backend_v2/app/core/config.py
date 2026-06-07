@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "CediTrees 2.0"
     API_V1_STR: str = "/api/v1"
     TESTING: bool = False
+    ENFORCE_HTTPS: bool = os.getenv("ENFORCE_HTTPS", "False").lower() in ("true", "1", "yes")
     
     SECRET_KEY: str = os.getenv("SECRET_KEY", "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
@@ -46,6 +47,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
+    AI_API_KEY: str = os.getenv("AI_API_KEY", "")
+    INITIAL_ADMIN_PASSWORD: str = os.getenv("INITIAL_ADMIN_PASSWORD", "")
 
     # Platform Percentages
     SELLER_PERCENTAGE: float = float(os.getenv("SELLER_PERCENTAGE", "0.70"))
@@ -72,3 +75,25 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 
 settings = Settings()
+
+def sanitize_secrets(value: any) -> str:
+    """Sanitizes sensitive information from string/exception messages."""
+    text = str(value)
+    # Mask Postgres Password
+    if settings.POSTGRES_PASSWORD and settings.POSTGRES_PASSWORD != "password":
+        text = text.replace(settings.POSTGRES_PASSWORD, "********")
+    # Mask Secret Key
+    if settings.SECRET_KEY and settings.SECRET_KEY != "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD":
+        text = text.replace(settings.SECRET_KEY, "********")
+    # Mask Stripe Key
+    if settings.STRIPE_SECRET_KEY:
+        text = text.replace(settings.STRIPE_SECRET_KEY, "********")
+    # Mask Paystack Key
+    if settings.PAYSTACK_SECRET_KEY:
+        text = text.replace(settings.PAYSTACK_SECRET_KEY, "********")
+    # Mask AI and Admin Keys
+    for key in [settings.GOOGLE_API_KEY, settings.OPENAI_API_KEY, settings.ANTHROPIC_API_KEY, settings.DEEPSEEK_API_KEY, settings.AI_API_KEY, settings.INITIAL_ADMIN_PASSWORD]:
+        if key:
+            text = text.replace(key, "********")
+    return text
+

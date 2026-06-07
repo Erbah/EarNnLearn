@@ -6,7 +6,7 @@ import {
   Search, Download, X, Smile, CheckCircle2, Zap, ShoppingBag,
   ChevronDown, ExternalLink, Eye, EyeOff, Key, Hash, DollarSign, Globe,
   Share2, MessageCircle, Twitter, Facebook, Copy, Send, Loader2, Check, Lock, Sparkles, LogOut, Trash2,
-  CheckCircle, ShieldCheck, AlertCircle
+  CheckCircle, ShieldCheck, AlertCircle, Database, Table, Settings
 } from 'lucide-react';
 
 import { API_BASE_URL, api } from '@/lib/api';
@@ -17,6 +17,140 @@ function Stat({ label, value, color = '#00E0FF' }: { label: string; value: strin
     <div className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-6 border border-white/10 flex flex-col justify-center min-h-[110px] hover:border-white/20 transition-all">
       <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2">{label}</div>
       <div className="text-3xl font-black tracking-tight" style={{ color }}>{value}</div>
+    </div>
+  );
+}
+
+function RealDatabaseInspector({ onClose }: { onClose: () => void }) {
+  const [tables, setTables] = useState<string[]>([]);
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [tableData, setTableData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api.get(`${API}/tables`).then(res => setTables(res.data));
+  }, []);
+
+  const loadTable = async (name: string) => {
+    setLoading(true);
+    setSelectedTable(name);
+    try {
+      const res = await api.get(`${API}/tables/${name}`);
+      setTableData(res.data);
+    } catch (e) { }
+    setLoading(false);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[160] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 md:p-8">
+      <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-[#0A0C10] border border-white/10 w-full max-w-6xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/50 via-primary to-primary/50" />
+        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 text-primary rounded-xl"><Database size={20} /></div>
+            <div>
+              <h3 className="text-xl font-bold text-white">System Database Explorer</h3>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black">Live Production Table Audit</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 transition-colors"><X size={24} /></button>
+        </div>
+
+        <div className="flex flex-1 overflow-hidden">
+          <div className="w-64 border-r border-white/5 bg-black/20 overflow-y-auto p-4 space-y-2">
+            <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 px-2">Registered Tables</h4>
+            {tables.map(t => (
+              <button
+                key={t}
+                onClick={() => loadTable(t)}
+                className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${selectedTable === t ? 'bg-primary text-black' : 'text-gray-400 hover:bg-white/5'}`}
+              >
+                <Table size={14} /> {t}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-hidden flex flex-col p-6">
+            {!selectedTable ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-4">
+                <Database size={48} className="opacity-20" />
+                <p className="text-sm font-medium">Select a table from the directory to begin inspection</p>
+              </div>
+            ) : loading ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-primary gap-4">
+                <Loader2 size={32} className="animate-spin" />
+                <p className="text-[10px] font-black uppercase tracking-widest">Querying Layer 1 Database...</p>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                    <span className="text-primary">{selectedTable}</span>
+                    <span className="text-xs text-gray-500 font-normal">({tableData?.data?.length || 0} rows cached)</span>
+                  </h4>
+                  <button onClick={() => loadTable(selectedTable)} className="p-2 bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors"><Zap size={16} /></button>
+                </div>
+
+                <div className="flex-1 overflow-auto border border-white/10 rounded-2xl bg-black/40 shadow-inner">
+                  <table className="w-full text-left text-[11px] border-collapse">
+                    <thead className="bg-white/5 sticky top-0 z-10">
+                      <tr>
+                        {tableData?.columns?.map((col: string) => (
+                          <th key={col} className="px-4 py-3 font-bold text-gray-500 border-b border-white/10 uppercase tracking-tighter">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {tableData?.data?.map((row: any, i: number) => (
+                        <tr key={i} className="hover:bg-white/5 transition-colors">
+                          {tableData.columns.map((col: string) => (
+                            <td key={col} className="px-4 py-3 font-mono text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={String(row[col])}>
+                              {String(row[col])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function DatabasePanel() {
+  const [showInspector, setShowInspector] = useState(false);
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Stat label="DB Engine" value="SQLite 3.x" color="#10B981" />
+        <Stat label="Storage" value="Persistent" color="#3B82F6" />
+        <Stat label="Security" value="Admin Restricted" color="#F59E0B" />
+      </div>
+      <div className="bg-white/5 border border-white/10 rounded-3xl p-12 text-center space-y-6 backdrop-blur-md">
+        <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto text-primary shadow-lg shadow-primary/10">
+          <Database size={40} />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-2xl font-bold text-white">System Database Explorer</h3>
+          <p className="text-gray-400 max-w-md mx-auto text-sm leading-relaxed">
+            Directly access the core data layer. Audit tables, verify transaction records, and monitor user state changes with precision.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowInspector(true)}
+          className="bg-primary text-black px-10 py-4 rounded-2xl font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-primary/20 active:scale-95"
+        >
+          Initialize Explorer
+        </button>
+      </div>
+      <AnimatePresence>
+        {showInspector && <RealDatabaseInspector onClose={() => setShowInspector(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
@@ -673,7 +807,7 @@ function StatCard({ icon, label, value, color }: { icon: any, label: string, val
   );
 }
 
-function DatabaseInspector({ onClose }: { onClose: () => void }) {
+function CodeInspector({ onClose }: { onClose: () => void }) {
   const [codes, setCodes] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [search, setSearch] = useState('');
@@ -712,7 +846,7 @@ function DatabaseInspector({ onClose }: { onClose: () => void }) {
         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center"><Eye className="w-5 h-5 text-primary" /></div>
-             <div><h2 className="text-xl font-bold text-white">Database Inspector</h2><p className="text-xs text-gray-400">Manage and audit generated system codes</p></div>
+             <div><h2 className="text-xl font-bold text-white">RID Activation Inspector</h2><p className="text-xs text-gray-400">Manage and audit generated system codes</p></div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-gray-500"><X className="w-6 h-6" /></button>
         </div>
@@ -1050,7 +1184,7 @@ function CodesPanel() {
         </div>
       </div>
       <AnimatePresence>
-        {showInspector && <DatabaseInspector onClose={() => setShowInspector(false)} />}
+        {showInspector && <RealDatabaseInspector onClose={() => setShowInspector(false)} />}
         {showAdvisor && <AIAdvisorModal data={advisorData} loading={advisorLoading} onClose={() => setShowAdvisor(false)} onApply={(c) => setConfigs([c])} />}
       </AnimatePresence>
     </div>
@@ -1270,7 +1404,7 @@ function AIStrategyPanel() {
 
   const fetchSettings = () => {
     setLoading(true);
-    api.get(`${API}/admin/ai-settings`)
+    api.get(`${API}/ai-settings`)
       .then(res => {
         setProvider(res.data.active_provider);
         setModel(res.data.active_model);
@@ -1287,7 +1421,7 @@ function AIStrategyPanel() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.put(`${API}/admin/ai-settings`, {
+      await api.put(`${API}/ai-settings`, {
         provider,
         model,
         api_key: apiKey || null,
@@ -1585,6 +1719,7 @@ export default function AdminDashboard() {
     { key: 'users', label: '👥 Users' },
     { key: 'payouts', label: '💰 Payouts' },
     { key: 'codes', label: '🔑 Codes' },
+    { key: 'database', label: '🗄️ Database' },
     { key: 'ai', label: '🧠 AI Strategy' },
     { key: 'logs', label: '📜 Logs' },
   ];
@@ -1626,6 +1761,7 @@ export default function AdminDashboard() {
         {activeTab === 'users' && <UsersPanel />}
         {activeTab === 'payouts' && <PayoutsPanel />}
         {activeTab === 'codes' && <CodesPanel />}
+        {activeTab === 'database' && <DatabasePanel />}
         {activeTab === 'ai' && <AIStrategyPanel />}
         {activeTab === 'logs' && <LogsPanel />}
       </motion.div>

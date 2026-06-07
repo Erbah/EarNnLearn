@@ -15,13 +15,13 @@ export default function MyCodesPage() {
   const [buying, setBuying] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   const headers: any = token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : {};
 
   useEffect(() => {
     if (token) {
       loadCodes();
-      fetch(`${API}/wallet`, { headers }).then(r => r.json()).then(data => setWalletBalance(Number(data.balance) || 0)).catch(() => { });
+      fetch(`${API}/wallet/`, { headers }).then(r => r.json()).then(data => setWalletBalance(Number(data.balance) || 0)).catch(() => { });
     }
   }, []);
 
@@ -40,7 +40,7 @@ export default function MyCodesPage() {
     if (r.ok) {
       await loadCodes();
       // update wallet balance
-      fetch(`${API}/wallet`, { headers }).then(res => res.json()).then(data => setWalletBalance(Number(data.balance) || 0)).catch(() => { });
+      fetch(`${API}/wallet/`, { headers }).then(res => res.json()).then(data => setWalletBalance(Number(data.balance) || 0)).catch(() => { });
     } else {
       const err = await r.json();
       alert(err.detail || "Failed to buy code");

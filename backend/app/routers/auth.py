@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models import User
+from app.core.security import verify_password, create_access_token, get_current_user, get_password_hash
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -36,7 +37,7 @@ def register(request: RegisterRequest, db: Session = Depends(get_db)):
     user = User(
         display_name=request.name or request.email.split("@")[0],
         email=request.email,
-        password_hash=request.password, # Security TIP: Hash this!
+        password_hash=get_password_hash(request.password),
         role="user",
         preferred_currency=request.preferred_currency,
         # Payment Layer
@@ -60,9 +61,29 @@ class LoginRequest(BaseModel):
     password: str
 
 @router.post("/login")
-def login(request: LoginRequest):
-    return {"access_token": "JWT_TOKEN", "token_type": "bearer"}
+def login(request: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    # Basic check (should be hashed in prod)
+    if not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    token = create_access_token(data={"sub": user.email, "role": user.role})
+    return {"access_token": token, "token_type": "bearer", "role": user.role}
 
 @router.get("/me")
-def get_current_user():
-    return {"id": 12, "email": "user@email.com", "wallet_balance": 120}
+def get_me(user: User = Depends(get_current_user)):
+    # Safely handle if fields don't exist in older DB rows
+    return {
+        "id": user.id,
+        "email": user.email,
+        "display_name": user.display_name,
+        "role": user.role,
+        "onboarding_completed": getattr(user, "onboarding_completed", False),
+        "last_onboarding_step": getattr(user, "last_onboarding_step", 0),
+        "learning_goal": getattr(user, "learning_goal", None),
+        "preferred_style": getattr(user, "preferred_style", None),
+        "wallet_balance": 0.0 # Placeholder or fetch from wallet relationship
+    }

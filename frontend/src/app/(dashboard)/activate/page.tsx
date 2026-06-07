@@ -43,7 +43,7 @@ export default function ActivateCodePage() {
 
   useEffect(() => {
     loadUserCodes();
-    api.get(`${API}/wallet`).then(res => setWalletBalance(Number(res.data.balance) || 0)).catch(() => { });
+    api.get(`${API}/wallet/`).then(res => setWalletBalance(Number(res.data.balance) || 0)).catch(() => { });
   }, []);
 
   async function loadUserCodes() {
@@ -79,7 +79,7 @@ export default function ActivateCodePage() {
         setStatus("success");
         setAffiliateCode(res.data.product_code);
         await loadUserCodes();
-        api.get(`${API}/wallet`).then(res => setWalletBalance(Number(res.data.balance) || 0)).catch(() => { });
+        api.get(`${API}/wallet/`).then(res => setWalletBalance(Number(res.data.balance) || 0)).catch(() => { });
       }
     } catch (err: any) {
       setStatus("error");

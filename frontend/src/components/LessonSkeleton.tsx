@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AriaOrb } from "./AriaOrb";
 
 interface LessonSkeletonProps {
   topic: string;
@@ -28,8 +27,14 @@ export const LessonSkeleton: React.FC<LessonSkeletonProps> = ({ topic }) => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
-      <div className="mb-12">
-        <AriaOrb state="thinking" size={120} />
+      <div className="mb-12 flex items-center justify-center">
+        <div className="relative w-24 h-24">
+          {/* Glowing Background */}
+          <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
+          {/* Animated Spinner Ring */}
+          <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+          <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -45,7 +50,7 @@ export const LessonSkeleton: React.FC<LessonSkeletonProps> = ({ topic }) => {
             {statuses[statusIndex]}
           </h2>
           <p className="text-blue-200/60 text-sm animate-pulse">
-            Aria is synthesizing custom content just for you.
+            Our engine is synthesizing custom content just for you.
           </p>
         </motion.div>
       </AnimatePresence>

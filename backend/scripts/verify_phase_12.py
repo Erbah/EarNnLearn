@@ -28,9 +28,9 @@ def verify_phase_12():
     # 0. Seed a dummy user
     print("\nSeeding dummy user...")
     db = SessionLocal()
-    existing = db.query(User).filter(User.username == "admin_test").first()
+    existing = db.query(User).filter(User.email == "admin@test.com").first()
     if not existing:
-        user = User(username="admin_test", display_name="Admin Test", email="admin@test.com", password_hash="hash", role="admin")
+        user = User(display_name="Admin Test", email="admin@test.com", password_hash="hash", role="admin")
         db.add(user)
         db.flush()
         

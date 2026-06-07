@@ -6,8 +6,9 @@ import hashlib
 from decimal import Decimal
 import json
 
+import os
 # --- CONFIG & SECRETS (Replicated from code_engine.py) ---
-CODE_SECRET_KEY = "CEDI-TREES-SECRET-2026"
+CODE_SECRET_KEY = os.getenv("CODE_SECRET_KEY", "CEDI-TREES-SECRET-2026")
 
 def generate_rid(parent_rid):
     suffix = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(4))

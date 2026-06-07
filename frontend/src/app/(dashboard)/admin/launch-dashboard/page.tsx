@@ -51,7 +51,7 @@ export default function LaunchDashboard() {
   const fetchMetrics = async () => {
     setIsRefreshing(true);
     try {
-      const response = await api.get('/api/v1/users/launch-metrics');
+      const response = await api.get('/api/v1/users/analytics/launch-metrics');
       setMetrics(response.data);
     } catch (error) {
       console.error('Failed to fetch metrics:', error);

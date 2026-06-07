@@ -37,3 +37,15 @@ class PaymentSubmission(BaseModel):
 class BuyCodeRequest(BaseModel):
     min_price: float
     currency: str
+
+class LegacyActivationRequest(BaseModel):
+    activation_code: str
+    code_type: str = "rid"
+    payment_method: str
+    payment_reference: str
+    payment_account: str
+    amount: float = 100.0
+
+class SimulationRequest(BaseModel):
+    amount: float
+    currency: str = "GHS"

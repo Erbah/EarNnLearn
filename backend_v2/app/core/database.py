@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
-from app.core.config import settings
+from app.core.config import settings, sanitize_secrets
 
 connect_args = {}
 if settings.DATABASE_BACKEND == "sqlite":
@@ -13,7 +13,7 @@ engine = create_engine(
     max_overflow=10,
     connect_args=connect_args
 )
-print(f"DEBUG: SQLAlchemy connecting to: {settings.SQLALCHEMY_DATABASE_URI}")
+print(sanitize_secrets(f"DEBUG: SQLAlchemy connecting to: {settings.SQLALCHEMY_DATABASE_URI}"))
 
 # Enable WAL mode for SQLite for better concurrent access
 if settings.DATABASE_BACKEND == "sqlite":

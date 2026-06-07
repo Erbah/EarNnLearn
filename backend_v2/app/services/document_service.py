@@ -1,21 +1,44 @@
 import fitz  # PyMuPDF
 import os
+import docx
+import openpyxl
+from pptx import Presentation
 from sqlalchemy.orm import Session
 from app.models.ai import KnowledgeSource, KnowledgeChunk
+from app.services.document_agent import clean_document_text
 
 class DocumentProcessor:
     """
-    Service to process academic materials (PDFs) into indexed chunks for RAG.
+    Service to process academic materials (PDFs, PPTX, DOCX, XLSX) into indexed chunks for RAG.
     """
     
     @staticmethod
-    def extract_text_from_pdf(file_path: str):
+    def extract_text(file_path: str, filename: str = None) -> list:
         """
-        Extracts raw text from a PDF file page by page.
+        Extracts raw text from a file based on extension.
+        Returns a list of dicts: [{'page_number': int, 'content': str}]
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
             
+        ext = os.path.splitext(filename or file_path)[1].lower()
+        
+        if ext == '.pdf':
+            return DocumentProcessor._extract_pdf(file_path)
+        elif ext in ['.docx', '.doc']:
+            return DocumentProcessor._extract_docx(file_path)
+        elif ext in ['.pptx', '.ppt']:
+            return DocumentProcessor._extract_pptx(file_path)
+        elif ext in ['.xlsx', '.xls']:
+            return DocumentProcessor._extract_xlsx(file_path)
+        elif ext in ['.txt', '.csv']:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return [{"page_number": 1, "content": clean_document_text(f.read())}]
+        else:
+            raise ValueError(f"Unsupported file type: {ext}")
+
+    @staticmethod
+    def _extract_pdf(file_path: str):
         doc = fitz.open(file_path)
         pages_text = []
         for page_num in range(len(doc)):
@@ -23,9 +46,45 @@ class DocumentProcessor:
             text = page.get_text("text")
             pages_text.append({
                 "page_number": page_num + 1,
-                "content": text
+                "content": clean_document_text(text)
             })
         doc.close()
+        return pages_text
+
+    @staticmethod
+    def _extract_docx(file_path: str):
+        doc = docx.Document(file_path)
+        full_text = "\n".join([para.text for para in doc.paragraphs])
+        return [{"page_number": 1, "content": clean_document_text(full_text)}]
+
+    @staticmethod
+    def _extract_pptx(file_path: str):
+        prs = Presentation(file_path)
+        pages_text = []
+        for i, slide in enumerate(prs.slides):
+            slide_text = []
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    slide_text.append(shape.text)
+            pages_text.append({
+                "page_number": i + 1,
+                "content": clean_document_text("\n".join(slide_text))
+            })
+        return pages_text
+
+    @staticmethod
+    def _extract_xlsx(file_path: str):
+        wb = openpyxl.load_workbook(file_path, data_only=True)
+        pages_text = []
+        for i, sheet_name in enumerate(wb.sheetnames):
+            sheet = wb[sheet_name]
+            rows_text = []
+            for row in sheet.iter_rows(values_only=True):
+                rows_text.append(" ".join([str(cell) for cell in row if cell is not None]))
+            pages_text.append({
+                "page_number": i + 1,
+                "content": clean_document_text("\n".join(rows_text))
+            })
         return pages_text
 
     @staticmethod
@@ -86,7 +145,7 @@ class DocumentProcessor:
             print(f"Indexing Started: {source.title} ({source.file_path})")
             
             # 1. Extract Text
-            pages_text = cls.extract_text_from_pdf(source.file_path)
+            pages_text = cls.extract_text(source.file_path)
             source.page_count = len(pages_text)
             
             # 2. Chunk Text

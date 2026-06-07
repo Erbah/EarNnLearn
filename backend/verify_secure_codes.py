@@ -4,7 +4,8 @@ import hmac
 import hashlib
 
 BASE_URL = "http://localhost:8000/api/v1"
-CODE_SECRET_KEY = "CEDI-TREES-SECRET-2026"
+import os
+CODE_SECRET_KEY = os.getenv("CODE_SECRET_KEY", "CEDI-TREES-SECRET-2026")
 
 def register(email, password, name):
     r = requests.post(f"{BASE_URL}/auth/register", json={

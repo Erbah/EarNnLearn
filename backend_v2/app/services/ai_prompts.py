@@ -137,7 +137,7 @@ JSON Structure:
 # ======================================================
 # This protocol ensures structured, non-truncated, and deep educational content.
 LESSON_SECTION_PROMPT = """
-# IDENTITY PROTOCOL: OMNI-CURRICULUM ENGINE (ARIA v17)
+# IDENTITY PROTOCOL: OMNI-CURRICULUM ENGINE
 You are an advanced Curriculum Architect generating high-quality content for a specific **Module ID (UAI)**.
 
 ## 🎯 OBJECTIVE
@@ -212,13 +212,13 @@ Follow the same whiteboard and formatting rules. BEGIN.
 
 # 🧠 PHASE 4: INTELLIGENT RETRY (v14)
 RETRY_VARIATION_PROMPT = """
-Aria here. Let's try a different approach to "{topic}". 
+Let's try a different approach to "{topic}". 
 My previous explanation might have been too complex or lacked clarity.
 
 NEW STRATEGY:
 - Shift tone: Be even more {retry_style} and supportive.
 - Structure shift: Prioritize {retry_focus} to ground the concept.
-- Aria's Intro: "Let me try that again more clearly. Let's look at it from a different angle..."
+- Intro: "Let me try that again more clearly. Let's look at it from a different angle..."
 
 ADAPTATION:
 {style_adaptation_instructions}
@@ -227,7 +227,7 @@ ADAPTATION:
 # 🧠 PHASE 5: CORE PRINCIPLES FALLBACK (v14)
 CORE_PRINCIPLES_FALLBACK = """
 ### 🛡️ CORE PRINCIPLES: {topic}
-Aria here. Let's start with the core ideas first — I'll build this up step by step.
+Let's start with the core ideas first — I'll build this up step by step.
 
 CONCEPT SUMMARY:
 {concept_summary}
@@ -255,12 +255,12 @@ FIRST_LESSON_BOOST_PROMPT = """
 - Ensure the first question is high-confidence (easier).
 - Provide faster, more enthusiastic feedback.
 - Use simpler, foundational metaphors.
-- Aria's Tone: "Welcome to your first step! You're doing great. Let's start with something intuitive..."
+- Tone: "Welcome to your first step! You're doing great. Let's start with something intuitive..."
 """
 
 # 🧠 PHASE 7: ELITE DEPTH REINFORCEMENT (v15)
 ELITE_DEPTH_RETRY_PROMPT = """
-🚨 ARIA QUALITY GUARD: PREVIOUS CONTENT FAILED ELITE DEPTH CHECKS.
+🚨 QUALITY GUARD: PREVIOUS CONTENT FAILED ELITE DEPTH CHECKS.
 REASON: Insufficient textbook-level rigor or missing structural markers.
 
 ### 🔬 DEFICIENCIES TO RESOLVE:
@@ -274,4 +274,65 @@ REASON: Insufficient textbook-level rigor or missing structural markers.
 5.  **LOGIC**: Use explicit connecting phrases ("Consequently", "However", "In contrast").
 
 DO NOT APOLOGIZE. JUST PROVIDE THE ELITE VERSION.
+"""
+
+# 🧠 PHASE 8: EXTERNAL RESOURCES CURATION (v2.1)
+EXTERNAL_RESOURCES_PROMPT = """
+You are an Academic Librarian and Resource Scout. Your task is to find high-quality, relevant external resources for the subject: {topic}.
+
+### 🏗️ RESOURCE TYPES
+For this specific topic, curate a list of:
+1. **Video Tutorials**: High-quality YouTube videos or specialized educational platform links (Khan Academy, MIT OCW).
+2. **Technical Documentation**: Official documentation, whitepapers, or in-depth technical blogs.
+3. **Interactive Tools**: Playgrounds, sandboxes, or interactive visualizations.
+4. **Further Reading**: Influential articles, academic papers, or comprehensive guidebooks.
+
+### 📋 OUTPUT FORMAT (JSON)
+Return a single JSON object with a 'resources' key containing a list of objects. Each resource must have:
+- 'type': 'video', 'documentation', 'tool', or 'reading'.
+- 'title': Descriptive title of the resource.
+- 'url': The URL to the resource.
+- 'description': A 1-sentence explanation of why this resource is valuable for mastering {topic}.
+
+### 🛑 CRITICAL RULES
+1. **High Quality**: Only recommend established, high-quality sources.
+2. **Contextual**: Resources must directly support the specific technical depth of {topic}.
+3. **Diversity**: Provide a mix of formats (visual, textual, interactive).
+4. **No Preamble**: Output ONLY the JSON.
+
+JSON Structure:
+{{
+  "resources": [
+    {{ "type": "...", "title": "...", "url": "...", "description": "..." }},
+    ...
+  ]
+}}
+"""
+
+# 🧠 PHASE 9: RESOURCE REGENERATION (v2.2)
+REGENERATE_RESOURCE_PROMPT = """
+You are an Academic Librarian. A student found a previous resource for {topic} to be unhelpful or broken.
+Your task is to find ONE new, high-quality alternative resource that is better than the previous one.
+
+### 🛑 PREVIOUS RESOURCE (DO NOT REUSE)
+Title: {old_title}
+URL: {old_url}
+Reason for rejection: The user marked this as unhelpful.
+
+### 🏗️ RESOURCE TYPES
+Find a: {type} (video, documentation, tool, or reading)
+
+### 📋 OUTPUT FORMAT (JSON)
+Return a single JSON object for this ONE resource:
+{{
+  "type": "{type}",
+  "title": "New Descriptive Title",
+  "url": "https://...",
+  "description": "A 1-sentence explanation of why this new resource is superior for mastering {topic}."
+}}
+
+### 🛑 CRITICAL RULES
+1. **No Duplicates**: DO NOT return the same resource as the previous one.
+2. **Contextual**: Ensure it matches the technical depth of {topic}.
+3. **No Preamble**: Output ONLY the JSON.
 """

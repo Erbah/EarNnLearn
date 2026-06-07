@@ -14,8 +14,7 @@ import {
   Settings,
   LogOut,
   Shield,
-  CreditCard,
-  Wand2
+  CreditCard
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUser } from "@/context/UserContext";
@@ -25,15 +24,13 @@ const API = `${API_BASE_URL}/api/v1`;
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
-  { name: "Learn Path", href: "/path", icon: GraduationCap, roles: ["USER"] },
   { name: "Activate Code", href: "/activate", icon: KeyRound, roles: ["USER"] },
   { name: "Wallet", href: "/wallet", icon: Wallet, roles: ["USER"] },
   { name: "Network", href: "/network", icon: Network, roles: ["USER"] },
   { name: "Courses", href: "/courses", icon: GraduationCap, roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
-  { name: "AI Studio", href: "/education-studio", icon: Wand2, roles: ["USER", "EDUCATION_ADMIN", "SUPER_ADMIN"] },
   { name: "Creator", href: "/creator", icon: ArrowRightLeft, roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
+  { name: "Settings", href: "/settings", icon: Settings, roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Platform Admin", href: "/admin", icon: Shield, roles: ["SUPER_ADMIN", "EDUCATION_ADMIN"] },
-  { name: "Education Admin", href: "/education", icon: GraduationCap, roles: ["EDUCATION_ADMIN", "SUPER_ADMIN"] },
 ];
 
 export function AdminSidebar() {

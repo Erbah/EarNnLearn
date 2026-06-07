@@ -3,8 +3,9 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime
 from app.core.database import get_db, SessionLocal
+from app.core.rate_limit import login_rate_limiter, register_rate_limiter
 from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user
 from app.core.config import settings
 from app.models.user import User
@@ -33,7 +34,7 @@ def simulate_payment_webhook(tx_id: str, code_id: str, user_id: str):
     finally:
         db.close()
 
-@router.post("/register", response_model=RegistrationResponse)
+@router.post("/register", response_model=RegistrationResponse, dependencies=[Depends(register_rate_limiter)])
 def register_user(response: Response, user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # 1. Check if user exists
     if db.query(User).filter(User.email == user_in.email).first():
@@ -122,7 +123,7 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
         httponly=True,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
+        samesite="strict",
         secure=True
     )
     
@@ -131,15 +132,41 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
         "token": {"access_token": access_token, "token_type": "bearer"}
     }
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=Token, dependencies=[Depends(login_rate_limiter)])
 def login_for_access_token(response: Response, login_data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == login_data.email).first()
+    
+    if user:
+        if user.locked_until and user.locked_until > datetime.utcnow():
+            remaining_seconds = int((user.locked_until - datetime.utcnow()).total_seconds())
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail=f"Account is temporarily locked. Try again in {remaining_seconds} seconds.",
+            )
+            
     if not user or not verify_password(login_data.password, user.password_hash):
+        if user:
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+            if user.failed_login_attempts >= 5:
+                user.locked_until = datetime.utcnow() + timedelta(minutes=15)
+                db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_423_LOCKED,
+                    detail="Account locked due to too many failed login attempts. Try again in 15 minutes.",
+                )
+            db.commit()
+            
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+        
+    # Reset lock state on successful login
+    if (user.failed_login_attempts or 0) > 0 or user.locked_until is not None:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        db.commit()
         
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
@@ -157,8 +184,8 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
         httponly=True,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax", # Using lax for compatibility, strict might block some redirects
-        secure=False # Set to True in production
+        samesite="strict",
+        secure=True
     )
     
     return {"access_token": access_token, "token_type": "bearer"}

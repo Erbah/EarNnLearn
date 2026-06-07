@@ -9,7 +9,7 @@ import { NetworkPreview } from "@/components/NetworkPreview";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { Wallet, Users, KeyRound, DollarSign, Share2, Copy, MessageCircle, Twitter, MessageSquare, BookOpen } from "lucide-react";
 import { API_BASE_URL, api } from "@/lib/api";
-import { ResumeLearningWidget } from "@/components/ResumeLearningWidget";
+
 
 const API = "/api/v1";
 
@@ -31,7 +31,7 @@ export default function DashboardPage() {
       setLoading(true);
       // Only fetch wallet, network, and transactions - NOT user profile
       const results = await Promise.allSettled([
-        api.get(`${API}/wallet`),
+        api.get(`${API}/wallet/`),
         api.get(`${API}/network/tree-view`),
         api.get(`${API}/wallet/transactions`)
       ]);
@@ -76,12 +76,9 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-white tracking-tight">
             Welcome back, {user?.name?.split(" ")[0] || "Member"}!
           </h1>
-          <p className="text-gray-400 mt-1">Ready to continue your AI-powered learning journey?</p>
+          <p className="text-gray-400 mt-1">Ready to continue your learning journey?</p>
         </div>
       </div>
-
-      {/* 🚀 AI LEARNING RESUME WIDGET */}
-      <ResumeLearningWidget />
 
       {/* Invite & Earn Header Banner */}
       <div className="bg-gradient-to-r from-primary/10 via-background to-secondary/10 border border-primary/20 rounded-2xl p-6 lg:p-8 shadow-[0_0_40px_rgba(0,224,255,0.05)] relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">

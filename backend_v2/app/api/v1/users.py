@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, verify_password, get_password_hash
 from app.models.user import User
 from app.models.analytics import OnboardingMetric
-from app.schemas.user_schema import UserResponse, OnboardingUpdate
+from app.schemas.user_schema import UserResponse, OnboardingUpdate, UserProfileUpdate
 from sqlalchemy import func
 
 router = APIRouter()
@@ -14,59 +14,8 @@ def get_me(current_user: User = Depends(get_current_user)):
     """Returns the current authenticated user profile."""
     return current_user
 
-@router.put("/onboarding", response_model=UserResponse)
-def update_onboarding(
-    payload: OnboardingUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Updates the user's onboarding progress and personalization preferences.
-    Added guards (v16) for database backward compatibility.
-    """
-    if payload.step is not None:
-        current_user.last_onboarding_step = payload.step
-    
-    if payload.learning_goal:
-        current_user.learning_goal = payload.learning_goal
-        
-    if payload.preferred_style:
-        current_user.preferred_style = payload.preferred_style
-        
-    if payload.onboarding_completed is not None:
-        current_user.onboarding_completed = payload.onboarding_completed
 
-    # Set hardened defaults if missing (DB Sync safety)
-    if not getattr(current_user, "learning_goal", None):
-        current_user.learning_goal = "General Exploration"
-    if not getattr(current_user, "preferred_style", None):
-        current_user.preferred_style = "Balanced"
 
-    db.commit()
-    db.refresh(current_user)
-    return current_user
-
-@router.post("/analytics/onboarding-event")
-def track_onboarding_event(
-    event: dict, 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Tracks onboarding analytics (drop-off, time per step).
-    Refined (v14): Persists to onboarding_metrics for KPI calculation.
-    """
-    metric = OnboardingMetric(
-        user_rid=current_user.rid,
-        step_reached=event.get("step", 0),
-        action_taken=event.get("action", "unknown"),
-        time_spent_ms=event.get("time_spent", 0),
-        onboarding_completed=(event.get("step") == 5),
-        session_metadata=event.get("metadata", {})
-    )
-    db.add(metric)
-    db.commit()
-    return {"status": "tracked"}
 
 @router.get("/analytics/launch-metrics")
 def get_launch_metrics(
@@ -92,3 +41,55 @@ def get_launch_metrics(
     }
     
     return metrics
+
+@router.put("/profile", response_model=UserResponse)
+def update_profile(
+    payload: UserProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Updates the current authenticated user's profile details.
+    """
+    if payload.name is not None:
+        current_user.name = payload.name
+    if payload.phone is not None:
+        current_user.phone = payload.phone
+    if payload.preferred_payment_method is not None:
+        current_user.preferred_payment_method = payload.preferred_payment_method
+    if payload.momo_provider is not None:
+        current_user.momo_provider = payload.momo_provider
+    if payload.momo_number is not None:
+        current_user.momo_number = payload.momo_number
+    if payload.momo_name is not None:
+        current_user.momo_name = payload.momo_name
+    if payload.payout_method is not None:
+        current_user.payout_method = payload.payout_method
+    if payload.payout_number is not None:
+        current_user.payout_number = payload.payout_number
+    if payload.payout_provider is not None:
+        current_user.payout_provider = payload.payout_provider
+    if payload.payout_name is not None:
+        current_user.payout_name = payload.payout_name
+    if payload.learning_goal is not None:
+        current_user.learning_goal = payload.learning_goal
+    if payload.preferred_style is not None:
+        current_user.preferred_style = payload.preferred_style
+
+    # Password update
+    if payload.new_password is not None:
+        if not payload.current_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is required to set a new password."
+            )
+        if not verify_password(payload.current_password, current_user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Incorrect current password."
+            )
+        current_user.password_hash = get_password_hash(payload.new_password)
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user

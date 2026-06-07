@@ -15,9 +15,8 @@ export async function middleware(request: NextRequest) {
 
   // 1. Define protected route prefixes
   const isAdminRoute = pathname.startsWith('/admin');
-  const isEducationRoute = pathname.startsWith('/education');
   
-  if (!isAdminRoute && !isEducationRoute) {
+  if (!isAdminRoute) {
     return NextResponse.next();
   }
 
@@ -47,14 +46,7 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    if (isEducationRoute) {
-      // Allow users to access their generated lessons and roadmaps from the AI Studio
-      const isPublicEducationRoute = pathname.startsWith('/education/lessons') || pathname.startsWith('/education/roadmap');
-      if (!isPublicEducationRoute && !ACCESS_LEVELS.USER_LEVEL.includes(userRole as any)) {
-        console.warn(`Unauthorized access attempt to ${pathname} by role ${userRole}`);
-        return NextResponse.redirect(new URL('/dashboard', request.url));
-      }
-    }
+
 
     return NextResponse.next();
   } catch (error) {
@@ -70,6 +62,5 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/:path*',
-    '/education/:path*',
   ],
 };

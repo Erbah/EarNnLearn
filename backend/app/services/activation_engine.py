@@ -122,11 +122,12 @@ class ActivationEngine:
             
             db.commit()
             
+            activation_id = activation.id
             def run_async_profit():
                 try:
                     from app.tasks.profit_tasks import distribute_profit
                     distribute_profit.apply_async(
-                        args=[activation.id, seller_id, master_id, amount, ancestor_rids],
+                        args=[activation_id, seller_id, master_id, amount, ancestor_rids],
                         countdown=1
                     )
                 except Exception as cel_e:

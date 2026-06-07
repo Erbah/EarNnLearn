@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Search, Bell, User, Home } from "lucide-react";
 import { useGamification } from "@/hooks/useGamification";
 import { useUser } from "@/context/UserContext";
@@ -11,6 +12,7 @@ import { API_BASE_URL } from "@/lib/api";
 const API = `${API_BASE_URL}/api/v1`;
 
 export function Topbar() {
+  const router = useRouter();
   const SHOW_HEARTS = false; // Set to true to re-enable heart system UI
   const { hud, loading: hudLoading } = useGamification();
   const { user } = useUser();
@@ -99,7 +101,7 @@ export function Topbar() {
         </button>
         <div className="h-8 w-[1px] bg-white/10"></div>
         <button
-          onClick={() => alert("Profile settings coming soon!")}
+          onClick={() => router.push("/settings")}
           className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer"
           aria-label="User Profile"
           title="User Profile"

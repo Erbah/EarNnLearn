@@ -11,7 +11,7 @@ Full control center for the platform:
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, text
 from pydantic import BaseModel
 from typing import Annotated
 from datetime import datetime, timedelta
@@ -51,11 +51,17 @@ def login_admin(body: AdminLoginRequest, db: Session = Depends(get_db)):
         if not verify_password(body.admin_password, setting.value):
             raise HTTPException(status_code=403, detail="Invalid admin credential")
     else:
-        # Default fallback
-        if body.admin_password != "erbah1983":
+        # Default fallback using environment variable
+        initial_password = settings.INITIAL_ADMIN_PASSWORD
+        if not initial_password:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Admin credentials are not initialized. Please set INITIAL_ADMIN_PASSWORD in environment."
+            )
+        if body.admin_password != initial_password:
             raise HTTPException(status_code=403, detail="Invalid admin credential")
         # Initialize the setting if missing
-        db.add(SystemSetting(key="ADMIN_PASSWORD", value=get_password_hash("erbah1983"), description="Admin Dashboard Login"))
+        db.add(SystemSetting(key="ADMIN_PASSWORD", value=get_password_hash(initial_password), description="Admin Dashboard Login"))
         db.commit()
     
     # Find the actual super admin user to issue a real token
@@ -83,14 +89,18 @@ def update_admin_credentials(
             raise HTTPException(status_code=403, detail="Current password incorrect")
         setting.value = get_password_hash(body.new_password)
     else:
-        if body.current_password != "erbah1983":
+        initial_password = settings.INITIAL_ADMIN_PASSWORD
+        if not initial_password:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Admin credentials are not initialized. Please set INITIAL_ADMIN_PASSWORD in environment."
+            )
+        if body.current_password != initial_password:
             raise HTTPException(status_code=403, detail="Current password incorrect")
         db.add(SystemSetting(key="ADMIN_PASSWORD", value=get_password_hash(body.new_password), description="Admin Dashboard Login"))
         
     db.commit()
     return {"status": "success", "detail": "Admin credentials updated"}
-
-ADMIN_SECRET = "erbah1983"
 
 class ElevateRequest(BaseModel):
     admin_password: str
@@ -98,8 +108,24 @@ class ElevateRequest(BaseModel):
 @router.post("/elevate")
 def elevate_to_admin(body: ElevateRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Elevate the current user to SUPER_ADMIN if the correct master password is provided."""
-    if body.admin_password != ADMIN_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid admin credential")
+    setting = db.query(SystemSetting).filter(SystemSetting.key == "ADMIN_PASSWORD").first()
+    
+    if setting:
+        if not verify_password(body.admin_password, setting.value):
+            raise HTTPException(status_code=403, detail="Invalid admin credential")
+    else:
+        # Default fallback using environment variable
+        initial_password = settings.INITIAL_ADMIN_PASSWORD
+        if not initial_password:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Admin credentials are not initialized. Please set INITIAL_ADMIN_PASSWORD in environment."
+            )
+        if body.admin_password != initial_password:
+            raise HTTPException(status_code=403, detail="Invalid admin credential")
+        # Initialize the setting if missing
+        db.add(SystemSetting(key="ADMIN_PASSWORD", value=get_password_hash(initial_password), description="Admin Dashboard Login"))
+        db.commit()
     
     current_user.role = ROLE_SUPER_ADMIN
     db.commit()
@@ -1066,3 +1092,33 @@ def reject_payment(transaction_id: str, reason: str, current_user: Annotated[Use
 @router.get("/logs", response_model=list[AdminLogOut])
 def get_admin_logs(current_user: Annotated[User, Depends(require_super_admin)], limit: int = 50, db: Session = Depends(get_db)):
     return db.query(AdminLog).order_by(desc(AdminLog.created_at)).limit(limit).all()
+
+
+@router.get("/tables")
+def list_db_tables(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """List all registered table names in the database."""
+    result = db.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+    return [row[0] for row in result.all()]
+
+
+@router.get("/tables/{table_name}")
+def get_table_data(
+    table_name: str, 
+    current_user: Annotated[User, Depends(require_super_admin)], 
+    limit: int = 100, 
+    db: Session = Depends(get_db)
+):
+    """Retrieve raw row data for database audits."""
+    tables_res = db.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+    valid_tables = [row[0] for row in tables_res.all()]
+    if table_name not in valid_tables:
+        raise HTTPException(status_code=400, detail="Invalid table name")
+        
+    result = db.execute(text(f"SELECT * FROM {table_name} LIMIT {limit}"))
+    columns = result.keys()
+    data = [dict(zip(columns, row)) for row in result.all()]
+    return {
+        "table": table_name,
+        "columns": list(columns),
+        "data": data
+    }

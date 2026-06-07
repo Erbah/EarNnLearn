@@ -35,6 +35,8 @@ def get_current_user(
     db: Session = Depends(get_db),
     token: str | None = None
 ) -> User:
+    token_source = "header"
+    
     # 1. Try to get token from header via oauth2_scheme
     # Note: oauth2_scheme (OAuth2PasswordBearer) is a callable that looks at the Authorization header
     try:
@@ -49,6 +51,7 @@ def get_current_user(
     # 2. If no header token, try to get from cookie
     if not token:
         token = request.cookies.get("access_token")
+        token_source = "cookie"
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -58,6 +61,14 @@ def get_current_user(
     
     if not token:
         raise credentials_exception
+
+    # CSRF protection: Reject cookie-based authentication for state-changing HTTP methods
+    if token_source == "cookie" and request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="State-changing requests must be authenticated via the Authorization header to prevent CSRF."
+        )
+
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         sub: str = payload.get("sub")

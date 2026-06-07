@@ -62,3 +62,19 @@ class OnboardingUpdate(BaseModel):
     learning_goal: str | None = None
     preferred_style: str | None = None
     onboarding_completed: bool | None = None
+
+class UserProfileUpdate(BaseModel):
+    name: str | None = None
+    phone: str | None = None
+    preferred_payment_method: str | None = None
+    momo_provider: str | None = None
+    momo_number: str | None = None
+    momo_name: str | None = None
+    payout_method: str | None = None
+    payout_number: str | None = None
+    payout_provider: str | None = None
+    payout_name: str | None = None
+    learning_goal: str | None = None
+    preferred_style: str | None = None
+    current_password: str | None = None
+    new_password: str | None = None

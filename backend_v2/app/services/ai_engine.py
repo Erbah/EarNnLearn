@@ -12,7 +12,8 @@ from app.services.ai_prompts import (
     FIRST_LESSON_BOOST_PROMPT,
     WHITEBOARD_PROTOCOL,
     ELITE_DEPTH_RETRY_PROMPT,
-    LESSON_PLAN_PROMPT
+    LESSON_PLAN_PROMPT,
+    EXTERNAL_RESOURCES_PROMPT
 )
 import json
 import re
@@ -142,9 +143,9 @@ class AITutorEngine:
         
         # Consistent Identity Traits (v9)
         persona_base = f"""
-# IDENTITY PROTOCOL: ARIA (Visual AI Tutor)
+# IDENTITY PROTOCOL: AI Tutor
 
-YOU ARE ARIA. YOU ARE NOT A BRANDED BOT. YOU ARE A REAL TUTOR.
+YOU ARE A REAL TUTOR.
 IDENTITY TRAITS: Encouraging but precise, highly intelligent, scholarly yet supportive.
 
 ## 🗣️ GUIDING PHRASES (USE NATURALLY)
@@ -156,7 +157,6 @@ IDENTITY TRAITS: Encouraging but precise, highly intelligent, scholarly yet supp
 - Student State: {student_state}
 - If 'Struggling': Be more supportive, provide more analogies, slow down.
 - If 'Excelling': Be more concise, use advanced terminology, challenge with deep insights.
-- **DO NOT** overuse the name "Aria" in every message. Keep it natural.
 
 ## 📏 MATH & SYMBOLS (MANDATORY FORMAT)
 - Use LaTeX for complex equations: `\[ equation \]` for blocks, `\( equation \)` for inline.
@@ -274,7 +274,7 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             
             if not api_key and active_provider not in ["mock", "google", "openai", "anthropic", "deepseek"]:
                  # Check if we have a generic API key set in env
-                 api_key = os.getenv("AI_API_KEY")
+                 api_key = settings.AI_API_KEY
 
             # Explicitly set environment variable for LiteLLM
             env_key_map = {
@@ -417,7 +417,7 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
         return context_str
 
     @classmethod
-    def generate_roadmap(cls, db: Session, user_rid: str, subject: str, source_id: str = None, timeout: int = 60, force: bool = False) -> dict:
+    def generate_roadmap(cls, db: Session, user_rid: str, subject: str, source_id: str = None, timeout: int = 60, force: bool = False, reuse_level: int = 1) -> dict:
         """
         Phase 1: Generates a complete structured curriculum for a subject.
         Persists it to the subject_roadmaps table.
@@ -443,14 +443,24 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             os.environ[env_key_map[active_provider]] = active_api_key or fallback_key or ""
 
         try:
-            # Check for existing valid roadmap with same subject
-            if not force:
+            # 1. Reuse Logic (Search before Generate)
+            if not force and reuse_level > 0:
+                # Check for user's own existing roadmap first
                 existing = db.query(SubjectRoadmap).filter(
                     SubjectRoadmap.user_rid == user_rid,
                     SubjectRoadmap.subject.ilike(subject)
                 ).first()
                 if existing:
                     return existing
+                
+                # Check for high-quality public roadmaps (Global Persistence)
+                from app.services.knowledge_service import knowledge_service
+                similar = knowledge_service.find_similar_roadmaps(db, subject, limit=1)
+                if similar:
+                    print(f"DEBUG: [OCE] Reusing existing public roadmap for '{subject}'")
+                    # Clone the best match for this user
+                    cloned = knowledge_service.clone_roadmap(db, similar[0].id, user_rid)
+                    return cloned
 
             # 2. RAG Context Injection
             source_context = ""
@@ -482,12 +492,23 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
             print(f"DEBUG: [OCE] Generating roadmap for '{subject}' (Timeout: {timeout}s, Model: {active_model})")
             response = litellm.completion(**completion_args)
             raw_text = response.choices[0].message.content
+            print(f"DEBUG: [OCE] Raw AI Response Length: {len(raw_text) if raw_text else 0}")
+            if not raw_text:
+                print("ERROR: [OCE] Received empty response from AI.")
+                raise ValueError("Empty response from AI")
+            
             # Extract JSON from response (handle markdown code blocks)
             import re as _re
             json_match = _re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
             if json_match:
                 raw_text = json_match.group(1).strip()
-            roadmap_json = json.loads(raw_text)
+            
+            try:
+                roadmap_json = json.loads(raw_text)
+            except json.JSONDecodeError as e:
+                print(f"DEBUG: [OCE] JSON Decode Error: {str(e)}")
+                print(f"DEBUG: [OCE] Snippet of failed JSON: {raw_text[:500]}...")
+                raise
             
             # --- 🛡️ Elite: Flatten Unit Logic for Robustness (v20: Deep Recursion) ---
             def extract_topics(obj):
@@ -793,9 +814,9 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
         return deficiencies
 
     @staticmethod
-    def get_aria_feedback(correct: bool, topic: str) -> str:
+    def get_tutor_feedback(correct: bool, topic: str) -> str:
         """
-        Varied Feedback Pool (Aria Persona).
+        Varied Feedback Pool (Tutor Persona).
         Includes 'Near-miss' and coaching tones.
         """
         import random
@@ -1192,7 +1213,8 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                     "title": rs["title"] or section_name,
                     "content": text,
                     "actions": actions,
-                    "quiz_questions": quiz_questions if i == len(raw_scenes) - 1 else []
+                    "quiz_questions": quiz_questions if i == len(raw_scenes) - 1 else [],
+                    "section_key": section_key
                 })
             
             try:
@@ -1238,4 +1260,613 @@ Whenever visualizing or demonstrating a concept, YOU MUST use the Whiteboard tag
                 "quiz_questions": cls.parse_quiz(fallback_content)
             }]
 
+    @classmethod
+    def generate_external_resources(cls, db: Session, user_rid: str, topic: str):
+        """
+        Generates a curated list of external resources (videos, docs, reading) for a topic.
+        Returns a scene-like dictionary for integration into a lesson.
+        """
+        from app.core.config import Settings
+        import litellm
+        import os
+        
+        settings = Settings()
+        # 0. Get Active Model from DB
+        active_provider, active_model, active_api_key, active_base_url = cls._get_active_model(db)
+
+        # Ensure LiteLLM can find the API key
+        env_key_map = {
+            "google": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY"
+        }
+        
+        if active_provider in env_key_map:
+            fallback_key = getattr(settings, f"{active_provider.upper()}_API_KEY", None)
+            os.environ[env_key_map[active_provider]] = active_api_key or fallback_key or ""
+
+        try:
+            prompt = EXTERNAL_RESOURCES_PROMPT.format(topic=topic)
+            
+            completion_args = {
+                "model": active_model,
+                "messages": [
+                    {"role": "system", "content": "You are an elite Academic Librarian. Return ONLY valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                "response_format": { "type": "json_object" }
+            }
+            
+            if active_base_url:
+                completion_args["api_base"] = active_base_url
+                
+            response = litellm.completion(**completion_args)
+            data = json.loads(response.choices[0].message.content)
+            resources = data.get("resources", [])
+            
+            if not resources:
+                return None
+                
+            # Build a Resource Hub Scene
+            content = f"To further your mastery of **{topic}**, I have curated these elite external resources for you. These will provide additional context, visual demonstrations, and technical depth.\n\n"
+            
+            for res in resources:
+                icon = "🎥" if res['type'] == 'video' else "📄" if res['type'] == 'documentation' else "🛠️" if res['type'] == 'tool' else "📚"
+                content += f"### {icon} {res['title']}\n"
+                content += f"*{res['description']}*\n\n"
+                content += f"🔗 [Access Resource]({res['url']})\n\n---\n\n"
+                
+            return {
+                "id": f"resources_{topic.lower().replace(' ', '_')}",
+                "type": "text_explanation",
+                "semantic_type": "resource_hub",
+                "title": f"Elite Resource Hub: {topic}",
+                "content": content,
+                "resources": resources,  # --- 🚀 Structured Data (v2.2) ---
+                "actions": [],
+                "quiz_questions": []
+            }
+        except Exception as e:
+            print(f"ERROR: Resource generation failed: {str(e)}")
+            return None
+
+    @classmethod
+    def regenerate_single_resource(cls, db: Session, topic: str, old_resource: dict):
+        """
+        Targeted Regeneration: Replaces a single rejected resource with a new one.
+        """
+        from app.core.config import Settings
+        from app.services.ai_prompts import REGENERATE_RESOURCE_PROMPT
+        import litellm
+        import os
+        
+        settings = Settings()
+        active_provider, active_model, active_api_key, active_base_url = cls._get_active_model(db)
+
+        env_key_map = {
+            "google": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY"
+        }
+        
+        if active_provider in env_key_map:
+            fallback_key = getattr(settings, f"{active_provider.upper()}_API_KEY", None)
+            os.environ[env_key_map[active_provider]] = active_api_key or fallback_key or ""
+
+        try:
+            prompt = REGENERATE_RESOURCE_PROMPT.format(
+                topic=topic,
+                old_title=old_resource.get('title', 'Unknown'),
+                old_url=old_resource.get('url', ''),
+                type=old_resource.get('type', 'video')
+            )
+            
+            completion_args = {
+                "model": active_model,
+                "messages": [
+                    {"role": "system", "content": "You are an elite Academic Librarian. Return ONLY valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                "response_format": { "type": "json_object" }
+            }
+            
+            if active_base_url:
+                completion_args["api_base"] = active_base_url
+                
+            response = litellm.completion(**completion_args)
+            new_resource = json.loads(response.choices[0].message.content)
+            
+            return new_resource
+        except Exception as e:
+            print(f"ERROR: Single resource regeneration failed: {str(e)}")
+            return None
+
+    @classmethod
+    def generate_subject_discovery(cls, db: Session, topic: str, intent: str = "Full Course", style: str = "Standard") -> dict:
+        """
+        SUBJECT DISCOVERY AGENT
+        ========================
+        Ports the multi-component curriculum generation from edupath/server.ts.
+        Generates a full 5-component educational payload for any topic not in the
+        standard catalog, including:
+          A) Subject Metadata & Classification
+          B) Sub-Subjects (4-8 branches)
+          C) Topics per sub-subject (6-10 micro-topics each)
+          D) Phased Roadmap nodes (Beginner → Intermediate → Advanced)
+          E) Seed Lesson (textbook-quality entry lesson with SVG illustration)
+        """
+        from app.core.config import Settings
+        import litellm
+        import os
+
+        settings = Settings()
+        active_provider, active_model, active_api_key, active_base_url = cls._get_active_model(db)
+
+        env_key_map = {
+            "google": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY"
+        }
+        if active_provider in env_key_map:
+            fallback_key = getattr(settings, f"{active_provider.upper()}_API_KEY", None)
+            os.environ[env_key_map[active_provider]] = active_api_key or fallback_key or ""
+
+        clean_topic = topic.strip()
+        now_iso = datetime.utcnow().isoformat()
+
+        if active_provider == "mock" or not active_model:
+            print(f"DEBUG: [SDA] Mock/unconfigured provider — returning offline fallback for '{clean_topic}'")
+            return cls._subject_discovery_offline_fallback(clean_topic, intent, style)
+
+        system_prompt = """You are the SUBJECT DISCOVERY AGENT for EduPath.
+Your job is to generate a deeply structured, comprehensive educational curriculum for search queries that are not in our catalog.
+You must construct and return exactly FIVE coordinates in a single JSON payload:
+- Component A (metadata): subject_id, unified title, slug, clear description, classification (interdisciplinary, existing, or new_top_level), parent tags, estimated total hours, difficulty range.
+- Component B (sub_subjects): A list of 4 to 8 sub-subjects dividing the topic meaningfully.
+- Component C (topics): A key-value object mapping each sub-subject name to a list of 6 to 10 micro-topics.
+- Component D (roadmap): A fully structured Phased sequence of nodes (Beginner, Intermediate, Advanced phase). There must be between 4 and 10 total nodes sequentially mapped.
+- Component E (seed_lesson): A textbook-quality, highly engaging initial Lesson containing explanation, analogy, code snippet or equation, visual-illustration-description, steps, and an SVG illustration vector that draws a beautiful conceptual diagram relevant to the top beginner node.
+
+Be highly professional. Ensure your response is beautiful, robust, and matches the requested formatting exactly. Output clean JSON only."""
+
+        user_prompt = f"""Generate a comprehensive dynamic curriculum for this new topic:
+Topic: "{clean_topic}"
+Chosen Intent Option: "{intent}"
+Style Setting: "{style}"
+
+Structure your response as a single clean JSON object matching this schema exactly:
+{{
+  "classification": {{
+    "user_input": "{clean_topic}",
+    "classification": "interdisciplinary | existing | new_top_level",
+    "parent_subjects": ["Category A", "Category B"],
+    "new_entry_type": "subject | sub-subject | topic",
+    "placement": "Hierarchy string",
+    "also_tagged_under": "Tag string"
+  }},
+  "metadata": {{
+    "subject_id": "unique-slug-based-id",
+    "title": "Clean Capitalized Title",
+    "slug": "url-friendly-slug",
+    "description": "Engaging 2-sentence description",
+    "classification": "interdisciplinary | existing | new_top_level",
+    "parent_tags": ["tag1", "tag2"],
+    "difficulty_range": "Beginner to Advanced",
+    "estimated_total_hours": 45,
+    "source": "ai-generated",
+    "generated_at": "{now_iso}",
+    "version": 1,
+    "generated_by": "subject-discovery-agent"
+  }},
+  "sub_subjects": ["Sub-subject Name 1", "Sub-subject Name 2"],
+  "topics": {{
+    "Sub-subject Name 1": ["Topic 1.1", "Topic 1.2"],
+    "Sub-subject Name 2": ["Topic 2.1", "Topic 2.2"]
+  }},
+  "roadmap": {{
+    "topic_id": "url-friendly-slug",
+    "topic_name": "Clean Capitalized Title",
+    "creation_date": "{now_iso}",
+    "version": 1,
+    "nodes": [
+      {{
+        "id": "node_unique_id",
+        "topic": "Clean Capitalized Title",
+        "phase": "Beginner",
+        "title": "Learning Node Title",
+        "duration_estimate": "1.5 hours",
+        "prerequisites": ["Prior knowledge or prior node title"],
+        "outcomes": ["Key measurable learning outcome"],
+        "lesson_generated": true
+      }}
+    ]
+  }},
+  "seed_lesson": {{
+    "concept_explanation": "Extremely high-quality introduction of first node concepts",
+    "analogy": "Clear real-world analogy connecting to everyday experience",
+    "steps": [
+      {{
+        "title": "Step title",
+        "explanation": "Deep explanation text"
+      }}
+    ],
+    "code_snippet": "Optional sample source code, equations, or pseudo-code",
+    "svg_illustration": "An inline SVG string with viewBox='0 0 400 180' using dark background #0f172a, indigo/purple gradients, lines, circles and text labels for stage checkpoints"
+  }}
+}}"""
+
+        try:
+            completion_args = {
+                "model": active_model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "timeout": 90,
+                "num_retries": 1,
+                "response_format": {"type": "json_object"}
+            }
+            if active_base_url:
+                completion_args["api_base"] = active_base_url
+
+            print(f"DEBUG: [SDA] Generating subject discovery for '{clean_topic}' via {active_model}")
+            response = litellm.completion(**completion_args)
+            raw_text = response.choices[0].message.content
+
+            # Strip markdown code fences if present
+            import re as _re
+            json_match = _re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
+            if json_match:
+                raw_text = json_match.group(1).strip()
+
+            data = json.loads(raw_text)
+            print(f"DEBUG: [SDA] Discovery successful for '{clean_topic}' — {len(data.get('roadmap', {}).get('nodes', []))} nodes generated.")
+            return data
+
+        except Exception as e:
+            print(f"ERROR: [SDA] Subject Discovery failed for '{clean_topic}': {str(e)}")
+            print(f"DEBUG: [SDA] Triggering offline fallback.")
+            return cls._subject_discovery_offline_fallback(clean_topic, intent, style)
+
+    @staticmethod
+    def _subject_discovery_offline_fallback(topic: str, intent: str, style: str) -> dict:
+        """
+        Offline fallback for Subject Discovery Agent.
+        Returns a professionally-structured curriculum without AI when the model is unavailable.
+        Matches the generateOfflineDiscoveryFallback() function from edupath/server.ts.
+        """
+        import re as _re
+        slug = _re.sub(r'[^a-z0-9]+', '-', topic.lower()).strip('-')
+        title = ' '.join(w.capitalize() for w in topic.split())
+        now_iso = datetime.utcnow().isoformat()
+
+        sub_subjects = [
+            f"Foundations of {title}",
+            f"Core Principles of {title}",
+            f"Applied Methodologies in {title}",
+            "Advanced Paradigms & Case Studies"
+        ]
+
+        topics_map = {
+            f"Foundations of {title}": [
+                f"Introduction to {title}",
+                f"Core terminology of {title}",
+                f"Historical evolution of {title}",
+                f"Key stakeholders and use cases",
+                f"Fundamental frameworks in {title}",
+                f"Scoping and boundary conditions"
+            ],
+            f"Core Principles of {title}": [
+                f"Fundamental structures in {title}",
+                f"Analyzing standard parameters in {title}",
+                f"Cause-and-effect models in {title}",
+                f"Decision logic in {title}",
+                f"Systematic breakdown of {title}",
+                f"Verification and validation in {title}"
+            ],
+            f"Applied Methodologies in {title}": [
+                f"Practical exercises in {title}",
+                f"Applying advanced models to {title}",
+                f"Case-based reasoning in {title}",
+                f"Tooling and ecosystem for {title}",
+                f"Common pitfalls and how to avoid them",
+                f"Performance optimization in {title}"
+            ],
+            "Advanced Paradigms & Case Studies": [
+                f"Industry transitions of {title}",
+                f"Future research directions in {title}",
+                f"Cross-domain integrations",
+                f"Ethical considerations in {title}",
+                f"Deep synthesis challenge problems",
+                f"Capstone project design for {title}"
+            ]
+        }
+
+        nodes = [
+            {
+                "id": f"{slug}_node_1",
+                "topic": title,
+                "phase": "Beginner",
+                "title": f"Introduction to {title} & core mechanics",
+                "duration_estimate": "1 hour",
+                "prerequisites": ["None"],
+                "outcomes": [
+                    f"Explain the foundational laws of {title}",
+                    f"Formulate conceptual models of {title}"
+                ],
+                "lesson_generated": True
+            },
+            {
+                "id": f"{slug}_node_2",
+                "topic": title,
+                "phase": "Beginner",
+                "title": f"Essential Parameters and Calculations in {title}",
+                "duration_estimate": "1.5 hours",
+                "prerequisites": [f"Introduction to {title} & core mechanics"],
+                "outcomes": [
+                    "Differentiate between structural phases",
+                    "Perform baseline checks under variable states"
+                ],
+                "lesson_generated": False
+            },
+            {
+                "id": f"{slug}_node_3",
+                "topic": title,
+                "phase": "Intermediate",
+                "title": "Applied Frameworks and Core Methodologies",
+                "duration_estimate": "2 hours",
+                "prerequisites": [f"Essential Parameters and Calculations in {title}"],
+                "outcomes": [
+                    "Incorporate functional metrics in standard environments",
+                    "Optimize multi-variable systems"
+                ],
+                "lesson_generated": False
+            },
+            {
+                "id": f"{slug}_node_4",
+                "topic": title,
+                "phase": "Advanced",
+                "title": "Advanced Architectural Integrations & Synthesis",
+                "duration_estimate": "3 hours",
+                "prerequisites": ["Applied Frameworks and Core Methodologies"],
+                "outcomes": [
+                    "Resolve complex diagnostic bottlenecks",
+                    "Conduct full-scale performance audits"
+                ],
+                "lesson_generated": False
+            }
+        ]
+
+        seed_lesson = {
+            "concept_explanation": f"Welcome to {title}! This dynamic curriculum was automatically mapped and compiled by the Subject Discovery Agent. {title} is a multi-dimensional field focusing on the robust execution of structural mechanisms, optimal resource flow, and scientific principles. It forms the bedrock of advanced specialized research, providing practitioners with predictive conceptual tools.",
+            "analogy": f"Think of {title} like learning to navigate a newly designed metro system. Before you board a high-speed express train (advanced level), you must first familiarize yourself with the basic transit map, the color-coded lines (foundations), and the mechanics of swiping your fare-card (core terminology). Without these beginner coordinates, you risk getting lost at intermediate transfers!",
+            "steps": [
+                {
+                    "title": "Establishing the Baseline Boundary",
+                    "explanation": f"To master {title}, we must first define our analytical limits. Consider how input constraints dictate behavioral outcomes. By isolating variables early, we keep calculations clean and robust."
+                },
+                {
+                    "title": "Tracing Conceptual Dependencies",
+                    "explanation": f"Next, examine how secondary factors rely on foundational inputs. Within {title}, execution occurs sequentially, which is why study modules must build exactly on top of prior locks."
+                }
+            ],
+            "code_snippet": f"// Conceptual outline for {title}\nfunction initializeSubject() {{\n  const subject = \"{title}\";\n  console.log(\"Analyzing foundations of \" + subject + \"...\");\n  return {{\n    status: \"active\",\n    source: \"EduPath Subject Discovery\",\n    version: 1.0\n  }};\n}}",
+            "svg_illustration": f"""<svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg" style="background:#0f172a;border-radius:8px;font-family:monospace">
+  <defs>
+    <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <line x1="0" y1="30" x2="400" y2="30" stroke="#1e293b" stroke-dasharray="4 4"/>
+  <line x1="0" y1="90" x2="400" y2="90" stroke="#1e293b" stroke-dasharray="4 4"/>
+  <line x1="0" y1="150" x2="400" y2="150" stroke="#1e293b" stroke-dasharray="4 4"/>
+  <path d="M 50 90 L 150 90 L 250 90 L 350 90" fill="none" stroke="url(#lineGrad)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="50" cy="90" r="12" fill="#312e81" stroke="#818cf8" stroke-width="2.5"/>
+  <circle cx="150" cy="90" r="12" fill="#312e81" stroke="#818cf8" stroke-width="2.5"/>
+  <circle cx="250" cy="90" r="12" fill="#312e81" stroke="#818cf8" stroke-width="2.5"/>
+  <circle cx="350" cy="90" r="12" fill="#312e81" stroke="#818cf8" stroke-width="2.5"/>
+  <text x="50" y="125" font-size="9.5" fill="#94a3b8" text-anchor="middle">Foundations</text>
+  <text x="150" y="125" font-size="9.5" fill="#94a3b8" text-anchor="middle">Core Principles</text>
+  <text x="250" y="125" font-size="9.5" fill="#94a3b8" text-anchor="middle">Application</text>
+  <text x="350" y="125" font-size="9.5" fill="#94a3b8" text-anchor="middle">Synthesis</text>
+  <text x="50" y="72" font-size="8" fill="#818cf8" font-weight="bold" text-anchor="middle">STAGE 1</text>
+  <text x="150" y="72" font-size="8" fill="#818cf8" font-weight="bold" text-anchor="middle">STAGE 2</text>
+  <text x="250" y="72" font-size="8" fill="#818cf8" font-weight="bold" text-anchor="middle">STAGE 3</text>
+  <text x="350" y="72" font-size="8" fill="#818cf8" font-weight="bold" text-anchor="middle">STAGE 4</text>
+  <text x="200" y="20" font-size="10" fill="#a5b4fc" font-weight="bold" text-anchor="middle">{title.upper()} LEARNING MAP</text>
+</svg>"""
+        }
+
+        return {
+            "classification": {
+                "user_input": topic,
+                "classification": "new_top_level",
+                "parent_subjects": ["General Curriculums"],
+                "new_entry_type": "subject",
+                "placement": f"General Curriculums → {title}",
+                "also_tagged_under": "Academic Discovery"
+            },
+            "metadata": {
+                "subject_id": f"sub_{slug}",
+                "title": title,
+                "slug": slug,
+                "description": f"A comprehensive customized study curriculum mapping theoretical frameworks, core principles, and advanced structures of {title}.",
+                "classification": "new_top_level",
+                "parent_tags": ["academic-discovery"],
+                "difficulty_range": "Beginner → Advanced",
+                "estimated_total_hours": 45,
+                "source": "ai-generated",
+                "generated_at": now_iso,
+                "version": 1,
+                "generated_by": "subject-discovery-agent-offline"
+            },
+            "sub_subjects": sub_subjects,
+            "topics": topics_map,
+            "roadmap": {
+                "topic_id": slug,
+                "topic_name": title,
+                "creation_date": now_iso,
+                "version": 1,
+                "nodes": nodes
+            },
+            "seed_lesson": seed_lesson
+        }
+
+    @classmethod
+    def generate_phase_quiz(cls, db: Session, phase: str, topic_name: str, completed_nodes: list = None) -> dict:
+        """
+        Generates a 4-question phase evaluation quiz using LiteLLM.
+        """
+        from app.core.config import Settings
+        from dotenv import load_dotenv, find_dotenv
+        import litellm
+        import os
+        import json
+        import re
+
+        load_dotenv(find_dotenv(), override=True)
+        settings = Settings()
+
+        active_provider, active_model, active_api_key, active_base_url = cls._get_active_model(db)
+
+        # Fallback offline quiz
+        if active_provider == "mock":
+            return cls._mock_quiz_fallback(phase, topic_name)
+
+        api_keys = {
+            "google": settings.GOOGLE_API_KEY,
+            "openai": settings.OPENAI_API_KEY,
+            "anthropic": settings.ANTHROPIC_API_KEY,
+            "deepseek": settings.DEEPSEEK_API_KEY,
+        }
+        
+        model = active_model or settings.AI_MODEL
+        api_key = active_api_key or api_keys.get(active_provider)
+        
+        env_key_map = {
+            "google": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY"
+        }
+        if active_provider in env_key_map:
+            os.environ[env_key_map[active_provider]] = api_key or ""
+
+        if not api_key and active_provider not in ["google", "openai", "anthropic", "deepseek"]:
+             api_key = settings.AI_API_KEY
+
+        completed_nodes_str = ", ".join(completed_nodes) if completed_nodes else ""
+        lesson_list_context = f'covering the milestones: "{completed_nodes_str}"' if completed_nodes_str else ""
+
+        system_instruction = "You generate interactive, pedagogically sound quizzes in JSON."
+        user_prompt = f"""You are the Quiz Agent in EduPath.
+Generate an engaging 4-question phase evaluation quiz for the phase: "{phase}" of the topic: "{topic_name}".
+{lesson_list_context}
+Format output strictly in standard JSON.
+
+The quiz format MUST contain:
+- Question 1: Multiple choice (40% weight) - options must be provided as a list of strings
+- Question 2: True/False (20% weight) - options must be exactly ["True", "False"]
+- Question 3: Short answer (20% weight) - correct answer should be a concise word or phrase
+- Question 4: Scenario-based (20% weight) - options must be provided as a list of strings
+
+Each question in the JSON MUST be an object with the fields:
+- id: integer
+- type: string (exactly: multiple-choice, true-false, short-answer, or scenario)
+- question: string
+- options: array of strings (required for multiple-choice, true-false, or scenario; for true-false must be exactly ["True", "False"])
+- correct_answer: string (the exact matching correct answer option text, true/false string, or a specific short-answer word/phrase)
+- explanation: string (comprehensive step-by-step reason of correctness, referencing topics from the completed lessons)
+
+Return the output in this format:
+{{
+  "phase": "{phase}",
+  "questions": [
+    ...
+  ]
+}}
+"""
+
+        completion_args = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_prompt}
+            ],
+            "max_tokens": 1500,
+            "response_format": {"type": "json_object"} if active_provider in ["openai", "google"] else None
+        }
+        if active_base_url:
+            completion_args["api_base"] = active_base_url
+
+        try:
+            response = litellm.completion(**completion_args)
+            raw_text = response.choices[0].message.content
+            
+            # Extract JSON from response (handle markdown code blocks)
+            json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
+            if json_match:
+                raw_text = json_match.group(1).strip()
+            
+            quiz_data = json.loads(raw_text.strip())
+            return quiz_data
+        except Exception as e:
+            print(f"Error generating phase quiz: {e}")
+            return cls._mock_quiz_fallback(phase, topic_name)
+
+    @staticmethod
+    def _mock_quiz_fallback(phase: str, topic_name: str) -> dict:
+        return {
+            "phase": phase,
+            "questions": [
+                {
+                    "id": 1,
+                    "type": "multiple-choice",
+                    "question": f"In classical learning, what is a primary limitation solved by doing {phase} phase study in {topic_name or 'this subject'}?",
+                    "options": [
+                        "Lack of precise structure and pacing feedback loop",
+                        "Too much memory consumed in basic registers",
+                        "Inability to work on offline computers",
+                        "None of the options apply"
+                    ],
+                    "correct_answer": "Lack of precise structure and pacing feedback loop",
+                    "explanation": f"A vital element of progress in studying {topic_name} is a targeted testing cycle that provides concrete, spaced reinforcement before transitioning to complex segments."
+                },
+                {
+                    "id": 2,
+                    "type": "true-false",
+                    "question": f"True or False: Every core milestone in {phase} includes structural boundaries that must be thoroughly processed beforehand.",
+                    "options": ["True", "False"],
+                    "correct_answer": "True",
+                    "explanation": "Prerequisites are structural safety rails designed to prevent concept leakage and downstream learning blocks."
+                },
+                {
+                    "id": 3,
+                    "type": "short-answer",
+                    "question": "What primary color token hex represents the Accent color utilized in EduPath diagrams? (Include the hash symbol, e.g. #10B981)",
+                    "correct_answer": "#10B981",
+                    "explanation": "Platform guidelines bind illustrations to the Emerald green accent token #10B981."
+                },
+                {
+                    "id": 4,
+                    "type": "scenario",
+                    "question": "SCENARIO: A learner tries to skip all Beginner topics and immediately studies Advanced optimization workflows. They crash during implementation. What is the fundamental root cause?",
+                    "options": [
+                        "Skipping the milestone prerequisites and essential foundation phases",
+                        "Incorrect computer architecture config parameters",
+                        "Failing to install Node package bundlers",
+                        "Inadequate server response timeouts"
+                    ],
+                    "correct_answer": "Skipping the milestone prerequisites and essential foundation phases",
+                    "explanation": "Mastering intermediate state controls is non-negotiable for diagnosing and debugging runtime bugs in production."
+                }
+            ]
+        }
+
+
 ai_tutor_engine = AITutorEngine()
+

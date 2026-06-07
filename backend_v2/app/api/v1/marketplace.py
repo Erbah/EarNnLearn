@@ -328,6 +328,17 @@ def add_module(course_id: str, body: ModuleCreate, current_user: User = Depends(
 @router.post("/modules/{module_id}/videos")
 def add_video(module_id: str, body: VideoCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Add a video to a module."""
+    module = db.query(Module).filter(Module.id == module_id).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+        
+    course = db.query(Course).filter(Course.id == module.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    if course.creator_rid != current_user.rid and current_user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this module's course")
+
     video = Video(
         module_id=module_id, 
         title=body.title, 
