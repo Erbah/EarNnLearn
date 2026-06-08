@@ -3,7 +3,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from app.core.config import settings, sanitize_secrets
 
 connect_args = {}
-if settings.DATABASE_BACKEND == "sqlite":
+if settings.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
     connect_args = {"check_same_thread": False, "timeout": 30}
 
 engine = create_engine(
@@ -16,7 +16,7 @@ engine = create_engine(
 print(sanitize_secrets(f"DEBUG: SQLAlchemy connecting to: {settings.SQLALCHEMY_DATABASE_URI}"))
 
 # Enable WAL mode for SQLite for better concurrent access
-if settings.DATABASE_BACKEND == "sqlite":
+if settings.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
