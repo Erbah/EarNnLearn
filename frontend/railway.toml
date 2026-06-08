@@ -2,5 +2,5 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "npx next start -H 0.0.0.0 -p $PORT"
+startCommand = "npx next start -H 0.0.0.0 -p 3000"
 restartPolicyType = "ON_FAILURE"
