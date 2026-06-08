@@ -184,11 +184,15 @@ function RegisterForm() {
         localStorage.setItem("access_token", token);
         document.cookie = `access_token=${token}; path=/; max-age=86400; SameSite=Lax`;
 
-        if (data.user.status === "pending") {
+        if (data.paystack_url && data.paystack_url !== "#simulated-paystack-checkout") {
+          // Real Paystack payment — redirect user to checkout
+          window.location.href = data.paystack_url;
+        } else if (data.user.status === "pending") {
+          // Mobile money or simulated — poll for activation
           setIsActivating(true);
           startActivationPolling(token);
         } else {
-          // Account already active, redirect immediately
+          // Already active
           router.push("/dashboard");
         }
       }

@@ -15,6 +15,7 @@ from app.models.transaction import Transaction
 from app.models.analytics import OnboardingMetric
 from app.schemas.user_schema import UserCreate, UserResponse, Token, RegistrationResponse, LoginRequest
 from app.services.activation_service import run_activation_engine
+from app.services.paystack_service import paystack_service
 
 router = APIRouter()
 
@@ -106,10 +107,7 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
     db.commit()
     db.refresh(new_user)
     db.refresh(new_tx)
-    
-    # Trigger auto-activation simulator
-    background_tasks.add_task(simulate_payment_webhook, str(new_tx.id), str(code.id), str(new_user.id))
-    
+
     # 7. Generate Token for Activation Polling
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -126,10 +124,36 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
         samesite="strict",
         secure=True
     )
+
+    paystack_url = None
+
+    if user_in.payment_method == "paystack":
+        # Initialize a real Paystack transaction for the activation fee
+        metadata = {
+            "type": "ACTIVATION",
+            "user_id": str(new_user.id),
+            "code_id": str(code.id),
+            "tx_id": str(new_tx.id),
+        }
+        from decimal import Decimal
+        ps_res = paystack_service.initialize_transaction(
+            email=new_user.email,
+            amount=Decimal(str(new_tx.amount)),
+            metadata=metadata
+        )
+        if ps_res.get("status") and ps_res["data"].get("authorization_url"):
+            # Update the pending transaction with the real Paystack reference
+            new_tx.payment_reference = ps_res["data"]["reference"]
+            db.commit()
+            paystack_url = ps_res["data"]["authorization_url"]
+    else:
+        # For mobile_money and other methods: simulate activation after 5 seconds
+        background_tasks.add_task(simulate_payment_webhook, str(new_tx.id), str(code.id), str(new_user.id))
     
     return {
         "user": new_user,
-        "token": {"access_token": access_token, "token_type": "bearer"}
+        "token": {"access_token": access_token, "token_type": "bearer"},
+        "paystack_url": paystack_url
     }
 
 @router.post("/login", response_model=Token, dependencies=[Depends(login_rate_limiter)])

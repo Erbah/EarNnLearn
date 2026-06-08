@@ -56,6 +56,7 @@ class LoginRequest(BaseModel):
 class RegistrationResponse(BaseModel):
     user: UserResponse
     token: Token
+    paystack_url: str | None = None
 
 class OnboardingUpdate(BaseModel):
     step: int | None = None
