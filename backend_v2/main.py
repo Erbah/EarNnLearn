@@ -259,7 +259,8 @@ def create_app() -> FastAPI:
             "status": "ok",
             "version": "2.0.0",
             "database": db_status,
-            "redis": redis_status
+            "redis": redis_status,
+            "paystack_configured": bool(settings.PAYSTACK_SECRET_KEY)
         }
 
     return app
