@@ -4,26 +4,22 @@ from app.core.config import settings
 
 class PaystackService:
     BASE_URL = "https://api.paystack.co"
-    SECRET_KEY = settings.PAYSTACK_SECRET_KEY
+
+    @classmethod
+    def _get_key(cls) -> str:
+        """Always read from settings so Railway env vars are picked up after restart."""
+        return settings.PAYSTACK_SECRET_KEY
 
     @classmethod
     def initialize_transaction(cls, email: str, amount: Decimal, metadata: dict = None):
         """
-        Paystack expects amount in KOBE/PESEWAS (cents).
+        Paystack expects amount in KOBO/PESEWAS (cents).
         1.00 GHS = 100 Pesewas.
         """
-        payload = {
-            "email": email,
-            "amount": int(float(amount) * 100),
-            "metadata": metadata or {}
-        }
-        headers = {
-            "Authorization": f"Bearer {cls.SECRET_KEY}",
-            "Content-Type": "application/json"
-        }
-        
+        secret_key = cls._get_key()
+
         # In test mode or if key is missing, return a dummy response
-        if not cls.SECRET_KEY or settings.TESTING:
+        if not secret_key or settings.TESTING:
             import uuid
             return {
                 "status": True,
@@ -33,17 +29,25 @@ class PaystackService:
                 }
             }
 
+        payload = {
+            "email": email,
+            "amount": int(float(amount) * 100),
+            "metadata": metadata or {}
+        }
+        headers = {
+            "Authorization": f"Bearer {secret_key}",
+            "Content-Type": "application/json"
+        }
         response = requests.post(f"{cls.BASE_URL}/transaction/initialize", json=payload, headers=headers)
         return response.json()
 
     @classmethod
     def verify_transaction(cls, reference: str):
-        headers = {
-            "Authorization": f"Bearer {cls.SECRET_KEY}"
-        }
-        if not cls.SECRET_KEY or settings.TESTING:
+        secret_key = cls._get_key()
+        if not secret_key or settings.TESTING:
             return {"status": True, "data": {"status": "success", "amount": 0}}
-            
+
+        headers = {"Authorization": f"Bearer {secret_key}"}
         response = requests.get(f"{cls.BASE_URL}/transaction/verify/{reference}", headers=headers)
         return response.json()
 
