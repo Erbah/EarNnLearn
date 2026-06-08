@@ -73,22 +73,28 @@ def run_activation_engine(db: Session, user: User, target_code: Code, transactio
     )
     db.add(new_product)
     generated_first_code = new_product
-
-    # Queue profit distribution
+    # 6. Run profit distribution synchronously (no Celery/Redis required)
     try:
-        from app.workers.profit_tasks import process_profit_distribution
-        from app.core.config import settings
-        # Need to commit before queuing so the task can find the transaction
         db.commit()
         db.refresh(transaction)
-        
-        # SKIP Celery if in testing mode to avoid hang on missing Redis
-        if not settings.TESTING:
-            process_profit_distribution.delay(str(transaction.id))
-        else:
-            print(f"   [TEST] Skipping Celery task for transaction {transaction.id}")
+        from app.services.profit_engine import distribute_profit, credit_wallet
+        from decimal import Decimal
+
+        payouts = distribute_profit(seller_rid, Decimal(str(transaction.amount)))
+
+        credit_wallet(db, payouts["seller"]["rid"], payouts["seller"]["amount"],
+                      "CREDIT_PROFIT_SELLER", f"Sale profit from buyer {new_rid}")
+        credit_wallet(db, payouts["platform"]["rid"], payouts["platform"]["amount"],
+                      "CREDIT_PROFIT_PLATFORM", f"Platform fee from {new_rid}")
+        for payout in payouts["family"]:
+            credit_wallet(db, payout["rid"], payout["amount"],
+                          "CREDIT_PROFIT_FAMILY", f"Network family share from {new_rid}")
+
+        transaction.status = "processed"
+        db.commit()
+        print(f"✅ Profit distributed: seller={payouts['seller']['amount']}, platform={payouts['platform']['amount']}, family={len(payouts['family'])} recipients")
     except Exception as e:
-        print(f"   [ERROR] Celery queue failed: {e}")
-        db.commit() # Ensure state is saved even if worker fail
-    
+        print(f"[ERROR] Profit distribution failed: {e}")
+        db.commit()  # Ensure activation state is saved even if profit calc fails
+
     return generated_first_code

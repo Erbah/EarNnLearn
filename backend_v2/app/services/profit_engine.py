@@ -57,9 +57,9 @@ def distribute_profit(parent_rid: str, price: Decimal, platform_r: Decimal = PLA
     Complete profit distribution calculation.
     Returns the full payout structure without touching the database.
     """
-    platform_profit = (price * (platform_r / 100)).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
-    seller_profit   = (price * (seller_r / 100)).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
-    family_profit   = (price * (family_r / 100)).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    platform_profit = (price * platform_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    seller_profit   = (price * seller_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
+    family_profit   = (price * family_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
 
     # Extract ancestors from dot-path — zero DB queries
     relatives = get_relatives(parent_rid)
