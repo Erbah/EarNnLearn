@@ -3,15 +3,17 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Bell, User, Home } from "lucide-react";
+import { Search, Bell, User, Home, Menu } from "lucide-react";
 import { useGamification } from "@/hooks/useGamification";
 import { useUser } from "@/context/UserContext";
 import { motion } from "framer-motion";
 import { API_BASE_URL } from "@/lib/api";
+import { useSidebar } from "@/components/Sidebar";
 
 const API = `${API_BASE_URL}/api/v1`;
 
 export const Topbar = React.memo(function Topbar() {
+  const { toggle: toggleSidebar } = useSidebar();
   const router = useRouter();
   const SHOW_HEARTS = false; // Set to true to re-enable heart system UI
   const { hud, loading: hudLoading } = useGamification();
@@ -26,14 +28,24 @@ export const Topbar = React.memo(function Topbar() {
   }, [router]);
 
   return (
-    <header className="h-20 w-full flex items-center justify-between px-8 bg-background/80 backdrop-blur-md sticky top-0 z-40 border-b border-white/5">
-      <div className="flex-1 flex items-center">
-        <div className="relative w-96 group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-primary transition-colors" />
+    <header className="h-16 lg:h-20 w-full flex items-center justify-between px-4 lg:px-8 bg-background/80 backdrop-blur-md sticky top-0 z-40 border-b border-white/5">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={toggleSidebar}
+          className="lg:hidden p-2 rounded-xl hover:bg-white/10 text-gray-400 hover:text-white transition-colors flex-shrink-0"
+          aria-label="Open menu"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+
+        {/* Search bar */}
+        <div className="relative flex-1 max-w-xs lg:max-w-md group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
-            placeholder="Search network, transactions, or courses..."
-            className="w-full bg-card/50 border border-white/10 rounded-full py-2.5 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-primary/50 transition-all font-medium"
+            placeholder="Search..."
+            className="w-full bg-card/50 border border-white/10 rounded-full py-2 pl-10 pr-3 text-sm text-white focus:outline-none focus:border-primary/50 transition-all font-medium"
           />
         </div>
       </div>

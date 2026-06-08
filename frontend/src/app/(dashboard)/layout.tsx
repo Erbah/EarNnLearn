@@ -1,7 +1,7 @@
 "use client";
 
 import { UserProvider } from "@/context/UserContext";
-import { AdminSidebar } from "@/components/Sidebar";
+import { AdminSidebar, SidebarProvider } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import { useUser } from "@/context/UserContext";
 import { useRouter, usePathname } from "next/navigation";
@@ -14,7 +14,9 @@ export default function DashboardLayout({
 }) {
   return (
     <UserProvider>
-      <DashboardContent>{children}</DashboardContent>
+      <SidebarProvider>
+        <DashboardContent>{children}</DashboardContent>
+      </SidebarProvider>
     </UserProvider>
   );
 }
@@ -69,10 +71,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <AdminSidebar />
-      <div className="flex-1 ml-64 flex flex-col relative overflow-x-hidden">
+      <div className="flex-1 lg:ml-64 flex flex-col relative overflow-x-hidden">
         <div className="absolute top-0 left-0 w-full h-[500px] bg-primary/5 rounded-full blur-[120px] -z-10 opacity-50 pointer-events-none" />
         <Topbar />
-        <main className="flex-1 px-8 py-8 w-full max-w-7xl mx-auto z-10">
+        <main className="flex-1 px-4 lg:px-8 py-6 lg:py-8 w-full max-w-7xl mx-auto z-10">
           {children}
         </main>
       </div>
