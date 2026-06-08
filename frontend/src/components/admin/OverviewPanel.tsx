@@ -25,16 +25,33 @@ interface AnalyticsData {
 
 export const OverviewPanel = React.memo(function OverviewPanel() {
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
+    setError(null);
     api.get(`${API}/analytics`, { signal: controller.signal })
       .then(res => setData(res.data && typeof res.data === 'object' ? res.data : null))
       .catch((err) => {
         if (axios.isCancel(err)) return;
+        const status = err.response?.status;
+        if (status === 401 || status === 403) {
+          sessionStorage.removeItem('admin_unlocked');
+          localStorage.removeItem('access_token');
+          setError(`Session expired (${status}). Redirecting to login...`);
+          setTimeout(() => { window.location.href = '/admin-login'; }, 2000);
+        } else {
+          setError(`Failed to load analytics (${status || 'Network Error'}). Check backend logs.`);
+        }
       });
     return () => controller.abort();
   }, []);
+
+  if (error) return (
+    <div style={{ color: '#F87171', padding: '40px', textAlign: 'center', background: 'rgba(239,68,68,0.05)', borderRadius: '16px', border: '1px solid rgba(239,68,68,0.2)' }}>
+      ⚠️ {error}
+    </div>
+  );
 
   if (!data) return <div style={ANALYTICS_LOADING_STYLE}>Loading analytics...</div>;
 
