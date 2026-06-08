@@ -289,17 +289,18 @@ def get_analytics(current_user: Annotated[User, Depends(require_super_admin)], d
         WalletTransaction.type.like("CREDIT_PROFIT%")
     ).scalar() or 0
 
-    # Top 5 promoters by network size
+    # Top 5 promoters by number of direct referrals
     top = db.query(
-        ReferralIndex.user_rid,
+        ReferralIndex.parent_rid,
         func.count(ReferralIndex.user_rid).label("network_size")
-    ).group_by(ReferralIndex.parent_rid).having(
+    ).filter(
         ReferralIndex.parent_rid != None
-    ).order_by(desc("network_size")).limit(5).all()
+    ).group_by(ReferralIndex.parent_rid).order_by(desc("network_size")).limit(5).all()
 
     top_promoters = []
     for row in top:
-        top_promoters.append({"rid": row[0], "network_size": row[1]})
+        if row[0]:  # skip null parent_rid
+            top_promoters.append({"rid": row[0], "network_size": row[1]})
 
     return AnalyticsOut(
         total_users=total_users,

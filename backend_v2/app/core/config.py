@@ -14,12 +14,13 @@ class Settings(BaseSettings):
     ROOT_USER_EMAIL: str = "root@ceditrees.com"
     ROOT_USER_PASSWORD: str = "rootpass123"
     
-    # CORS Configuration
-    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002"
+    # CORS Configuration — include both localhost dev and Railway production frontend
+    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,https://earnnlearn.up.railway.app,https://www.earnnlearn.up.railway.app"
     
     @property
     def CORS_ORIGINS_LIST(self) -> list[str]:
-        return [s.strip() for s in self.BACKEND_CORS_ORIGINS.split(",") if s.strip()]
+        origins = [s.strip() for s in self.BACKEND_CORS_ORIGINS.split(",") if s.strip()]
+        return origins if origins else ["*"]  # fail-open if misconfigured
 
     # Database
     DATABASE_BACKEND: str = "sqlite"
