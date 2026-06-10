@@ -75,6 +75,9 @@ export default function LearnPage() {
     try {
       const res = await api.get(`${API}/learn/status/${courseId}`, { signal });
       setPaymentStatus(res.data);
+      if (res.data.watched_video_ids) {
+        setWatchedIds(new Set(res.data.watched_video_ids));
+      }
     } catch (err: any) {
       if (axios.isCancel(err)) return;
     }

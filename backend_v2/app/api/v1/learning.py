@@ -437,11 +437,12 @@ def payment_status(course_id: str, current_user: User = Depends(get_current_user
         payment.status = "expired"
         db.commit()
 
-    videos_watched = db.query(func.count(VideoProgress.id)).filter(
+    watched_videos = db.query(VideoProgress.video_id).filter(
         VideoProgress.user_rid == current_user.rid,
         VideoProgress.course_id == course_id,
         VideoProgress.watched == True
-    ).scalar()
+    ).all()
+    watched_video_ids = [wv[0] for wv in watched_videos]
 
     return {
         "enrolled": True,
@@ -451,7 +452,8 @@ def payment_status(course_id: str, current_user: User = Depends(get_current_user
         "amount_paid": float(payment.amount_paid),
         "remaining": float(payment.remaining),
         "ppc": float(payment.ppc),
-        "videos_watched": videos_watched,
+        "videos_watched": len(watched_video_ids),
+        "watched_video_ids": watched_video_ids,
         "unpaid_videos": payment.unpaid_videos,
         "starts_at_season": payment.start_season,
         "current_season": current_season
