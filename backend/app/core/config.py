@@ -2,7 +2,7 @@ import os
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "EarNnLearn API"
+    PROJECT_NAME: str = "EarNnLearN API"
     
     # Database — defaults to SQLite for local dev
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///d:/PROJECTS/LearNnEarn/backend/ceditrees_dev.db")

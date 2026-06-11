@@ -1,4 +1,4 @@
-# EarNnLearn 10M-Scale User Flow 🗺️
+# EarNnLearN 10M-Scale User Flow 🗺️
 
 This diagram visualizes the high-speed registration, activation, and viral selling loop.
 

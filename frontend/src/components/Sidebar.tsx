@@ -89,11 +89,11 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             onClick={onClose}
             className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent opacity-80"
           >
-            EarNnLearn
+            EarNnLearN
           </Link>
         ) : (
           <div className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent opacity-20">
-            EarNnLearn
+            EarNnLearN
           </div>
         )}
         {/* Close button — only visible on mobile */}

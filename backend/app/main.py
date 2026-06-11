@@ -57,4 +57,4 @@ app.include_router(education.router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the EarNnLearn API"}
+    return {"message": "Welcome to the EarNnLearN API"}

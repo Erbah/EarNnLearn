@@ -3,21 +3,24 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, PlayCircle, KeyRound, Lightbulb, Users } from "lucide-react";
+import { TopBanner } from "@/components/TopBanner";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-hidden">
-      {/* Navbar Minimal */}
-      <nav className="absolute top-0 w-full p-6 flex justify-between items-center z-50">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">EarNnLearn</h1>
-        <div className="space-x-4">
-          <Link href="/login" className="text-white hover:text-primary transition-colors text-sm font-medium">Login</Link>
-          <Link href="/register" className="bg-white/10 hover:bg-white/20 px-5 py-2.5 rounded-full text-white transition-all text-sm font-medium border border-white/10 glass">Get Started</Link>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-background text-foreground overflow-hidden flex flex-col">
+      <TopBanner />
+      <div className="relative flex-1 flex flex-col">
+        {/* Navbar Minimal */}
+        <nav className="absolute top-0 w-full p-6 flex justify-between items-center z-50">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">EarNnLearN</h1>
+          <div className="space-x-4">
+            <Link href="/login" className="text-white hover:text-primary transition-colors text-sm font-medium">Login</Link>
+            <Link href="/register" className="bg-white/10 hover:bg-white/20 px-5 py-2.5 rounded-full text-white transition-all text-sm font-medium border border-white/10 glass">Get Started</Link>
+          </div>
+        </nav>
 
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center pt-20">
+        {/* Hero Section */}
+        <section className="relative min-h-[calc(100vh-40px)] flex items-center justify-center pt-20">
         {/* Background Effects */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 blur-[150px] rounded-full pointer-events-none -z-10" />
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-secondary/10 blur-[150px] rounded-full pointer-events-none -z-10" />
@@ -91,6 +94,7 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+      </div>
     </div>
   );
 }
