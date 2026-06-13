@@ -58,6 +58,9 @@ class User(Base):
     learning_goal = Column(String, default="General Exploration")
     preferred_style = Column(String, default="Balanced")
     onboarding_completed = Column(Boolean, default=False)
+    
+    # Notification Routing
+    preferred_notification_method = Column(String, default="auto") # auto, phone, email, both
     last_onboarding_step = Column(Integer, default=0)
     is_beta_user = Column(Boolean, default=True)
 

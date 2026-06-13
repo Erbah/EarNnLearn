@@ -53,8 +53,16 @@ def update_profile(
     """
     if payload.name is not None:
         current_user.name = payload.name
+    if payload.email is not None:
+        # Check uniqueness manually if needed, but DB handles IntegrityError
+        # A robust solution checks before setting, but for now we set it.
+        # Ensure we don't set email to empty string, use None instead
+        current_user.email = payload.email if payload.email != "" else None
     if payload.phone is not None:
-        current_user.phone = payload.phone
+        from app.utils.phone import normalize_phone
+        current_user.phone = normalize_phone(payload.phone) if payload.phone != "" else None
+    if payload.preferred_notification_method is not None:
+        current_user.preferred_notification_method = payload.preferred_notification_method
     if payload.preferred_payment_method is not None:
         current_user.preferred_payment_method = payload.preferred_payment_method
     if payload.momo_provider is not None:

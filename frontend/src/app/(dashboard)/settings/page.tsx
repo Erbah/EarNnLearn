@@ -33,6 +33,8 @@ export default function SettingsPage() {
   // Profile fields
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [preferredNotification, setPreferredNotification] = useState("auto");
 
   // Financial fields
   const [preferredPayment, setPreferredPayment] = useState("mobile_money");
@@ -60,6 +62,8 @@ export default function SettingsPage() {
     if (user) {
       setName(user.name || "");
       setPhone(user.phone || "");
+      setEmail(user.email || "");
+      setPreferredNotification(user.preferred_notification_method || "auto");
       setPreferredPayment(user.preferred_payment_method || "mobile_money");
       setPayoutMethod(user.payout_method || "mobile_money");
       setPayoutNumber(user.payout_number || "");
@@ -83,6 +87,8 @@ export default function SettingsPage() {
     if (activeTab === "profile") {
       payload.name = name;
       payload.phone = phone;
+      payload.email = email;
+      payload.preferred_notification_method = preferredNotification;
     } else if (activeTab === "financial") {
       payload.preferred_payment_method = preferredPayment;
       payload.payout_method = payoutMethod;
@@ -262,14 +268,30 @@ export default function SettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Email Address (Read-Only)</label>
+                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Email Address</label>
                   <input
                     type="email"
-                    disabled
-                    value={user?.email || ""}
-                    className="w-full bg-white/5 border border-white/5 rounded-2xl px-4 py-3 text-gray-400 cursor-not-allowed text-sm"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                    placeholder="john@example.com"
                   />
-                  <p className="text-[10px] text-gray-500 mt-2">Login email cannot be changed for security and referential safety.</p>
+                  <p className="text-[10px] text-gray-500 mt-2">You can log in with your email or phone number.</p>
+                </div>
+                
+                <div className="pt-2">
+                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Preferred Notification Method</label>
+                  <select
+                    value={preferredNotification}
+                    onChange={(e) => setPreferredNotification(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors text-sm appearance-none cursor-pointer"
+                  >
+                    <option value="auto" className="bg-card text-white">Auto (Smart Routing)</option>
+                    <option value="phone" className="bg-card text-white">Phone / SMS / WhatsApp</option>
+                    <option value="email" className="bg-card text-white">Email Only</option>
+                    <option value="both" className="bg-card text-white">Both Email & Phone</option>
+                  </select>
+                  <p className="text-[10px] text-gray-500 mt-2">How we send you OTPs, alerts, and transaction receipts.</p>
                 </div>
               </div>
             )}

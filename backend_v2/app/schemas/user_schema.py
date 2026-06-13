@@ -23,6 +23,9 @@ class UserCreate(BaseModel):
     # Pricing
     purchase_amount: float | None = 20.0
     preferred_currency: str | None = "GHS"
+    
+    # Notifications
+    preferred_notification_method: str | None = "auto"
 
     @model_validator(mode='after')
     def check_contact_method(self) -> 'UserCreate':
@@ -49,6 +52,9 @@ class UserResponse(BaseModel):
     last_onboarding_step: int = 0
     is_beta_user: bool = True
     
+    # Notifications
+    preferred_notification_method: str = "auto"
+    
     class Config:
         from_attributes = True
 
@@ -73,6 +79,7 @@ class OnboardingUpdate(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     name: str | None = None
+    email: EmailStr | None = None
     phone: str | None = None
     preferred_payment_method: str | None = None
     momo_provider: str | None = None
@@ -86,3 +93,4 @@ class UserProfileUpdate(BaseModel):
     preferred_style: str | None = None
     current_password: str | None = None
     new_password: str | None = None
+    preferred_notification_method: str | None = None
