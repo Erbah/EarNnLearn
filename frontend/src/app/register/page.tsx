@@ -968,7 +968,7 @@ function RegisterForm() {
                           <div className="bg-secondary/10 p-3 rounded-lg border border-secondary/20">
                             <p className="text-[9px] text-secondary/70 uppercase font-black">Paystack Transfer</p>
                             <p className="text-[8px] text-gray-500 leading-tight">Fast settlements directly to your bank or wallet.</p>
-                            <p className="text-[8px] text-secondary/70 font-mono mt-1.5">Registered Email: {formData.email}</p>
+                            <p className="text-[8px] text-secondary/70 font-mono mt-1.5">Registered Email: {formData.identifier}</p>
                           </div>
                         </div>
                       )}
