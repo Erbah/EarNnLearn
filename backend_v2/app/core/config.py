@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     ROOT_USER_PASSWORD: str = "rootpass123"
     
     # CORS Configuration — include both localhost dev and Railway production frontend
-    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,https://earnnlearn.up.railway.app,https://www.earnnlearn.up.railway.app"
+    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,https://earnnlearn.up.railway.app,https://www.earnnlearn.up.railway.app,https://earnnnlearn.up.railway.app,https://www.earnnnlearn.up.railway.app"
     
     @property
     def CORS_ORIGINS_LIST(self) -> list[str]:
