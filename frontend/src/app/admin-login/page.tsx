@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { API_BASE_URL, api } from '@/lib/api';
+import { LandingHeader } from '@/components/LandingHeader';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
 
@@ -35,15 +36,17 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background items-center justify-center relative overflow-hidden text-foreground">
+    <div className="flex min-h-screen bg-background flex-col relative overflow-hidden text-foreground">
+      <LandingHeader />
       {/* Background ambient lighting */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[400px] bg-primary/20 rounded-full blur-[150px] -z-10 opacity-70 pointer-events-none" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md p-10 rounded-[32px] bg-card border border-white/10 shadow-2xl relative z-10"
-      >
+      <div className="flex-1 flex items-center justify-center p-6 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md p-10 rounded-[32px] bg-card border border-white/10 shadow-2xl relative z-10"
+        >
         <div className="text-center space-y-3 mb-8">
           <div className="w-20 h-20 mx-auto rounded-3xl bg-primary/10 flex items-center justify-center text-4xl border border-primary/20 shadow-inner">
             🛡️
@@ -83,6 +86,7 @@ export default function AdminLogin() {
           </button>
         </div>
       </motion.div>
+      </div>
     </div>
   );
 }

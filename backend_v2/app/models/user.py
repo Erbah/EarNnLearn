@@ -1,18 +1,21 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint('email IS NOT NULL OR phone IS NOT NULL', name='user_contact_required'),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     rid = Column(String, unique=True, index=True)
     name = Column(String)
-    email = Column(String, unique=True, index=True)
-    phone = Column(String)
+    email = Column(String, unique=True, index=True, nullable=True)
+    phone = Column(String, unique=True, index=True, nullable=True)
     password_hash = Column(String)
     
     # Internal Referral Architecture

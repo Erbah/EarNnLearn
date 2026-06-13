@@ -3,13 +3,11 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, PlayCircle, KeyRound, Lightbulb, Users, ShieldCheck, Zap, Cpu, Award } from "lucide-react";
-import { TopBanner } from "@/components/TopBanner";
 import { LandingHeader } from "@/components/LandingHeader";
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden flex flex-col">
-      <TopBanner />
       <LandingHeader />
       <div className="relative flex-1 flex flex-col">
         {/* Hero Section */}

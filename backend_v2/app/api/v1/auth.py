@@ -37,8 +37,14 @@ def simulate_payment_webhook(tx_id: str, code_id: str, user_id: str):
 
 @router.post("/register", response_model=RegistrationResponse, dependencies=[Depends(register_rate_limiter)])
 def register_user(response: Response, user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    from app.utils.phone import normalize_phone
+    normalized_phone = normalize_phone(user_in.phone) if user_in.phone else None
+
     # 1. Check if user exists
-    if db.query(User).filter(User.email == user_in.email).first():
+    if normalized_phone and db.query(User).filter(User.phone == normalized_phone).first():
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+
+    if user_in.email and db.query(User).filter(User.email == user_in.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     # 2. Validate activation code
@@ -62,7 +68,7 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
     new_user = User(
         name=user_in.name,
         email=user_in.email,
-        phone=user_in.phone,
+        phone=normalized_phone,
         password_hash=get_password_hash(user_in.password),
         parent_rid=code.owner_rid,
         tier_type="public", # Default for new users
@@ -110,8 +116,9 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
 
     # 7. Generate Token for Activation Polling
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    sub_identifier = new_user.email or new_user.phone
     access_token = create_access_token(
-        data={"sub": new_user.email, "role": new_user.role}, expires_delta=access_token_expires
+        data={"sub": sub_identifier, "role": new_user.role}, expires_delta=access_token_expires
     )
     
     # Set secure cookie
@@ -136,8 +143,14 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
             "tx_id": str(new_tx.id),
         }
         from decimal import Decimal
+        
+        dynamic_paystack_email = new_user.email
+        if not dynamic_paystack_email and new_user.phone:
+            clean_phone = new_user.phone.replace('+', '')
+            dynamic_paystack_email = f"u{clean_phone}@users.learnnearn.com"
+            
         ps_res = paystack_service.initialize_transaction(
-            email=new_user.email,
+            email=dynamic_paystack_email,
             amount=Decimal(str(new_tx.amount)),
             metadata=metadata
         )
@@ -158,7 +171,17 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
 
 @router.post("/login", response_model=Token, dependencies=[Depends(login_rate_limiter)])
 def login_for_access_token(response: Response, login_data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == login_data.email).first()
+    from app.utils.phone import normalize_phone
+    identifier = login_data.identifier
+    
+    # Try normalizing as a phone number
+    normalized_phone = normalize_phone(identifier) if identifier.replace('+', '').isdigit() else identifier
+    
+    user = db.query(User).filter(
+        (User.email == identifier) | 
+        (User.phone == normalized_phone) | 
+        (User.phone == identifier)
+    ).first()
     
     if user:
         if user.locked_until and user.locked_until > datetime.utcnow():
@@ -194,8 +217,8 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
         
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    # We use user.rid for the sub if activated, otherwise email for pre-activation login
-    sub_claim = user.rid if user.rid else user.email
+    # We use user.rid for the sub if activated, otherwise email or phone for pre-activation login
+    sub_claim = user.rid if user.rid else (user.email or user.phone)
     
     access_token = create_access_token(
         data={"sub": sub_claim, "role": user.role}, expires_delta=access_token_expires

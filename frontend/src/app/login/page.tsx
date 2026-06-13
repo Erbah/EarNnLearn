@@ -8,10 +8,12 @@ import { useRouter } from "next/navigation";
 import { API_BASE_URL, api } from "@/lib/api";
 import { PLATFORM_NAME, API_PREFIX } from "@/lib/config";
 
+import { LandingHeader } from "@/components/LandingHeader";
+
 const API = API_PREFIX;
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export default function LoginPage() {
 
     try {
       const loginData = {
-        email: email,
+        identifier: identifier,
         password: password
       };
 
@@ -98,20 +100,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
+      <LandingHeader />
+      
       {/* Background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/20 blur-[150px] rounded-full pointer-events-none -z-10" />
 
-      {/* Back to Home */}
-      <Link
-        href="/"
-        className="absolute top-8 left-8 flex items-center gap-2 text-gray-500 hover:text-white transition-colors group z-20"
-      >
-        <div className="p-2 rounded-xl bg-white/5 border border-white/10 group-hover:border-primary/50 transition-colors">
-          <ChevronLeft className="w-4 h-4" />
-        </div>
-        <span className="text-sm font-medium">Back to Website</span>
-      </Link>
+      <div className="flex-1 flex items-center justify-center p-6 relative z-10">
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -134,14 +129,14 @@ export default function LoginPage() {
 
         <form className="space-y-5" onSubmit={handleLogin}>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Email Address or Phone Number</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="you@example.com or 054 123 4567"
                 required
                 className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all"
               />
@@ -194,6 +189,7 @@ export default function LoginPage() {
           Don't have an account? <Link href="/register" className="text-white hover:text-primary transition-colors font-medium">Create one</Link>
         </p>
       </motion.div>
+      </div>
     </div>
   );
 }

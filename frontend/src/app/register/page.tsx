@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useCallback, useMemo } from "react";
+import { useState, useEffect, Suspense, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -28,8 +28,7 @@ function RegisterForm() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    email: "",
-    phone: "",
+    identifier: "",
     password: "",
     manualCode: "",
     // Payment (Pay-in)
@@ -51,15 +50,25 @@ function RegisterForm() {
   const [referralApplied, setReferralApplied] = useState(false);
 
   const [entryMethod, setEntryMethod] = useState<"rid" | "product_code">("rid");
-  const [pool, setPool] = useState<any[]>([]);
+  const [activationPool, setActivationPool] = useState<any[]>([]);
+  const [productPool, setProductPool] = useState<any[]>([]);
   const [loadingPool, setLoadingPool] = useState(false);
-  const [selectedCode, setSelectedCode] = useState("");
   const [codeMetadata, setCodeMetadata] = useState<any>(null);
   const [exchangeRates, setExchangeRates] = useState<any>({});
   const [currencies, setCurrencies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isActivationDropdownOpen, setIsActivationDropdownOpen] = useState(false);
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // New state variables for validation feedback and loading states
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Ref to prevent double validation
+  const lastVerifiedCodeRef = useRef<string>("");
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -74,15 +83,15 @@ function RegisterForm() {
     }
   }, []);
 
-  const loadPool = useCallback(async (type: "rid" | "product_code", signal?: AbortSignal) => {
+  const loadPools = useCallback(async (signal?: AbortSignal) => {
     setLoadingPool(true);
     try {
-      const endpoint = type === "rid" ? "rids" : "product-codes";
-      const url = `${API}/marketplace/${endpoint}`;
-      console.log("Fetching pool from:", url);
-      const res = await api.get(url, { signal });
-      console.log("Pool data received:", res.data);
-      setPool(res.data);
+      const [ridsRes, productsRes] = await Promise.all([
+        api.get(`${API}/marketplace/rids`, { signal }),
+        api.get(`${API}/marketplace/product-codes`, { signal })
+      ]);
+      setActivationPool(ridsRes.data);
+      setProductPool(productsRes.data);
     } catch (e) {
       if (axios.isCancel(e)) return;
       console.error("Pool fetch failed:", e);
@@ -93,14 +102,133 @@ function RegisterForm() {
     }
   }, []);
 
+  // Simple input changer
+  const handleCodeChange = useCallback((code: string) => {
+    setFormData(prev => ({ ...prev, manualCode: code }));
+  }, []);
+
+  // Selected code immediately verifies
+  const handleSelectCode = useCallback(async (code: string, type: "rid" | "product_code", metadata: any) => {
+    setEntryMethod(type);
+    setFormData(prev => ({ ...prev, manualCode: code, purchaseAmount: "" }));
+    setCodeMetadata(null);
+    setIsActivationDropdownOpen(false);
+    setIsProductDropdownOpen(false);
+    setValidationError(null);
+    setIsValidating(true);
+    lastVerifiedCodeRef.current = code;
+
+    try {
+      const res = await api.get(`${API}/marketplace/check?code=${code}`);
+      const meta = res.data;
+      if (meta.valid) {
+        setCodeMetadata(meta);
+        const rate = exchangeRates[formData.preferredCurrency] || 1;
+        const converted = meta.price * rate;
+        setFormData(prev => ({ ...prev, purchaseAmount: converted.toFixed(2) }));
+      } else {
+        setValidationError("Selected code is invalid or already used");
+      }
+    } catch (e) {
+      console.error("Verification of selected code failed:", e);
+      setValidationError("Failed to verify selected code");
+    } finally {
+      setIsValidating(false);
+    }
+  }, [exchangeRates, formData.preferredCurrency]);
+
+  // Unified Parallel Ingestion
   useEffect(() => {
     const controller = new AbortController();
-    loadPool(entryMethod, controller.signal);
+    loadPools(controller.signal);
     loadCurrencies(controller.signal);
     return () => {
       controller.abort();
     };
-  }, [entryMethod, loadPool, loadCurrencies]);
+  }, [loadPools, loadCurrencies]);
+
+  // Click outside handling for dropdowns
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".dropdown-container")) {
+        setIsActivationDropdownOpen(false);
+        setIsProductDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Debounced Validation for Manual Code Inputs
+  useEffect(() => {
+    setValidationError(null);
+    
+    // Clear metadata and purchaseAmount immediately on change (unless matched verified ref)
+    if (formData.manualCode !== lastVerifiedCodeRef.current) {
+      setCodeMetadata(null);
+      setFormData(prev => {
+        if (prev.purchaseAmount === "") return prev;
+        return { ...prev, purchaseAmount: "" };
+      });
+    }
+
+    if (!formData.manualCode) {
+      setIsValidating(false);
+      return;
+    }
+
+    if (formData.manualCode === lastVerifiedCodeRef.current) {
+      return;
+    }
+
+    if (formData.manualCode.length < 6) {
+      setValidationError("Code must be at least 6 characters");
+      return;
+    }
+
+    setIsValidating(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(async () => {
+      try {
+        const res = await api.get(`${API}/marketplace/check?code=${formData.manualCode}`, {
+          signal: controller.signal
+        });
+        const meta = res.data;
+        if (meta.valid) {
+          lastVerifiedCodeRef.current = formData.manualCode;
+          setCodeMetadata(meta);
+          if (meta.type === "rid") {
+            setEntryMethod("rid");
+          } else if (meta.type === "product_code") {
+            setEntryMethod("product_code");
+          }
+          const converted = meta.price * (exchangeRates[formData.preferredCurrency] || 1);
+          setFormData(prev => ({ ...prev, purchaseAmount: converted.toFixed(2) }));
+        } else {
+          setCodeMetadata(null);
+          setValidationError(meta.error || "Code is invalid or not found");
+        }
+      } catch (e: any) {
+        if (!axios.isCancel(e)) {
+          console.error("Code check failed:", e);
+          setCodeMetadata(null);
+          setValidationError("Verification failed. Please try again.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsValidating(false);
+        }
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [formData.manualCode, exchangeRates, formData.preferredCurrency]);
 
   // Auto-fill from Shareable Link
   useEffect(() => {
@@ -109,9 +237,9 @@ function RegisterForm() {
 
     if (codeParam && typeParam) {
       setEntryMethod(typeParam);
-      setSelectedCode(codeParam);
-      setFormData(prev => ({ ...prev, manualCode: codeParam }));
+      setFormData(prev => ({ ...prev, manualCode: codeParam, purchaseAmount: "" }));
       setReferralApplied(true);
+      lastVerifiedCodeRef.current = codeParam;
 
       const controller = new AbortController();
       api.get(`${API}/marketplace/check?code=${codeParam}`, { signal: controller.signal })
@@ -145,6 +273,32 @@ function RegisterForm() {
 
   // Robust Sync Logic: Keep payout in sync with payment if toggle is on
   useEffect(() => {
+    if (formData.paymentMethod === "paystack") {
+      setFormData(prev => {
+        if (prev.paymentNumber === prev.identifier) return prev;
+        return { ...prev, paymentNumber: prev.identifier };
+      });
+    }
+  }, [formData.paymentMethod, formData.identifier]);
+
+  useEffect(() => {
+    if (formData.payoutMethod === "paystack") {
+      setFormData(prev => {
+        if (prev.payoutNumber === prev.identifier) return prev;
+        return { ...prev, payoutNumber: prev.identifier };
+      });
+    }
+  }, [formData.payoutMethod, formData.identifier]);
+
+  useEffect(() => {
+    setFormData(prev => {
+      const newName = `${prev.firstName} ${prev.lastName}`.trim();
+      if (prev.payoutName === newName) return prev;
+      return { ...prev, payoutName: newName };
+    });
+  }, [formData.firstName, formData.lastName]);
+
+  useEffect(() => {
     if (formData.syncPayout) {
       setFormData(prev => ({
         ...prev,
@@ -157,13 +311,18 @@ function RegisterForm() {
 
   async function handleRegister() {
     setLoading(true);
+    setSubmitError(null);
     try {
+      const isEmail = formData.identifier.includes('@');
+      const email = isEmail ? formData.identifier.trim() : null;
+      const phone = isEmail ? null : formData.identifier.trim();
+
       const registrationData = {
         name: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
-        phone: formData.payoutNumber || formData.phone,
+        email: email,
+        phone: phone,
         password: formData.password,
-        activation_code: selectedCode === "manual" ? formData.manualCode : selectedCode,
+        activation_code: formData.manualCode,
         code_type: entryMethod,
         purchase_amount: parseFloat(formData.purchaseAmount),
         preferred_currency: formData.preferredCurrency,
@@ -201,7 +360,7 @@ function RegisterForm() {
       const errorMessage = data && Array.isArray(data.detail)
         ? data.detail.map((err: any) => `${err.msg} (${err.loc.join('.')})`).join(", ")
         : data?.detail || "Registration failed";
-      alert(errorMessage || "An error occurred during registration");
+      setSubmitError(errorMessage || "An error occurred during registration");
     } finally {
       setLoading(false);
     }
@@ -243,6 +402,26 @@ function RegisterForm() {
       setActivationStatus("Activation is taking longer than expected. Please refresh or login later to check status.");
     }, 180000);
   }
+  const isCurrentStepValid = () => {
+    if (step === 1) {
+      return formData.firstName.trim() !== "" &&
+             formData.lastName.trim() !== "" &&
+             formData.identifier.trim() !== "" &&
+             formData.password.trim() !== "";
+    }
+    if (step === 2) {
+      const codeValid = formData.manualCode.trim() !== "" && codeMetadata !== null;
+      const amount = parseFloat(formData.purchaseAmount);
+      const minAmount = codeMetadata ? codeMetadata.price * (exchangeRates[formData.preferredCurrency] || 1) : 0;
+      const amountValid = !isNaN(amount) && amount >= minAmount;
+      const paymentValid = formData.paymentNumber.trim() !== "";
+      return codeValid && amountValid && paymentValid;
+    }
+    if (step === 3) {
+      return formData.payoutNumber.trim() !== "";
+    }
+    return true;
+  };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden py-12 px-4">
@@ -329,7 +508,7 @@ function RegisterForm() {
 
                   <div className="text-center mb-6">
                     <h2 className="text-xl font-bold text-white">Identity Setup</h2>
-                    <p className="text-sm text-gray-400">Basic details for your permanent account.</p>
+                    <p className="text-sm text-gray-400">Provide at least one contact method (phone number or email address).</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -364,16 +543,17 @@ function RegisterForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Email Address or Phone Number <span className="text-red-400">*</span></label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                       <input
-                        type="email"
-                        aria-label="Email Address"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        type="text"
+                        aria-label="Email or Phone Number"
+                        value={formData.identifier}
+                        onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
                         className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 focus:outline-none focus:border-primary/50 text-white"
-                        placeholder="john@example.com"
+                        placeholder="john@example.com or 054 123 4567"
+                        required
                       />
                     </div>
                   </div>
@@ -417,73 +597,51 @@ function RegisterForm() {
                     <p className="text-sm text-gray-400">Unlock your account with an Activation RID.</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <button
-                      type="button"
-                      onClick={() => { setEntryMethod("rid"); setSelectedCode(""); setCodeMetadata(null); }}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${entryMethod === "rid" ? "bg-primary/10 border-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]" : "bg-white/5 border-white/10 hover:border-white/20"
-                        }`}
-                    >
-                      <KeyRound className={`w-5 h-5 ${entryMethod === "rid" ? "text-primary" : "text-gray-500"}`} />
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-white">ACTIVATION KEY</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setEntryMethod("product_code"); setSelectedCode(""); setCodeMetadata(null); }}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${entryMethod === "product_code" ? "bg-secondary/10 border-secondary shadow-[0_0_15px_rgba(var(--secondary-rgb),0.1)]" : "bg-white/5 border-white/10 hover:border-white/20"
-                        }`}
-                    >
-                      <Globe className={`w-5 h-5 ${entryMethod === "product_code" ? "text-secondary" : "text-gray-500"}`} />
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-white">ACCESS KEY (PRODUCT CODE)</span>
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="relative z-[60]">
+                  <div className="grid grid-cols-2 gap-3 mb-6 relative">
+                    <div className="relative dropdown-container">
                       <button
                         type="button"
-                        aria-label="Select activation code"
-                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white text-center focus:outline-none relative"
+                        onClick={() => {
+                          setEntryMethod("rid");
+                          setIsActivationDropdownOpen(!isActivationDropdownOpen);
+                          setIsProductDropdownOpen(false);
+                        }}
+                        className={`w-full flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${(entryMethod === "rid" || isActivationDropdownOpen) ? "bg-primary/10 border-primary shadow-[0_0_15px_rgba(34,211,238,0.1)]" : "bg-white/5 border-white/10 hover:border-white/20"
+                          }`}
                       >
-                        <span className="truncate block w-full px-4">
-                          {selectedCode === "manual" ? "Enter manually..." :
-                            selectedCode ? (
-                              selectedCode
-                            ) : "Select a code..."
-                          }
-                        </span>
-                        <ChevronDown className={`absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                        <div className="flex items-center gap-1.5">
+                          <KeyRound className={`w-5 h-5 ${(entryMethod === "rid" || isActivationDropdownOpen) ? "text-primary" : "text-gray-500"}`} />
+                          <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                        </div>
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-white">ACTIVATION KEY</span>
                       </button>
 
                       <AnimatePresence>
-                        {isDropdownOpen && (
+                        {isActivationDropdownOpen && (
                           <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className="absolute w-full mt-2 bg-card border border-white/10 rounded-xl overflow-hidden shadow-2xl z-[70] backdrop-blur-xl"
+                            className="absolute left-0 w-full mt-2 bg-card border border-white/10 rounded-xl overflow-hidden shadow-2xl z-[70] backdrop-blur-xl"
                           >
                             <div className="max-h-[200px] overflow-y-auto">
-                              <button
-                                type="button"
-                                onClick={() => { setSelectedCode("manual"); setCodeMetadata(null); setIsDropdownOpen(false); }}
-                                className="w-full px-5 py-3 text-left hover:bg-white/5 text-gray-400 text-sm border-b border-white/5"
-                              >
-                                Enter manually...
-                              </button>
-                              {pool.map((c) => (
+                              {loadingPool && (
+                                <div className="p-3 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+                                  <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                                  Loading codes...
+                                </div>
+                              )}
+                              {!loadingPool && activationPool.length === 0 && (
+                                <div className="p-3 text-center text-xs text-gray-500">No activation codes available</div>
+                              )}
+                              {activationPool.map((c) => (
                                 <button
                                   key={c.code}
                                   type="button"
                                   onClick={() => {
-                                    setSelectedCode(c.code);
-                                    setCodeMetadata(c);
-                                    setIsDropdownOpen(false);
-                                    const converted = c.price * (exchangeRates[formData.preferredCurrency] || 1);
-                                    setFormData(prev => ({ ...prev, purchaseAmount: converted.toFixed(2) }));
+                                    handleSelectCode(c.code, "rid", c);
                                   }}
-                                  className="w-full px-5 py-3 text-left hover:bg-primary/10 text-white text-sm transition-colors border-b border-white/5"
+                                  className="w-full px-4 py-2.5 text-left hover:bg-primary/10 text-white text-xs transition-colors border-b border-white/5 font-mono"
                                 >
                                   {c.code}
                                 </button>
@@ -494,33 +652,89 @@ function RegisterForm() {
                       </AnimatePresence>
                     </div>
 
-                    {selectedCode === "manual" && (
-                      <div className="relative">
-                        <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                        <input
-                          type="text"
-                          aria-label="Manual Code Input"
-                          value={formData.manualCode}
-                          onChange={async (e) => {
-                            const code = e.target.value;
-                            setFormData({ ...formData, manualCode: code });
-                            if (code.length >= 6) {
-                              try {
-                                const res = await api.get(`${API}/marketplace/check?code=${code}`);
-                                const meta = res.data;
-                                if (meta.valid) {
-                                  setCodeMetadata(meta);
-                                  const converted = meta.price * (exchangeRates[formData.preferredCurrency] || 1);
-                                  setFormData(prev => ({ ...prev, purchaseAmount: converted.toFixed(2) }));
-                                }
-                              } catch (e) {
-                                console.error("Manual code verification failed:", e);
-                              }
-                            }
-                          }}
-                          placeholder="Paste your code here..."
-                          className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 text-white focus:outline-none focus:border-primary/50"
-                        />
+                    <div className="relative dropdown-container">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEntryMethod("product_code");
+                          setIsProductDropdownOpen(!isProductDropdownOpen);
+                          setIsActivationDropdownOpen(false);
+                        }}
+                        className={`w-full flex flex-col items-center gap-2 p-3 rounded-2xl border transition-all ${(entryMethod === "product_code" || isProductDropdownOpen) ? "bg-secondary/10 border-secondary shadow-[0_0_15px_rgba(59,130,246,0.1)]" : "bg-white/5 border-white/10 hover:border-white/20"
+                          }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Globe className={`w-5 h-5 ${(entryMethod === "product_code" || isProductDropdownOpen) ? "text-secondary" : "text-gray-500"}`} />
+                          <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                        </div>
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-white">ACCESS KEY (PRODUCT CODE)</span>
+                      </button>
+
+                      <AnimatePresence>
+                        {isProductDropdownOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute right-0 w-full mt-2 bg-card border border-white/10 rounded-xl overflow-hidden shadow-2xl z-[70] backdrop-blur-xl"
+                          >
+                            <div className="max-h-[200px] overflow-y-auto">
+                              {loadingPool && (
+                                <div className="p-3 text-center text-xs text-gray-500 flex items-center justify-center gap-2">
+                                  <Loader2 className="w-3.5 h-3.5 text-secondary animate-spin" />
+                                  Loading codes...
+                                </div>
+                              )}
+                              {!loadingPool && productPool.length === 0 && (
+                                <div className="p-3 text-center text-xs text-gray-500">No product codes available</div>
+                              )}
+                              {productPool.map((c) => (
+                                <button
+                                  key={c.code}
+                                  type="button"
+                                  onClick={() => {
+                                    handleSelectCode(c.code, "product_code", c);
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left hover:bg-secondary/10 text-white text-xs transition-colors border-b border-white/5 font-mono"
+                                >
+                                  {c.code}
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <KeyRound className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${entryMethod === "rid" ? "text-primary" : "text-secondary"}`} />
+                      <input
+                        type="text"
+                        aria-label="Access Code"
+                        value={formData.manualCode}
+                        onChange={(e) => handleCodeChange(e.target.value)}
+                        placeholder="Enter or select a code..."
+                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-white focus:outline-none focus:border-primary/50 text-sm font-mono placeholder:font-sans"
+                      />
+                      {isValidating && (
+                        <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 animate-spin" />
+                      )}
+                    </div>
+
+                    {validationError && (
+                      <p className="text-[10px] text-red-400 font-medium pl-1 animate-in fade-in slide-in-from-top-1">
+                        {validationError}
+                      </p>
+                    )}
+
+                    {codeMetadata && (
+                      <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1.5 pl-1 animate-in fade-in slide-in-from-top-1">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>
+                          Code type: {codeMetadata.type === "rid" ? "Activation RID" : "Access Key (Product)"} | Price: {codeMetadata.price} {codeMetadata.currency || "GHS"}
+                        </span>
                       </div>
                     )}
 
@@ -646,18 +860,8 @@ function RegisterForm() {
                               <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                                 <div className="bg-primary/5 p-3 rounded-lg border border-primary/20">
                                   <p className="text-[9px] text-gray-400 leading-relaxed uppercase font-bold">Paystack Secure</p>
-                                  <p className="text-[8px] text-gray-500">Supports Card, MoMo, & Bank Transfer</p>
-                                </div>
-                                <div className="relative">
-                                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                  <input
-                                    type="email"
-                                    aria-label="Paystack Transaction Email"
-                                    value={formData.paymentNumber}
-                                    onChange={(e) => setFormData({ ...formData, paymentNumber: e.target.value })}
-                                    placeholder="Transaction receipt email"
-                                    className="w-full bg-background/80 border border-white/10 rounded-lg py-3 pl-10 text-xs text-white focus:outline-none focus:border-primary/40"
-                                  />
+                                  <p className="text-[8px] text-gray-500 mb-1.5">Supports Card, MoMo, & Bank Transfer</p>
+                                  <p className="text-[8px] text-primary/70 font-mono">Receipt email: {formData.email}</p>
                                 </div>
                               </div>
                             )}
@@ -764,15 +968,8 @@ function RegisterForm() {
                           <div className="bg-secondary/10 p-3 rounded-lg border border-secondary/20">
                             <p className="text-[9px] text-secondary/70 uppercase font-black">Paystack Transfer</p>
                             <p className="text-[8px] text-gray-500 leading-tight">Fast settlements directly to your bank or wallet.</p>
+                            <p className="text-[8px] text-secondary/70 font-mono mt-1.5">Registered Email: {formData.email}</p>
                           </div>
-                          <input
-                            type="email"
-                            aria-label="Paystack Registration Email"
-                            value={formData.payoutNumber}
-                            onChange={(e) => setFormData({ ...formData, payoutNumber: e.target.value })}
-                            placeholder="Registered Paystack Email"
-                            className="w-full bg-background/50 border border-white/10 rounded-xl py-3 px-4 text-xs text-secondary focus:outline-none focus:border-secondary/50 placeholder:text-gray-600 shadow-inner"
-                          />
                         </div>
                       )}
 
@@ -806,28 +1003,42 @@ function RegisterForm() {
                       </div>
                     </div>
                   )}
-
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                      type="text"
-                      aria-label="Account Holder Name"
-                      value={formData.payoutName}
-                      onChange={(e) => setFormData({ ...formData, payoutName: e.target.value })}
-                      placeholder="Registered Legal Name"
-                      className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 text-xs text-white focus:outline-none focus:border-primary/40 shadow-inner"
-                    />
-                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {submitError && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-center mb-4 flex flex-col items-center justify-center ${
+                  submitError.toLowerCase().includes('email') ? 'cursor-pointer hover:bg-red-500/20 transition-colors group' : ''
+                }`}
+                onClick={() => {
+                  if (submitError.toLowerCase().includes('email')) {
+                    setStep(1);
+                    setSubmitError(null);
+                  }
+                }}
+              >
+                <p className="text-xs text-red-400 font-bold">{submitError}</p>
+                {submitError.toLowerCase().includes('email') && (
+                  <span className="text-[10px] text-red-400/80 mt-1 flex items-center gap-1 group-hover:text-red-300 transition-colors">
+                    <ChevronLeft className="w-3 h-3" /> Click here to go back and fix it
+                  </span>
+                )}
+              </motion.div>
+            )}
 
             <div className="flex gap-4 pt-4 mt-8">
               {step > 1 && (
                 <button
                   type="button"
                   aria-label="Go Back"
-                  onClick={() => setStep(step - 1)}
+                  onClick={() => {
+                    setStep(step - 1);
+                    setSubmitError(null);
+                  }}
                   className="flex-[0.25] py-4 border border-white/10 rounded-xl hover:bg-white/5 transition-all flex items-center justify-center text-gray-400 group"
                 >
                   <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -838,7 +1049,7 @@ function RegisterForm() {
                 type="button"
                 aria-label={step === 3 ? "Launch Account" : "Next Phase"}
                 onClick={() => step < 3 ? setStep(step + 1) : handleRegister()}
-                disabled={loading || (step === 2 && codeMetadata && (parseFloat(formData.purchaseAmount) < (codeMetadata.price * (exchangeRates[formData.preferredCurrency] || 1))))}
+                disabled={loading || !isCurrentStepValid()}
                 className={`flex-1 py-4 bg-white text-background font-black text-xs uppercase tracking-widest rounded-xl hover:bg-gray-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center justify-center group disabled:opacity-50`}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : step === 3 ? "Launch Account" : "Next Phase"}

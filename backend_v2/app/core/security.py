@@ -83,4 +83,14 @@ def get_current_user(
     ).first()
     if user is None:
         raise credentials_exception
+
+    # Enforce active check for all routes except auth/me and auth/logout
+    if user.status != "active" and user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        allowed_suffixes = ["/auth/me", "/auth/logout"]
+        if not any(request.url.path.endswith(s) for s in allowed_suffixes):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account activation pending. Please complete transaction."
+            )
+
     return user

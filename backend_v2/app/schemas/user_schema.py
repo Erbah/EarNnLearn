@@ -1,10 +1,10 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, model_validator
 from uuid import UUID
 
 class UserCreate(BaseModel):
     name: str
-    email: EmailStr
     phone: str | None = None
+    email: EmailStr | None = None
     password: str
     activation_code: str | None = None
     code_type: str | None = "rid" # rid or product_code
@@ -24,10 +24,17 @@ class UserCreate(BaseModel):
     purchase_amount: float | None = 20.0
     preferred_currency: str | None = "GHS"
 
+    @model_validator(mode='after')
+    def check_contact_method(self) -> 'UserCreate':
+        if not self.phone and not self.email:
+            raise ValueError('Either phone or email must be provided')
+        return self
+
 class UserResponse(BaseModel):
     id: UUID
     name: str
-    email: EmailStr
+    email: EmailStr | None = None
+    phone: str | None = None
     rid: str | None = None
     tier_type: str
     role: str
@@ -50,7 +57,7 @@ class Token(BaseModel):
     token_type: str
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    identifier: str
     password: str
 
 class RegistrationResponse(BaseModel):

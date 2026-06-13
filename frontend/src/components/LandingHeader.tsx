@@ -31,8 +31,8 @@ export function LandingHeader() {
     <header
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${
         scrolled
-          ? "bg-background/85 backdrop-blur-md border-b border-white/5 py-4 shadow-[0_4px_30px_rgba(0,0,0,0.3)]"
-          : "bg-transparent py-6"
+          ? "bg-background/90 backdrop-blur-lg border-b border-primary/20 py-4 shadow-[0_10px_30px_rgba(0,224,255,0.08)]"
+          : "bg-background/30 backdrop-blur-md border-b border-white/10 py-5"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -158,6 +158,6 @@ export function LandingHeader() {
           </>
         )}
       </AnimatePresence>
-    </>
+    </header>
   );
 }
