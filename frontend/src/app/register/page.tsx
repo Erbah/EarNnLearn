@@ -861,7 +861,7 @@ function RegisterForm() {
                                 <div className="bg-primary/5 p-3 rounded-lg border border-primary/20">
                                   <p className="text-[9px] text-gray-400 leading-relaxed uppercase font-bold">Paystack Secure</p>
                                   <p className="text-[8px] text-gray-500 mb-1.5">Supports Card, MoMo, & Bank Transfer</p>
-                                  <p className="text-[8px] text-primary/70 font-mono">Receipt email: {formData.email}</p>
+                                  <p className="text-[8px] text-primary/70 font-mono">Receipt email: {formData.identifier}</p>
                                 </div>
                               </div>
                             )}
