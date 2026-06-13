@@ -106,21 +106,33 @@ def create_app() -> FastAPI:
         
         db = SessionLocal()
         try:
-            # SQLite migration for user lockout columns
+            # Automatic schema migration for new columns
             try:
-                columns = db.execute(text("PRAGMA table_info(users)")).fetchall()
-                existing_cols = {col[1] for col in columns}
-                if "failed_login_attempts" not in existing_cols:
-                    print("Adding column failed_login_attempts to users table")
-                    db.execute(text("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0"))
-                    db.commit()
-                if "locked_until" not in existing_cols:
-                    print("Adding column locked_until to users table")
-                    db.execute(text("ALTER TABLE users ADD COLUMN locked_until DATETIME"))
-                    db.commit()
+                if engine.name == "sqlite":
+                    columns = db.execute(text("PRAGMA table_info(users)")).fetchall()
+                    existing_cols = {col[1] for col in columns}
+                else:
+                    columns = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users'")).fetchall()
+                    existing_cols = {col[0] for col in columns}
+                
+                cols_to_check = [
+                    ("failed_login_attempts", "INTEGER DEFAULT 0"),
+                    ("locked_until", "TIMESTAMP" if engine.name != "sqlite" else "DATETIME"),
+                    ("preferred_notification_method", "VARCHAR DEFAULT 'auto'"),
+                    ("last_onboarding_step", "INTEGER DEFAULT 0"),
+                    ("is_beta_user", "BOOLEAN DEFAULT true"),
+                    ("learning_goal", "VARCHAR DEFAULT 'General Exploration'"),
+                    ("preferred_style", "VARCHAR DEFAULT 'Balanced'"),
+                    ("onboarding_completed", "BOOLEAN DEFAULT false")
+                ]
+                for col_name, col_type in cols_to_check:
+                    if col_name not in existing_cols:
+                        print(f"Adding column {col_name} to users table")
+                        db.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
+                        db.commit()
             except Exception as e:
                 db.rollback()
-                print(sanitize_secrets(f"Failed to add lockout columns to users table: {e}"))
+                print(sanitize_secrets(f"Failed to migrate users table: {e}"))
 
             existing = db.query(User).first()
             if not existing:
