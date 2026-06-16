@@ -78,6 +78,7 @@ class CourseOut(BaseModel):
     enrollment_count: int
     is_published: bool
     approval_status: str
+    thumbnail_url: str | None = None
     class Config:
         from_attributes = True
 

@@ -23,6 +23,7 @@ interface Course {
   avg_rating: number;
   enrollment_count: number;
   is_published: boolean;
+  thumbnail_url?: string;
 }
 
 interface Category {
@@ -212,10 +213,14 @@ export default function CoursesPage() {
                   <div className="group rounded-2xl bg-white/[0.03] border border-white/10 hover:border-primary/30 transition-all duration-300 overflow-hidden hover:shadow-[0_0_30px_rgba(0,224,255,0.08)]">
                     {/* Course Banner */}
                     <div className="h-36 bg-gradient-to-br from-primary/20 via-blue-600/10 to-purple-600/10 flex items-center justify-center relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/80" />
-                      <BookOpen className="w-10 h-10 text-primary/50 relative z-10" />
+                      {course.thumbnail_url ? (
+                        <img src={course.thumbnail_url} alt={course.title} className="absolute inset-0 w-full h-full object-cover z-0" />
+                      ) : (
+                        <BookOpen className="w-10 h-10 text-primary/50 relative z-10" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/80 z-10" />
                       {course.price === 0 && (
-                        <span className="absolute top-3 right-3 px-2.5 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded-full border border-green-500/20 z-10">
+                        <span className="absolute top-3 right-3 px-2.5 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded-full border border-green-500/20 z-20">
                           FREE
                         </span>
                       )}
