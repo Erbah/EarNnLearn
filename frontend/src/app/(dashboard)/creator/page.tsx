@@ -19,12 +19,14 @@ export default function CreatorPage() {
   const [form, setForm] = useState({ 
     title: "", 
     description: "", 
+    creator_name: "",
     category: "General", 
     skill_level: "Beginner", 
     price: 0, 
     playlist_url: "",
     is_free: true 
   });
+  const [fetchingMetadata, setFetchingMetadata] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [myCourses, setMyCourses] = useState<any[]>([]);
   const [editingCourse, setEditingCourse] = useState<any>(null);
@@ -81,7 +83,7 @@ export default function CreatorPage() {
           published: false,
           approval_status: "pending" 
         }]);
-        setForm({ title: "", description: "", category: "General", skill_level: "Beginner", price: 0, playlist_url: "", is_free: true });
+        setForm({ title: "", description: "", creator_name: "", category: "General", skill_level: "Beginner", price: 0, playlist_url: "", is_free: true });
         setShowCreateForm(false);
         setTab("my-courses");
       }
@@ -89,6 +91,26 @@ export default function CreatorPage() {
       alert(e.response?.data?.detail || "Failed to create course");
     }
     setCreating(false);
+  }
+
+  async function handleUrlBlur() {
+    if (!form.playlist_url || (!form.title && !form.description && !form.creator_name)) {
+      if (form.playlist_url) {
+        setFetchingMetadata(true);
+        try {
+          const res = await api.post(`${API}/marketplace/youtube-metadata`, { url: form.playlist_url });
+          setForm(prev => ({
+            ...prev,
+            title: prev.title || res.data.title || "",
+            description: prev.description || res.data.description || "",
+            creator_name: prev.creator_name || res.data.creator_name || ""
+          }));
+        } catch (e) {
+          console.error("Failed to fetch metadata", e);
+        }
+        setFetchingMetadata(false);
+      }
+    }
   }
 
   async function togglePublish(courseId: string, published: boolean) {
@@ -346,6 +368,13 @@ export default function CreatorPage() {
                         className="w-full px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 focus:bg-white/[0.04] transition-all resize-none"
                       />
                     </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 block">Content Creator / Youtuber Name</label>
+                      <input value={form.creator_name} onChange={e => setForm({ ...form, creator_name: e.target.value })}
+                        placeholder="e.g. FreeCodeCamp, Marques Brownlee"
+                        className="w-full px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 focus:bg-white/[0.04] transition-all"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-6">
@@ -414,8 +443,13 @@ export default function CreatorPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 block">Playlist Integration</label>
-                      <input value={form.playlist_url} onChange={e => setForm({ ...form, playlist_url: e.target.value })}
+                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 block flex items-center gap-2">
+                        Playlist Integration 
+                        {fetchingMetadata && <span className="text-primary normal-case tracking-normal">Auto-populating...</span>}
+                      </label>
+                      <input value={form.playlist_url} 
+                        onChange={e => setForm({ ...form, playlist_url: e.target.value })}
+                        onBlur={handleUrlBlur}
                         placeholder="YouTube URL"
                         className="w-full px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-primary/50"
                       />

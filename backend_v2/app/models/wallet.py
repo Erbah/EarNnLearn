@@ -46,5 +46,10 @@ class WithdrawalRequest(Base):
     payout_details = Column(JSON, nullable=True) # JSON blob for flexibility
     
     admin_notes = Column(String, nullable=True)
+    
+    # Withdrawal Limit Permit (WLP) - Two Factor Auth
+    wlp_code = Column(String, nullable=True)
+    wlp_expires_at = Column(DateTime, nullable=True)
+    
     processed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

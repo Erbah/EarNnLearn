@@ -75,6 +75,91 @@ class AITutorEngine:
         """
         return f"Generate a 5-question multiple choice quiz for the educational video titled '{video_title}'. Make it challenging but fair."
 
+    @classmethod
+    def generate_video_quiz(cls, db: Session, video_title: str, transcript: str, active_model: str = None, active_base_url: str = None) -> list:
+        """
+        Uses the AI Engine to generate a JSON array of quiz questions directly from a video transcript.
+        """
+        import litellm
+        import os
+        from app.core.config import Settings
+        
+        # Determine model
+        provider, model, key, base_url = cls._get_active_model(db)
+        model = active_model or model
+        base_url = active_base_url or base_url
+        
+        # Configure API Keys
+        settings = Settings()
+        env_key_map = {
+            "google": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY"
+        }
+        if provider in env_key_map:
+            os.environ[env_key_map[provider]] = key or getattr(settings, f"{provider.upper()}_API_KEY", "") or ""
+
+        prompt = (
+            f"You are an expert educator and instructional designer. I will provide you with the transcript of a video titled '{video_title}'.\n"
+            f"Your task is to generate exactly 5 high-quality questions based STRICTLY on the content discussed in the transcript.\n\n"
+            f"IMPORTANT: You must first analyze the transcript and determine which question types best suit the material. You can mix and match the following types:\n"
+            f"- 'multiple_choice': Standard 4-option questions.\n"
+            f"- 'true_false': Simple binary questions.\n"
+            f"- 'subjective': Open-ended, short-answer questions (do not provide options for this, but provide an 'ideal_answer' in the options array marked as correct).\n"
+            f"- 'practical': Scenario-based application questions (Bloom's Taxonomy: Apply/Create).\n"
+            f"- 'fill_in_the_blank': A key sentence from the transcript with a critical vocabulary word or formula missing. (Provide the exact missing word as the only option marked correct).\n"
+            f"- 'ordering': Process steps to be arranged chronologically. (Provide the steps in the correct order in the options array, all marked as correct).\n"
+            f"- 'debugging': A broken technical scenario or incorrect statement based on the video to be identified and fixed.\n"
+            f"- 'socratic': A question forcing the user to deduce an answer from first principles discussed.\n\n"
+            f"You MUST output ONLY a valid JSON array. Do not wrap it in markdown block tags if possible. Here is the exact JSON structure you must follow:\n"
+            f"[\n"
+            f"  {{\n"
+            f"    \"question_text\": \"What is the main concept?\",\n"
+            f"    \"question_type\": \"multiple_choice\",\n"
+            f"    \"options\": [\n"
+            f"      {{\"option_text\": \"Option A\", \"is_correct\": true}},\n"
+            f"      {{\"option_text\": \"Option B\", \"is_correct\": false}},\n"
+            f"      {{\"option_text\": \"Option C\", \"is_correct\": false}},\n"
+            f"      {{\"option_text\": \"Option D\", \"is_correct\": false}}\n"
+            f"    ]\n"
+            f"  }},\n"
+            f"  {{\n"
+            f"    \"question_text\": \"Explain the core principle in your own words.\",\n"
+            f"    \"question_type\": \"subjective\",\n"
+            f"    \"options\": [\n"
+            f"      {{\"option_text\": \"The core principle is...\", \"is_correct\": true}}\n"
+            f"    ]\n"
+            f"  }}\n"
+            f"]\n\n"
+            f"TRANSCRIPT:\n"
+            f"{transcript[:15000]}" # Cap transcript to safe size
+        )
+
+        try:
+            completion_args = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "timeout": 45
+            }
+            if base_url:
+                completion_args["api_base"] = base_url
+
+            response = litellm.completion(**completion_args)
+            raw_text = response.choices[0].message.content
+            
+            # Clean Markdown wrappers if AI returned them
+            import re
+            json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
+            if json_match:
+                raw_text = json_match.group(1).strip()
+            
+            import json
+            questions = json.loads(raw_text)
+            return questions
+        except Exception as e:
+            print(f"Quiz Generation Error: {str(e)}")
+            return []
+
     @staticmethod
     def generate_course_review_prompt(title: str, description: str, category: str, price: float) -> str:
         """

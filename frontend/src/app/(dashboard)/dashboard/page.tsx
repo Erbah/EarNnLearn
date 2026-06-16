@@ -6,7 +6,6 @@ import { useUser } from "@/context/UserContext";
 import { StatCard } from "@/components/StatCard";
 import dynamic from "next/dynamic";
 import { EarningsChartSkeleton } from "@/components/Skeletons";
-import { NetworkPreview } from "@/components/NetworkPreview";
 import { ActivityFeed } from "@/components/ActivityFeed";
 
 const EarningsChart = dynamic(
@@ -16,9 +15,9 @@ const EarningsChart = dynamic(
     ssr: false
   }
 );
-import { Wallet, Users, KeyRound, DollarSign, Share2, Copy, MessageCircle, Twitter, MessageSquare, BookOpen } from "lucide-react";
+import { Wallet, Users, KeyRound, DollarSign, Share2 } from "lucide-react";
 import axios from "axios";
-import { API_BASE_URL, api } from "@/lib/api";
+import { api } from "@/lib/api";
 
 
 const API = "/api/v1";
@@ -26,17 +25,15 @@ const API = "/api/v1";
 export default function DashboardPage() {
   const { user, loading: userLoading } = useUser();
   const [wallet, setWallet] = useState<any>(null);
-  const [network, setNetwork] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchDashboardData = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      // Only fetch wallet, network, and transactions - NOT user profile
+      // Only fetch wallet and transactions - NOT user profile
       const results = await Promise.allSettled([
         api.get(`${API}/wallet/`, { signal }),
-        api.get(`${API}/network/tree-view`, { signal }),
         api.get(`${API}/wallet/transactions`, { signal })
       ]);
       
@@ -51,19 +48,10 @@ export default function DashboardPage() {
       }
       
       if (results[1].status === 'fulfilled') {
-        setNetwork(results[1].value.data);
+        setTransactions(results[1].value.data);
       } else {
         if (!axios.isCancel(results[1].reason)) {
-          console.debug("Network fetch failed:", results[1].reason?.response?.status);
-          setNetwork(null);
-        }
-      }
-      
-      if (results[2].status === 'fulfilled') {
-        setTransactions(results[2].value.data);
-      } else {
-        if (!axios.isCancel(results[2].reason)) {
-          console.debug("Transactions fetch failed:", results[2].reason?.response?.status);
+          console.debug("Transactions fetch failed:", results[1].reason?.response?.status);
           setTransactions([]);
         }
       }
@@ -71,7 +59,6 @@ export default function DashboardPage() {
       if (axios.isCancel(e)) return;
       console.debug("Dashboard data fetch error:", e.message);
       setWallet(null);
-      setNetwork(null);
       setTransactions([]);
     } finally {
       if (!signal?.aborted) {
@@ -157,7 +144,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard
           title="Wallet Balance"
           value={wallet ? `${Number(wallet.balance).toFixed(2)} ${wallet.currency || 'GHS'}` : "LOADING..."}
@@ -168,17 +155,8 @@ export default function DashboardPage() {
           href="/wallet"
         />
         <StatCard
-          title="Network Size"
-          value={network ? String(network.children_count) : "0"}
-          trend="+"
-          isPositive={true}
-          icon={Users}
-          delay={0.2}
-          href="/network"
-        />
-        <StatCard
           title="Activations"
-          value={network ? String(network.children?.length || 0) : "0"}
+          value={user?.product_codes?.length ? String(user.product_codes.length) : "0"}
           trend="Direct"
           isPositive={true}
           icon={KeyRound}
@@ -196,10 +174,9 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Main Grid: Charts & Network */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main Grid: Charts */}
+      <div className="grid grid-cols-1 gap-6">
         <EarningsChart />
-        <NetworkPreview count={network?.children_count || 0} />
       </div>
 
       {/* Activity Content */}

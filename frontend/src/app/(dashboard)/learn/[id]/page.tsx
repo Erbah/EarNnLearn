@@ -241,29 +241,33 @@ export default function LearnPage() {
 
   // Sync to Backend
   async function syncProgress(videoId: string, watchTime: number, duration: number) {
-    const resp = await api.post(`${API}/learn/watch/${courseId}`, {
-      video_id: videoId,
-      duration,
-      watch_time: Math.floor(watchTime)
-    });
+    try {
+      const resp = await api.post(`${API}/learn/watch/${courseId}`, {
+        video_id: videoId,
+        duration,
+        watch_time: Math.floor(watchTime)
+      });
 
-    if (resp.status === 200) {
-      const data = resp.data;
-      
-      if (data.status === "completed") {
-        setWatchResult(data);
-        setWatchedIds(prev => new Set(prev).add(videoId));
+      if (resp.status === 200) {
+        const data = resp.data;
         
-        // Trigger XP Animation
-        setShowXpPop(true);
-        setTimeout(() => setShowXpPop(false), 3000);
-        
-        refreshStatus();
-        setTimeout(() => setWatchResult(null), 4000);
+        if (data.status === "completed") {
+          setWatchResult(data);
+          setWatchedIds(prev => new Set(prev).add(videoId));
+          
+          // Trigger XP Animation
+          setShowXpPop(true);
+          setTimeout(() => setShowXpPop(false), 3000);
+          
+          refreshStatus();
+          setTimeout(() => setWatchResult(null), 4000);
+        }
       }
-    } else if (resp.status === 403) {
-      playerRef.current?.pauseVideo();
-      setWatchResult({ status: "paused", message: "Course paused — earn more to continue" });
+    } catch (err: any) {
+      if (err.response && err.response.status === 403) {
+        playerRef.current?.pauseVideo();
+        setWatchResult({ status: "paused", message: err.response.data?.detail || "Course paused — earn more to continue" });
+      }
     }
   }
 
@@ -289,10 +293,14 @@ export default function LearnPage() {
   }
 
   async function requestCertificate() {
-    const res = await api.post(`${API}/courses/${courseId}/certificate`);
-    if (res.status === 200) {
-      const data = res.data;
-      alert(`🎓 Certificate issued: ${data.certificate_code}`);
+    try {
+      const res = await api.post(`${API}/courses/${courseId}/certificate`);
+      if (res.status === 200) {
+        const data = res.data;
+        alert(`🎓 Certificate issued: ${data.certificate_code}`);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Failed to issue certificate");
     }
   }
 

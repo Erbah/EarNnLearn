@@ -12,7 +12,8 @@ import {
   RefreshCcw,
   ShieldCheck,
   X,
-  Plus
+  Plus,
+  ChevronDown
 } from "lucide-react";
 import axios from "axios";
 
@@ -54,8 +55,9 @@ export default function WalletPage() {
   const [showAddFundsModal, setShowAddFundsModal] = useState(false);
   const [addAmount, setAddAmount] = useState(100);
   const [withdrawAmount, setWithdrawAmount] = useState(50);
-  const [payoutMethod, setPayoutMethod] = useState("Mobile Money (MTN)");
-  const [payoutDetails, setPayoutDetails] = useState("");
+  const [bankCode, setBankCode] = useState("MTN");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
 
   const fetchWalletData = useCallback(async (signal?: any) => {
     const abortSignal = signal instanceof AbortSignal ? signal : undefined;
@@ -112,8 +114,12 @@ export default function WalletPage() {
     try {
       const res = await api.post(`${API}/wallet/withdraw`, {
         amount: withdrawAmount,
-        payout_method: payoutMethod,
-        payout_details: { account: payoutDetails }
+        payout_method: "paystack",
+        payout_details: { 
+          name: accountName,
+          account_number: accountNumber,
+          bank_code: bankCode
+        }
       });
 
       if (res.status === 200) {
@@ -389,28 +395,42 @@ export default function WalletPage() {
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Payout Method</label>
-                <select
-                  value={payoutMethod}
-                  onChange={(e) => setPayoutMethod(e.target.value)}
-                  title="Select Payout Method"
-                  aria-label="Select Payout Method"
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary appearance-none cursor-pointer"
-                >
-                  <option value="Mobile Money (MTN)" className="bg-card">Mobile Money (MTN)</option>
-                  <option value="Mobile Money (Telecel)" className="bg-card">Mobile Money (Telecel)</option>
-                  <option value="Bank Transfer" className="bg-card">Bank Transfer</option>
-                </select>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Network / Bank</label>
+                <div className="relative">
+                  <select
+                    value={bankCode}
+                    onChange={(e) => setBankCode(e.target.value)}
+                    title="Select Network"
+                    aria-label="Select Network"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-12 text-white focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                  >
+                    <option value="MTN" className="bg-card">MTN Mobile Money</option>
+                    <option value="VOD" className="bg-card">Telecel (Vodafone) Cash</option>
+                    <option value="AIR" className="bg-card">AirtelTigo Money</option>
+                  </select>
+                  <ChevronDown className="w-5 h-5 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Payment Details (Phone/Account)</label>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Account Name</label>
                 <input
                   type="text"
-                  value={payoutDetails}
-                  onChange={(e) => setPayoutDetails(e.target.value)}
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary"
-                  placeholder="Enter number or account number"
+                  placeholder="e.g. Kwame Mensah"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Account Number</label>
+                <input
+                  type="text"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary"
+                  placeholder="e.g. 024XXXXXXX"
                 />
               </div>
 

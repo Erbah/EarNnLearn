@@ -12,6 +12,7 @@ from app.schemas.engagement import (
     QuizCreate, QuizOut, QuizQuestionCreate, QuizAttemptCreate, QuizAttemptOut,
     DiscussionCreate, DiscussionOut, DiscussionReplyCreate, DiscussionReplyOut
 )
+from app.services.gamification_service import GamificationService
 
 router = APIRouter()
 
@@ -124,6 +125,16 @@ def submit_quiz(
     score_pct = (earned_points / total_points * 100) if total_points > 0 else 0
     passed = score_pct >= quiz.passing_score
     
+    # Check if this is the user's first time passing this quiz
+    is_first_pass = False
+    if passed:
+        previous_pass = db.query(QuizAttempt).filter(
+            QuizAttempt.quiz_id == quiz_id,
+            QuizAttempt.user_rid == current_user.rid,
+            QuizAttempt.passed == True
+        ).first()
+        is_first_pass = previous_pass is None
+    
     attempt = QuizAttempt(
         quiz_id=quiz_id,
         user_rid=current_user.rid,
@@ -132,6 +143,11 @@ def submit_quiz(
         passed=passed
     )
     db.add(attempt)
+    
+    if passed and is_first_pass:
+        GamificationService.award_xp(db, current_user, amount=100, difficulty="medium", is_first_attempt=True)
+        GamificationService.update_streak(db, current_user)
+        
     db.commit()
     db.refresh(attempt)
     return attempt

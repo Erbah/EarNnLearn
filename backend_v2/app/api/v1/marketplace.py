@@ -39,6 +39,7 @@ class CourseCreate(BaseModel):
     skill_level: str = "Beginner"
     price: float = 0.0
     playlist_url: str | None = None
+    creator_name: str | None = None
 
 class CourseUpdate(BaseModel):
     title: str | None = None
@@ -47,6 +48,7 @@ class CourseUpdate(BaseModel):
     skill_level: str | None = None
     price: float | None = None
     is_published: bool | None = None
+    creator_name: str | None = None
 
 class ModuleCreate(BaseModel):
     title: str
@@ -68,6 +70,7 @@ class CourseOut(BaseModel):
     title: str
     description: str | None
     creator_rid: str
+    creator_name: str | None
     category: str
     skill_level: str
     price: float
@@ -269,6 +272,7 @@ def create_course(
     course = Course(
         title=body.title, description=body.description,
         creator_rid=current_user.rid, category=body.category,
+        creator_name=body.creator_name,
         skill_level=body.skill_level, price=body.price,
         playlist_url=body.playlist_url,
         approval_status="pending", is_published=False
@@ -295,6 +299,34 @@ def create_course(
         pass
 
     return course
+
+
+class YoutubeMetadataRequest(BaseModel):
+    url: str
+
+@router.post("/youtube-metadata")
+def get_youtube_metadata(body: YoutubeMetadataRequest, current_user: User = Depends(get_current_user)):
+    """Fetch metadata (title, description, author) for a YouTube video or playlist."""
+    import yt_dlp
+    ydl_opts = {
+        'quiet': True,
+        'extract_flat': 'in_playlist',
+        'skip_download': True,
+        'ignoreerrors': True,
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(body.url, download=False)
+            if not info:
+                raise HTTPException(status_code=400, detail="Could not extract info from URL")
+            
+            return {
+                "title": info.get('title', ''),
+                "description": info.get('description', ''),
+                "creator_name": info.get('uploader', '') or info.get('channel', '')
+            }
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/{course_id}", response_model=CourseOut)

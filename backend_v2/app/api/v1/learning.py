@@ -24,6 +24,8 @@ from app.models.wallet import Wallet, WalletTransaction
 from app.models.course import Course, Module, Video
 from app.models.marketplace import CourseEnrollment
 from app.models.learning import CoursePayment, VideoProgress, SkillNode, generate_uuid, get_now
+from app.models.marketplace import Certificate
+from app.models.engagement import Quiz, QuizAttempt
 from app.models.transaction import Transaction
 from app.services.paystack_service import paystack_service
 from app.models.admin import Season, Tier
@@ -273,8 +275,7 @@ def initialize_course_checkout(course_id: str, current_user: User = Depends(get_
         currency="GHS",
         payment_method="PAYSTACK",
         payment_reference=paystack_res["data"]["reference"],
-        status="pending",
-        description=f"Purchase Course: {course.title}"
+        status="pending"
     )
     db.add(new_tx)
     db.commit()
@@ -365,6 +366,10 @@ def watch_video(course_id: str, body: WatchVideoRequest, current_user: User = De
     # Mark as completely watched!
     progress.watched = True
     deduction = Decimal("0")
+    
+    # Gamification: Reward learning
+    GamificationService.award_xp(db, current_user, amount=50, difficulty="easy")
+    GamificationService.update_streak(db, current_user)
 
     # 6. PPC DEDUCTION (earn-to-learn only & still has remaining)
     if payment.payment_method == "earn_to_learn" and payment.remaining > 0 and not progress.deduction_applied:
@@ -534,3 +539,84 @@ def heartbeat_sync(current_user: User = Depends(get_current_user), db: Session =
     db.commit()
     return {"streak": streak, "status": "synced"}
 
+# ═══════════════════════════════════════
+#  CERTIFICATES
+# ═══════════════════════════════════════
+@router.post("/claim-certificate/{course_id}")
+def claim_certificate(course_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Check if user has finished all videos and passed all quizzes.
+    If yes, issue a certificate.
+    """
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    existing_cert = db.query(Certificate).filter(
+        Certificate.user_rid == current_user.rid,
+        Certificate.course_id == course_id
+    ).first()
+    
+    if existing_cert:
+        return {"status": "Already claimed", "certificate_id": existing_cert.id}
+        
+    # 1. Check Video Completion
+    total_videos = count_course_videos(db, course_id)
+    videos_watched = db.query(func.count(VideoProgress.id)).filter(
+        VideoProgress.user_rid == current_user.rid,
+        VideoProgress.course_id == course_id,
+        VideoProgress.watched == True
+    ).scalar() or 0
+    
+    if total_videos > 0 and videos_watched < total_videos:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Incomplete video progress: {videos_watched}/{total_videos} watched."
+        )
+        
+    # 2. Check Quiz Completion & Grade
+    course_quizzes = db.query(Quiz).filter(Quiz.course_id == course_id).all()
+    total_grade = 0.0
+    passed_quizzes = 0
+    
+    if course_quizzes:
+        for q in course_quizzes:
+            # Find their best passed attempt
+            best_attempt = db.query(QuizAttempt).filter(
+                QuizAttempt.user_rid == current_user.rid,
+                QuizAttempt.quiz_id == q.id,
+                QuizAttempt.passed == True
+            ).order_by(QuizAttempt.score.desc()).first()
+            
+            if not best_attempt:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Incomplete quizzes: You have not passed the quiz '{q.title}'."
+                )
+            
+            score_pct = (best_attempt.score / best_attempt.total_points * 100) if best_attempt.total_points > 0 else 0
+            total_grade += score_pct
+            passed_quizzes += 1
+            
+    final_grade = (total_grade / passed_quizzes) if passed_quizzes > 0 else 100.0
+    
+    # 3. Issue Certificate
+    import uuid
+    cert = Certificate(
+        user_rid=current_user.rid,
+        course_id=course_id,
+        course_title=course.title,
+        user_name=current_user.name or "User",
+        certificate_code=str(uuid.uuid4())[:8].upper(),
+        grade_percentage=round(final_grade, 2)
+    )
+    db.add(cert)
+    db.commit()
+    db.refresh(cert)
+    
+    return {
+        "status": "Success",
+        "message": "Certificate claimed successfully!",
+        "certificate_id": cert.id,
+        "grade": cert.grade_percentage
+    }

@@ -52,5 +52,7 @@ class Certificate(Base):
     user_name = Column(String, nullable=False)
     issued_at = Column(DateTime, default=datetime.utcnow)
     certificate_code = Column(String, unique=True)  # Verifiable code
+    grade_percentage = Column(Numeric(5, 2), default=0.0)
+    certificate_url = Column(String, nullable=True)
 
 

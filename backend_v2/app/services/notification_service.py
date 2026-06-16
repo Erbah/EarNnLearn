@@ -70,12 +70,12 @@ class NotificationService:
     def _send_sms_or_whatsapp(self, phone: str, subject: str, message: str):
         # Stub: Integrate real SMS/WhatsApp gateway here (Twilio, Termii, Hubtel)
         logger.info(f"[SMS/WhatsApp] To {phone}: {subject} - {message}")
-        print(f"📱 [SMS/WhatsApp] To {phone}: {subject} - {message}")
+        print(f"[SMS/WhatsApp] To {phone}: {subject} - {message}")
         
     def _send_email(self, email: str, subject: str, message: str):
         # Stub: Integrate real Email gateway here (SendGrid, Mailgun)
         logger.info(f"[EMAIL] To {email}: {subject} - {message}")
-        print(f"📧 [EMAIL] To {email}: {subject} - {message}")
+        print(f"[EMAIL] To {email}: {subject} - {message}")
 
 # Singleton instance
 notification_service = NotificationService()

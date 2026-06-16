@@ -10,6 +10,8 @@ from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.models.transaction import Transaction
 from app.services.profit_engine import distribute_profit, credit_wallet
+from app.services.notification_service import notification_service
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,16 @@ def process_profit_distribution(self, transaction_id: str):
             "CREDIT_PROFIT_SELLER",
             f"Sale profit from buyer {tx.buyer_rid}"
         )
+        
+        # Notify Seller
+        seller_user = db.query(User).filter(User.rid == payouts["seller"]["rid"]).first()
+        if seller_user:
+            first_name = seller_user.name.split(" ")[0] if seller_user.name else "Partner"
+            notification_service.send_alert(
+                seller_user,
+                "🎉 You made a sale!",
+                f"Hello {first_name}! Cha-ching! You just earned {payouts['seller']['amount']} GHS from a direct code sale. Log in to your wallet to view your new balance!"
+            )
 
         # Credit platform (renamed from master)
         credit_wallet(
@@ -83,6 +95,25 @@ def process_profit_distribution(self, transaction_id: str):
                 "CREDIT_PROFIT_FAMILY",
                 f"Network family share from {tx.buyer_rid}"
             )
+            
+            # Notify Family Member
+            family_user = db.query(User).filter(User.rid == payout["rid"]).first()
+            if family_user:
+                first_name = family_user.name.split(" ")[0] if family_user.name else "Partner"
+                notification_service.send_alert(
+                    family_user,
+                    "🎉 Network Earnings!",
+                    f"Hello {first_name}! Cha-ching! You just earned {payout['amount']} GHS from your network tree. Keep growing your community!"
+                )
+
+        # Credit community pot (rounding dust)
+        community_payout = payouts.get("community_pot")
+        if community_payout and community_payout["amount"] > 0:
+            credit_wallet(
+                db, community_payout["rid"], community_payout["amount"],
+                "CREDIT_COMMUNITY_POT",
+                f"Community sweep from {tx.buyer_rid} purchase"
+            )
 
         # Mark as processed (idempotency flag)
         tx.status = "processed"
@@ -91,7 +122,8 @@ def process_profit_distribution(self, transaction_id: str):
         logger.info(
             f"✅ Profit distributed for tx {transaction_id}: "
             f"seller={payouts['seller']['amount']}, "
-            f"master={payouts['master']['amount']}, "
+            f"platform={payouts['platform']['amount']}, "
+            f"community={payouts.get('community_pot', {}).get('amount', 0)}, "
             f"family={len(payouts['family'])} recipients"
         )
         return "Success"

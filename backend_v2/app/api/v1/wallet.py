@@ -72,7 +72,8 @@ def request_withdrawal(body: WithdrawalRequestCreate, current_user: User = Depen
     if not current_user.rid:
         raise HTTPException(status_code=400, detail="User not activated")
         
-    wallet = db.query(Wallet).filter(Wallet.user_rid == current_user.rid).first()
+    # Use with_for_update() to lock the wallet row and prevent double-spend race conditions
+    wallet = db.query(Wallet).filter(Wallet.user_rid == current_user.rid).with_for_update().first()
     if not wallet or wallet.withdrawable_balance < body.amount:
         raise HTTPException(status_code=400, detail="Insufficient withdrawable balance")
         
@@ -111,6 +112,40 @@ def request_withdrawal(body: WithdrawalRequestCreate, current_user: User = Depen
         amount=-total_deduction,
         description=f"Withdrawal request for {body.amount} (Fee: {fee}) via {body.payout_method}"
     ))
+    
+    # Optional: Route through automated payout system if enabled
+    auto_payout_setting = db.query(SystemSetting).filter(SystemSetting.key == "automated_withdrawals").first()
+    if auto_payout_setting and auto_payout_setting.value.lower() == "true":
+        # Check max auto withdrawal setting
+        max_auto_withdrawal_setting = db.query(SystemSetting).filter(SystemSetting.key == "max_auto_withdrawal").first()
+        max_auto_val = Decimal(max_auto_withdrawal_setting.value) if max_auto_withdrawal_setting else Decimal("500.00")
+        
+        if body.amount > max_auto_val:
+            import random
+            from datetime import timedelta
+            from app.services.notification_service import notification_service
+            
+            wlp_code = str(random.randint(100000, 999999))
+            req.wlp_code = wlp_code
+            req.wlp_expires_at = datetime.utcnow() + timedelta(minutes=15)
+            req.status = "AWAITING_WLP"
+            req.admin_notes = "Amount exceeds auto-payout limit. WLP code generated and sent to user."
+            
+            notification_service.send_alert(
+                current_user,
+                "Action Required: Withdrawal Limit Permit (WLP)",
+                f"Your request to withdraw {body.amount} GHS exceeds the automated limit. Your secure WLP code is: {wlp_code}. It expires in 15 minutes."
+            )
+        else:
+            from app.services.payout_service import payout_service
+            result = payout_service.process_automated_payout(body.amount, body.payout_method, body.payout_details)
+            if result["success"]:
+                req.status = "APPROVED"
+                req.admin_notes = f"Automated payout successful. Ref: {result['reference']}"
+                req.processed_at = datetime.utcnow()
+            else:
+                req.admin_notes = result["message"]
+
     db.commit()
     db.refresh(req)
     return req
@@ -122,6 +157,49 @@ def get_my_withdrawals(current_user: User = Depends(get_current_user), db: Sessi
     return db.query(WithdrawalRequest).filter(
         WithdrawalRequest.user_rid == current_user.rid
     ).order_by(WithdrawalRequest.created_at.desc()).all()
+
+class WLPVerifyRequest(BaseModel):
+    wlp_code: str
+
+@router.post("/withdraw/{request_id}/verify-wlp", response_model=WithdrawalRequestOut)
+def verify_wlp_and_payout(request_id: str, body: WLPVerifyRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.rid:
+        raise HTTPException(status_code=400, detail="User not activated")
+        
+    req = db.query(WithdrawalRequest).filter(
+        WithdrawalRequest.id == request_id, 
+        WithdrawalRequest.user_rid == current_user.rid
+    ).with_for_update().first()
+    
+    if not req:
+        raise HTTPException(status_code=404, detail="Withdrawal request not found")
+        
+    if req.status != "AWAITING_WLP":
+        raise HTTPException(status_code=400, detail="Request is not awaiting WLP verification")
+        
+    if not req.wlp_code or req.wlp_code != body.wlp_code:
+        raise HTTPException(status_code=400, detail="Invalid WLP code")
+        
+    if req.wlp_expires_at and datetime.utcnow() > req.wlp_expires_at:
+        raise HTTPException(status_code=400, detail="WLP code has expired. Please cancel and request a new withdrawal.")
+        
+    # Code is valid, process payout
+    from app.services.payout_service import payout_service
+    result = payout_service.process_automated_payout(req.amount, req.payout_method, req.payout_details)
+    
+    if result["success"]:
+        req.status = "APPROVED"
+        req.admin_notes = f"WLP Verified. Automated payout successful. Ref: {result['reference']}"
+        req.processed_at = datetime.utcnow()
+        req.wlp_code = None # clear it
+    else:
+        req.status = "PENDING"
+        req.admin_notes = f"WLP Verified but payout failed: {result['message']}"
+        req.wlp_code = None
+        
+    db.commit()
+    db.refresh(req)
+    return req
 
 @router.post("/deposit")
 def initialize_deposit(body: DepositRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -156,8 +234,7 @@ def initialize_deposit(body: DepositRequest, current_user: User = Depends(get_cu
         currency="GHS",
         payment_method="PAYSTACK",
         payment_reference=paystack_res["data"]["reference"],
-        status="pending",
-        description=f"Wallet Deposit of {body.amount} GHS"
+        status="pending"
     )
     db.add(new_tx)
     db.commit()

@@ -83,6 +83,17 @@ export default function ActivateCodePage() {
   }
 
   async function buyCode() {
+    if (walletBalance < minPrice) {
+      const amountNeeded = Math.max(minPrice - walletBalance, minPrice);
+      const proceed = window.confirm(
+        `Insufficient wallet balance (${walletBalance.toFixed(2)} GHS).\n\nYou need ${minPrice.toFixed(2)} GHS to purchase this code.\nWould you like to top up the remaining ${amountNeeded.toFixed(2)} GHS via Momo/Card?`
+      );
+      if (proceed) {
+        return handleDeposit();
+      }
+      return;
+    }
+
     setLoading(true);
     setStatus("idle");
     try {
@@ -96,6 +107,28 @@ export default function ActivateCodePage() {
     } catch (err: any) {
       setStatus("error");
       setMessage(err.response?.data?.detail || "Failed to buy code");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeposit() {
+    setLoading(true);
+    try {
+      const amountToAdd = Math.max(minPrice - walletBalance, minPrice);
+      const res = await api.post(`${API}/wallet/deposit`, {
+        amount: amountToAdd
+      });
+
+      if (res.data.authorization_url) {
+        window.location.href = res.data.authorization_url;
+      } else {
+        setStatus("error");
+        setMessage("Failed to initialize deposit");
+      }
+    } catch (err: any) {
+      setStatus("error");
+      setMessage(err.response?.data?.detail || "Error initializing deposit");
     } finally {
       setLoading(false);
     }

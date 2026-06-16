@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user, verify_password, get_password_hash
 from app.models.user import User
+from app.models.marketplace import Certificate
+from app.models.course import Course
 from app.models.analytics import OnboardingMetric
 from app.schemas.user_schema import UserResponse, OnboardingUpdate, UserProfileUpdate
 from sqlalchemy import func
@@ -101,3 +103,42 @@ def update_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+@router.get("/{rid}/portfolio")
+def get_public_portfolio(rid: str, db: Session = Depends(get_db)):
+    """
+    Public Portfolio / CV Endpoint.
+    Does not require authentication.
+    Returns Gamification stats and earned certificates for a user.
+    Hides all sensitive financial and contact details.
+    """
+    user = db.query(User).filter(User.rid == rid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    certificates = db.query(Certificate).filter(Certificate.user_rid == rid).order_by(Certificate.issued_at.desc()).all()
+    
+    cert_list = []
+    for cert in certificates:
+        course = db.query(Course).filter(Course.id == cert.course_id).first()
+        cert_list.append({
+            "certificate_id": cert.id,
+            "course_title": course.title if course else "Unknown Course",
+            "course_category": course.category if course else "General",
+            "institution": course.institution if course and course.institution else (course.creator_name if course else "Independent"),
+            "issued_at": cert.issued_at,
+            "grade_percentage": cert.grade_percentage,
+            "certificate_url": cert.certificate_url
+        })
+        
+    return {
+        "profile": {
+            "name": user.name,
+            "learning_goal": user.learning_goal,
+            "level": user.level,
+            "total_xp": user.total_xp,
+            "member_since": user.created_at
+        },
+        "total_certificates": len(cert_list),
+        "certificates": cert_list
+    }

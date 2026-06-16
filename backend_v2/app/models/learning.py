@@ -60,7 +60,6 @@ class VideoProgress(Base):
     
     watched_at = Column(DateTime, default=get_now)
 
-
 # ═══════════════════════════════════════
 #  SKILL TREE (THE FOREST)
 # ═══════════════════════════════════════

@@ -11,6 +11,8 @@ class Course(Base):
     title = Column(String, nullable=False)
     description = Column(String, nullable=True)
     creator_rid = Column(String, index=True, nullable=False)
+    creator_name = Column(String, nullable=True)
+    institution = Column(String, nullable=True)  # MIT, Harvard, or company name
     
     # Marketplace fields
     category = Column(String, default="General", index=True)

@@ -12,7 +12,8 @@ import {
   CheckCircle,
   AlertCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronDown
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { API_BASE_URL, api } from "@/lib/api";
@@ -56,6 +57,20 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // Bank List Dropdown State
+  const [showBankDropdown, setShowBankDropdown] = useState(false);
+  const [bankSearchQuery, setBankSearchQuery] = useState("");
+  const bankList = [
+    // Global & US
+    "Bank of America", "Barclays", "Citigroup", "Goldman Sachs", "HSBC", "JPMorgan Chase", "Morgan Stanley", "Wells Fargo",
+    // Europe & UK
+    "BNP Paribas", "Credit Suisse", "Deutsche Bank", "ING Group", "Lloyds Bank", "Santander", "Standard Chartered", "UBS",
+    // Pan-African
+    "Absa Bank", "Access Bank", "Ecobank", "First Bank of Nigeria", "Guaranty Trust Bank (GTBank)", "Standard Bank", "United Bank for Africa (UBA)", "Zenith Bank",
+    // Regional (Ghana)
+    "Agricultural Development Bank (ADB)", "Bank of Africa", "CalBank", "Consolidated Bank Ghana (CBG)", "Fidelity Bank", "First Atlantic Bank", "First National Bank", "GCB Bank", "National Investment Bank (NIB)", "Prudential Bank", "Republic Bank", "Societe Generale", "Stanbic Bank", "Universal Merchant Bank (UMB)"
+  ].sort();
 
   // Initialize fields with user data
   useEffect(() => {
@@ -158,8 +173,7 @@ export default function SettingsPage() {
 
   const tabItems = [
     { id: "profile" as TabType, label: "Personal Profile", icon: UserIcon },
-    { id: "financial" as TabType, label: "Financial Accounts", icon: CreditCard },
-    { id: "learning" as TabType, label: "Personalization", icon: BookOpen },
+    { id: "financial" as TabType, label: "Payout Details", icon: CreditCard },
     { id: "security" as TabType, label: "Security & Access", icon: Lock },
   ];
 
@@ -197,7 +211,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Tab Content Box */}
-        <div className="flex-1 w-full bg-card/65 border border-white/10 rounded-3xl glass p-8 shadow-xl relative overflow-hidden">
+        <div className="flex-1 w-full bg-card/65 border border-white/10 rounded-3xl glass p-8 shadow-xl relative overflow-visible">
           {/* Status Message Alerts */}
           <AnimatePresence mode="wait">
             {successMsg && (
@@ -231,11 +245,7 @@ export default function SettingsPage() {
                 <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Personal Information</h3>
                 
                 {/* Meta details */}
-                <div className="grid grid-cols-2 gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 text-xs">
-                  <div>
-                    <span className="text-gray-500 uppercase tracking-widest text-[9px] block">Referral ID (RID)</span>
-                    <span className="text-primary font-bold font-mono text-sm">{user?.rid || "Unassigned"}</span>
-                  </div>
+                <div className="grid grid-cols-1 gap-4 bg-white/5 p-4 rounded-2xl border border-white/5 text-xs">
                   <div>
                     <span className="text-gray-500 uppercase tracking-widest text-[9px] block">Membership Tier</span>
                     <span className="text-secondary font-bold uppercase tracking-wider">{user?.tier_type || "Public"} Member</span>
@@ -281,16 +291,19 @@ export default function SettingsPage() {
                 
                 <div className="pt-2">
                   <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Preferred Notification Method</label>
-                  <select
-                    value={preferredNotification}
-                    onChange={(e) => setPreferredNotification(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors text-sm appearance-none cursor-pointer"
-                  >
-                    <option value="auto" className="bg-card text-white">Auto (Smart Routing)</option>
-                    <option value="phone" className="bg-card text-white">Phone / SMS / WhatsApp</option>
-                    <option value="email" className="bg-card text-white">Email Only</option>
-                    <option value="both" className="bg-card text-white">Both Email & Phone</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={preferredNotification}
+                      onChange={(e) => setPreferredNotification(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-10 text-white focus:outline-none focus:border-primary transition-colors text-sm appearance-none cursor-pointer"
+                    >
+                      <option value="auto" className="bg-card text-white">Auto (Smart Routing)</option>
+                      <option value="phone" className="bg-card text-white">Phone / SMS / WhatsApp</option>
+                      <option value="email" className="bg-card text-white">Email Only</option>
+                      <option value="both" className="bg-card text-white">Both Email & Phone</option>
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                  </div>
                   <p className="text-[10px] text-gray-500 mt-2">How we send you OTPs, alerts, and transaction receipts.</p>
                 </div>
               </div>
@@ -298,33 +311,24 @@ export default function SettingsPage() {
 
             {activeTab === "financial" && (
               <div className="space-y-6">
-                <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Financial Settings</h3>
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-1">Withdrawal Settings</h3>
+                  <p className="text-xs text-gray-400 border-b border-white/5 pb-4">Where should we send your earnings when you request a withdrawal?</p>
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Preferred Deposit Method</label>
-                    <select
-                      value={preferredPayment}
-                      onChange={(e) => setPreferredPayment(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors text-sm appearance-none cursor-pointer"
-                    >
-                      <option value="mobile_money" className="bg-card text-white">Mobile Money</option>
-                      <option value="paystack" className="bg-card text-white">Paystack Wallet</option>
-                      <option value="stripe" className="bg-card text-white">Stripe Gateway</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Preferred Payout Method</label>
-                    <select
-                      value={payoutMethod}
-                      onChange={(e) => setPayoutMethod(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors text-sm appearance-none cursor-pointer"
-                    >
-                      <option value="mobile_money" className="bg-card text-white">Mobile Money (MoMo)</option>
-                      <option value="bank" className="bg-card text-white">Bank Account / Wire</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Select Payout Method</label>
+                <div className="relative w-full md:w-1/2">
+                  <select
+                    value={payoutMethod}
+                    onChange={(e) => setPayoutMethod(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-10 text-white focus:outline-none focus:border-primary transition-colors text-sm appearance-none cursor-pointer"
+                  >
+                    <option value="mobile_money" className="bg-card text-white">Mobile Money (MoMo)</option>
+                    <option value="bank" className="bg-card text-white">Bank Account (For Card Users)</option>
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                </div>
                 </div>
 
                 {/* Conditional Fields based on Payout Selection */}
@@ -334,15 +338,18 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="text-[9px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Network Provider</label>
-                        <select
-                          value={payoutProvider}
-                          onChange={(e) => setPayoutProvider(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primary text-xs cursor-pointer"
-                        >
-                          <option value="MTN" className="bg-card">MTN Ghana</option>
-                          <option value="Telecel" className="bg-card">Telecel / Vodafone</option>
-                          <option value="AirtelTigo" className="bg-card">AT / AirtelTigo</option>
-                        </select>
+                        <div className="relative">
+                          <select
+                            value={payoutProvider}
+                            onChange={(e) => setPayoutProvider(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 pr-8 text-white focus:outline-none focus:border-primary text-xs appearance-none cursor-pointer"
+                          >
+                            <option value="MTN" className="bg-card">MTN Ghana</option>
+                            <option value="Telecel" className="bg-card">Telecel / Vodafone</option>
+                            <option value="AirtelTigo" className="bg-card">AT / AirtelTigo</option>
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                        </div>
                       </div>
                       <div>
                         <label className="text-[9px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">MoMo Number</label>
@@ -368,17 +375,67 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <div className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-4">
-                    <span className="text-[10px] uppercase font-bold text-primary tracking-widest block mb-2">Bank Wire Credentials</span>
+                    <span className="text-[10px] uppercase font-bold text-primary tracking-widest block mb-2">Bank Account Details (Linked to Card)</span>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="text-[9px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Bank Name</label>
-                        <input
-                          type="text"
-                          value={payoutProvider}
-                          onChange={(e) => setPayoutProvider(e.target.value)}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-primary text-xs"
-                          placeholder="e.g. GCB Bank"
-                        />
+                        <div className="relative">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={payoutProvider}
+                              onChange={(e) => {
+                                setPayoutProvider(e.target.value);
+                                setBankSearchQuery(e.target.value);
+                                setShowBankDropdown(true);
+                              }}
+                              onFocus={() => {
+                                setBankSearchQuery(""); // Clear search to show full list
+                                setShowBankDropdown(true);
+                              }}
+                              onBlur={() => setTimeout(() => setShowBankDropdown(false), 200)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 pr-8 text-white focus:outline-none focus:border-primary text-xs"
+                              placeholder="Select or type bank..."
+                            />
+                            <ChevronDown 
+                              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 cursor-pointer" 
+                              onClick={() => {
+                                setBankSearchQuery(""); // Clear search to show full list
+                                setShowBankDropdown(!showBankDropdown);
+                              }}
+                            />
+                          </div>
+                          
+                          <AnimatePresence>
+                            {showBankDropdown && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: -5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5 }}
+                                className="absolute z-20 w-full mt-2 bg-[#0B1221] border border-white/10 rounded-xl max-h-48 overflow-y-auto shadow-2xl overflow-hidden"
+                              >
+                                {bankList.filter(bank => bank.toLowerCase().includes(bankSearchQuery.toLowerCase())).map(bank => (
+                                  <div 
+                                    key={bank} 
+                                    className="px-4 py-3 text-xs text-white hover:bg-primary/20 hover:text-primary transition-colors cursor-pointer border-b border-white/5 last:border-0"
+                                    onClick={() => {
+                                      setPayoutProvider(bank);
+                                      setBankSearchQuery(""); // reset search
+                                      setShowBankDropdown(false);
+                                    }}
+                                  >
+                                    {bank}
+                                  </div>
+                                ))}
+                                {bankList.filter(bank => bank.toLowerCase().includes(bankSearchQuery.toLowerCase())).length === 0 && (
+                                  <div className="px-4 py-3 text-xs text-gray-500 italic">
+                                    Press "Save Settings" to use custom bank "{payoutProvider}"
+                                  </div>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
                       <div>
                         <label className="text-[9px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Account Number</label>
@@ -403,73 +460,6 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
-
-            {activeTab === "learning" && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-bold text-white border-b border-white/5 pb-2">Elite Personalization</h3>
-
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-3 block">Primary Learning Goal</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { title: "General Exploration", desc: "Gain broad context and foundational knowledge." },
-                      { title: "Technical Mastery", desc: "Deep analytical study focusing on engineering & logic." },
-                      { title: "Career Switch", desc: "Targeted skill nodes aligned with career paths." },
-                      { title: "Entrepreneurship", desc: "Actionable execution, monetization, and launch patterns." }
-                    ].map((goal) => {
-                      const isSelected = learningGoal === goal.title;
-                      return (
-                        <button
-                          key={goal.title}
-                          type="button"
-                          onClick={() => setLearningGoal(goal.title)}
-                          className={`p-4 rounded-2xl border text-left cursor-pointer transition-all ${
-                            isSelected
-                              ? "bg-primary/5 border-primary/40 text-white shadow-lg"
-                              : "bg-white/5 border-white/5 hover:border-white/10 text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          <span className={`text-sm font-bold block mb-1 ${isSelected ? "text-primary" : "text-white"}`}>
-                            {goal.title}
-                          </span>
-                          <span className="text-xs text-gray-400/80 leading-relaxed block">{goal.desc}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-3 block">Preferred Learning Style</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { title: "Explain Like I'm 5", sub: "Simple Analogies" },
-                      { title: "Balanced", sub: "Standard Format" },
-                      { title: "Technical Deep Dive", sub: "Math & Code Heavy" }
-                    ].map((style) => {
-                      const isSelected = preferredStyle === style.title;
-                      return (
-                        <button
-                          key={style.title}
-                          type="button"
-                          onClick={() => setPreferredStyle(style.title)}
-                          className={`p-4 rounded-2xl border text-center cursor-pointer transition-all ${
-                            isSelected
-                              ? "bg-primary/5 border-primary/40 text-white"
-                              : "bg-white/5 border-white/5 hover:border-white/10 text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          <span className={`text-xs font-bold block ${isSelected ? "text-primary" : "text-white"}`}>
-                            {style.title}
-                          </span>
-                          <span className="text-[9px] text-gray-500 uppercase tracking-wider block mt-1">{style.sub}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
               </div>
             )}
 

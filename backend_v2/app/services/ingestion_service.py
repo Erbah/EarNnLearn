@@ -47,6 +47,32 @@ class PlaylistIngestor:
                 raise e
 
     @staticmethod
+    def fetch_youtube_transcript(youtube_id: str) -> str:
+        """
+        Fetches the transcript for a YouTube video using the youtube-transcript-api.
+        Tries manual English first, then falls back to translation or any generated sub.
+        Returns the raw text as a continuous string.
+        """
+        from youtube_transcript_api import YouTubeTranscriptApi
+        try:
+            ytt_api = YouTubeTranscriptApi()
+            transcript_list = ytt_api.list(youtube_id)
+            # Try to get english first
+            try:
+                transcript = transcript_list.find_transcript(['en'])
+            except:
+                # Fallback to the first available transcript (often auto-generated)
+                transcript = transcript_list.find_generated_transcript(['en'])
+                
+            pieces = transcript.fetch()
+            # Join all pieces into a single text block
+            full_text = " ".join([getattr(p, 'text', p.get('text', '') if isinstance(p, dict) else '') for p in pieces])
+            return full_text
+        except Exception as e:
+            print(f"Transcript Fetch Error for {youtube_id}: {str(e)}")
+            return ""
+
+    @staticmethod
     def process_playlist(course_id: str):
         """
         Processes a playlist for an existing course.

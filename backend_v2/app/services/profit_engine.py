@@ -66,15 +66,20 @@ def distribute_profit(parent_rid: str, price: Decimal, platform_r: Decimal = PLA
     valid_relatives = select_valid_relatives(relatives, family_profit)
 
     family_payouts = []
+    total_family_distributed = Decimal('0.00')
     if valid_relatives:
         share = (family_profit / Decimal(str(len(valid_relatives)))).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
         for rid in valid_relatives:
             family_payouts.append({"rid": rid, "amount": share})
+            total_family_distributed += share
+
+    dust = price - (platform_profit + seller_profit + total_family_distributed)
 
     return {
         "seller": {"rid": parent_rid, "amount": seller_profit},
         "platform": {"rid": MASTER_RID, "amount": platform_profit},
-        "family": family_payouts
+        "family": family_payouts,
+        "community_pot": {"rid": "COMMUNITY_POT", "amount": dust}
     }
 
 
