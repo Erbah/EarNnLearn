@@ -190,7 +190,7 @@ class CodeUpdate(BaseModel):
     family_share: float | None = None
 
 class UserOut(BaseModel):
-    id: str
+    id: uuid.UUID
     rid: str | None
     name: str | None
     email: str
