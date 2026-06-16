@@ -378,37 +378,7 @@ export default function CreatorPage() {
                   </div>
 
                   <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 block">Category</label>
-                        <div className="relative">
-                          <select 
-                            value={form.category} 
-                            onChange={e => setForm({ ...form, category: e.target.value })}
-                            title="Course Category"
-                            className="w-full px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl text-white focus:outline-none focus:border-primary/50 appearance-none outline-none cursor-pointer"
-                          >
-                            {categories.map(c => <option key={c.id} value={c.name} className="bg-zinc-900">{c.icon} {c.name}</option>)}
-                          </select>
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                            <TrendingUp className="w-4 h-4" />
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 block">Complexity</label>
-                        <select 
-                          value={form.skill_level} 
-                          onChange={e => setForm({ ...form, skill_level: e.target.value })}
-                          title="Skill Level"
-                          className="w-full px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl text-white focus:outline-none focus:border-primary/50 appearance-none outline-none cursor-pointer"
-                        >
-                          <option className="bg-zinc-900">Beginner</option>
-                          <option className="bg-zinc-900">Intermediate</option>
-                          <option className="bg-zinc-900">Advanced</option>
-                        </select>
-                      </div>
-                    </div>
+
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
