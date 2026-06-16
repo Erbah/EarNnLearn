@@ -64,7 +64,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }
 
   // --- 🚨 Elite Hardening: Prevent Pending Users from Accessing Dashboard ---
-  if (!loading && user && user.status === "pending" && user.role !== 'SUPER_ADMIN') {
+  const isPending = !loading && user && user.status === "pending" && user.role !== 'SUPER_ADMIN';
+
+  if (isPending && pathname !== '/activate') {
     return (
       <div className="flex h-screen flex-col items-center justify-center bg-zinc-950 p-8 text-center overscroll-none relative">
         <div className="absolute top-0 left-0 w-full h-[300px] bg-primary/10 rounded-full blur-[120px] -z-10" />
@@ -84,8 +86,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
           
           <button 
+            onClick={() => router.push('/activate')}
+            className="w-full py-4 bg-primary text-background font-bold rounded-xl hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(0,224,255,0.3)] hover:shadow-[0_0_25px_rgba(0,224,255,0.5)] flex items-center justify-center gap-2 cursor-pointer mt-4"
+          >
+            Go to Activation Page
+          </button>
+
+          <button 
             onClick={handleLogout}
-            className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-bold rounded-xl border border-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-bold rounded-xl border border-red-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
           >
             <LogOut className="w-4 h-4" />
             Logout & Return
