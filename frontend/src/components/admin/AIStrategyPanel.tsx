@@ -12,6 +12,7 @@ export const AIStrategyPanel = React.memo(function AIStrategyPanel() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [strategy, setStrategy] = useState<any>(null);
 
   // Form State
   const [provider, setProvider] = useState('');
@@ -30,11 +31,15 @@ export const AIStrategyPanel = React.memo(function AIStrategyPanel() {
 
   const fetchSettings = useCallback((signal?: AbortSignal) => {
     setLoading(true);
-    api.get(`${API}/ai-settings`, { signal })
-      .then(res => {
-        setProvider(res.data.active_provider);
-        setModel(res.data.active_model);
-        setBaseUrl(res.data.active_base_url || '');
+    Promise.all([
+      api.get(`${API}/ai-settings`, { signal }),
+      api.get(`${API}/ai/strategy`, { signal })
+    ])
+      .then(([settingsRes, strategyRes]) => {
+        setProvider(settingsRes.data.active_provider);
+        setModel(settingsRes.data.active_model);
+        setBaseUrl(settingsRes.data.active_base_url || '');
+        setStrategy(strategyRes.data);
       })
       .catch((err) => {
         if (axios.isCancel(err)) return;
@@ -266,36 +271,27 @@ export const AIStrategyPanel = React.memo(function AIStrategyPanel() {
 
         {/* Stats Column */}
         <div className="space-y-6">
-          <div className="bg-card/70 border border-white/10 rounded-3xl p-6 space-y-6">
-            <h4 className="text-[10px] uppercase font-black text-gray-500 tracking-[0.2em]">Performance Index</h4>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-gray-400">Response Latency</span>
-                <span className="text-xs font-bold text-emerald-500">OPTIMAL (1.2s)</span>
-              </div>
-              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: '85%' }} className="h-full bg-emerald-500" />
-              </div>
-              
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-xs font-bold text-gray-400">Context Retention</span>
-                <span className="text-xs font-bold text-primary">ELITE (98%)</span>
-              </div>
-              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: '98%' }} className="h-full bg-primary" />
-              </div>
-            </div>
-          </div>
-
           <div className="bg-primary/10 border border-primary/20 rounded-3xl p-6">
             <h4 className="text-[10px] uppercase font-black text-primary tracking-[0.2em] mb-4">Neural Health</h4>
             <div className="flex items-end gap-2 mb-2">
-              <span className="text-3xl font-black text-white">99.4</span>
+              <span className="text-3xl font-black text-white">{strategy?.health_score || 0}</span>
               <span className="text-xs font-bold text-primary mb-1">%</span>
             </div>
             <p className="text-[10px] text-gray-400 leading-relaxed">
-              Strategy uptime is currently at peak levels. No degradation detected across regional clusters.
+              {strategy?.global_recommendation || "Strategy uptime is currently at peak levels. No degradation detected across regional clusters."}
             </p>
+            
+            {strategy?.trends?.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-primary/20 space-y-3">
+                <span className="text-[9px] uppercase font-bold text-gray-500 tracking-widest">Detected Trends</span>
+                {strategy.trends.map((t: string, i: number) => (
+                  <div key={i} className="text-[11px] text-gray-300 flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span className="leading-relaxed">{t}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
