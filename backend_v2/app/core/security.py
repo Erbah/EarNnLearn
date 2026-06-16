@@ -86,8 +86,22 @@ def get_current_user(
 
     # Enforce active check for all routes except auth/me and auth/logout
     if user.status != "active" and user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
-        allowed_suffixes = ["/auth/me", "/auth/logout"]
-        if not any(request.url.path.endswith(s) for s in allowed_suffixes):
+        allowed_paths = [
+            "/auth/me", 
+            "/auth/logout", 
+            "/auth/retry-activation",
+            "/codes/seller-payment",
+            "/codes/submit-payment",
+            "/codes/activate",
+            "/wallet/"
+        ]
+        is_allowed = False
+        for p in allowed_paths:
+            if p in request.url.path:
+                is_allowed = True
+                break
+                
+        if not is_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account activation pending. Please complete transaction."
