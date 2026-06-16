@@ -5,8 +5,9 @@ import { AdminSidebar, SidebarProvider } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import { useUser } from "@/context/UserContext";
 import { useRouter, usePathname } from "next/navigation";
-import { useCallback, useEffect } from "react";
-import { Loader2, LogOut, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Loader2, LogOut, RefreshCw, AlertCircle } from "lucide-react";
+import { api } from "@/lib/api";
 
 export default function DashboardLayout({
   children,
@@ -36,6 +37,26 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     window.location.href = "/login";
   }, []);
+
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryError, setRetryError] = useState("");
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    setRetryError("");
+    try {
+      const res = await api.post("/api/v1/auth/retry-activation");
+      if (res.data.status === "paystack" && res.data.paystack_url) {
+        window.location.href = res.data.paystack_url;
+      } else {
+        await refetchUser();
+      }
+    } catch (e: any) {
+      setRetryError(e.response?.data?.detail || "Failed to retry activation.");
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   // Poll for user status if pending
   useEffect(() => {
@@ -80,9 +101,23 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             Your registration is complete, but your activation payment is currently pending verification. 
             Once your payment/transaction is confirmed successful, your dashboard will unlock automatically.
           </p>
-          <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-primary text-sm font-semibold flex items-center justify-center gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            Waiting for verification...
+
+          {retryError && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-sm flex items-start gap-3 text-left">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <p>{retryError}</p>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <button 
+              onClick={handleRetry}
+              disabled={isRetrying}
+              className="p-4 bg-white/5 hover:bg-white/10 transition-colors rounded-2xl border border-white/10 text-primary text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRetrying ? "animate-spin" : ""}`} />
+              {isRetrying ? "Checking..." : "Check Payment Status / Retry"}
+            </button>
           </div>
           
           <button 

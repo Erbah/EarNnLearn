@@ -245,3 +245,62 @@ def read_users_me(current_user: User = Depends(get_current_user), db: Session = 
     codes = db.query(Code).filter(Code.owner_rid == current_user.rid).all()
     resp.product_codes = [c.product_code for c in codes if c.product_code]
     return resp
+
+@router.post("/retry-activation")
+def retry_activation(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Allows a user stuck in 'pending' status to retry their activation.
+    If Mobile Money, it forces the simulated activation synchronously.
+    If Paystack, it generates a new checkout URL.
+    """
+    if current_user.status == "active":
+        return {"status": "success", "message": "User is already active."}
+        
+    buyer_rid = f"PENDING_ACT_{current_user.id}"
+    
+    tx = db.query(Transaction).filter(
+        Transaction.buyer_rid == buyer_rid,
+        Transaction.status == "pending"
+    ).order_by(Transaction.created_at.desc()).first()
+    
+    if not tx:
+        raise HTTPException(status_code=404, detail="No pending activation transaction found.")
+        
+    code = db.query(Code).filter(Code.id == tx.code_id).first()
+    if not code:
+        raise HTTPException(status_code=404, detail="Activation code not found.")
+        
+    if current_user.preferred_payment_method == "paystack":
+        metadata = {
+            "type": "ACTIVATION",
+            "user_id": str(current_user.id),
+            "code_id": str(code.id),
+            "tx_id": str(tx.id),
+        }
+        from decimal import Decimal
+        dynamic_paystack_email = current_user.email
+        if not dynamic_paystack_email and current_user.phone:
+            clean_phone = current_user.phone.replace('+', '')
+            dynamic_paystack_email = f"u{clean_phone}@users.learnnearn.com"
+            
+        ps_res = paystack_service.initialize_transaction(
+            email=dynamic_paystack_email,
+            amount=Decimal(str(tx.amount)),
+            metadata=metadata
+        )
+        if ps_res.get("status") and ps_res["data"].get("authorization_url"):
+            tx.payment_reference = ps_res["data"]["reference"]
+            db.commit()
+            return {"status": "paystack", "paystack_url": ps_res["data"]["authorization_url"]}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to initialize Paystack checkout.")
+    else:
+        try:
+            run_activation_engine(db, current_user, code, tx)
+            # Commit is handled inside run_activation_engine, but we should make sure
+            # any updates to user status are visible.
+            return {"status": "success", "message": "Activation successful."}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Activation failed: {str(e)}")
+

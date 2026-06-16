@@ -108,6 +108,9 @@ def buy_product_code(req: BuyCodeRequest, current_user: User = Depends(get_curre
     Purchase a new product code entry for the new season.
     This generates the user's ONE and ONLY resalable code.
     """
+    if current_user.status == "pending" and not current_user.rid:
+        raise HTTPException(status_code=400, detail="Please complete your initial activation before purchasing from the marketplace.")
+
     # Check if user already has an active (unused) product code
     existing_code = db.query(Code).filter(
         Code.owner_rid == current_user.rid,
