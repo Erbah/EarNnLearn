@@ -1,4 +1,7 @@
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
 import os
 import docx
 import openpyxl
@@ -39,6 +42,8 @@ class DocumentProcessor:
 
     @staticmethod
     def _extract_pdf(file_path: str):
+        if fitz is None:
+            raise ImportError("PyMuPDF (fitz) is not installed. PDF extraction is unavailable.")
         doc = fitz.open(file_path)
         pages_text = []
         for page_num in range(len(doc)):
