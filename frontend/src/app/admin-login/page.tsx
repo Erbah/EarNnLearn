@@ -21,7 +21,11 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       const response = await api.post(`${API}/login`, { admin_password: password });
-      if (response.data.token) localStorage.setItem('access_token', response.data.token);
+      if (response.data.token) {
+        localStorage.setItem('access_token', response.data.token);
+        // Set cookie for middleware auth
+        document.cookie = `access_token=${response.data.token}; path=/; max-age=86400; SameSite=Lax`;
+      }
     } catch (e: any) {
       setError(e.response?.data?.detail || 'Authorization failed');
       setLoading(false);

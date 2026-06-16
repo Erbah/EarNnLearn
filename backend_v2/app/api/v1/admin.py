@@ -70,7 +70,7 @@ def login_admin(body: AdminLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="No Super Admin user found in database")
 
     new_token = create_access_token(
-        data={"sub": admin_user.rid, "tier_type": "admin"}
+        data={"sub": admin_user.rid, "tier_type": "admin", "role": admin_user.role}
     )
     
     return {"status": "authenticated", "tier_type": "admin", "token": new_token}
