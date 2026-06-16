@@ -176,7 +176,7 @@ export default function DashboardPage() {
 
       {/* Main Grid: Charts */}
       <div className="grid grid-cols-1 gap-6">
-        <EarningsChart />
+        <EarningsChart transactions={transactions} />
       </div>
 
       {/* Activity Content */}
