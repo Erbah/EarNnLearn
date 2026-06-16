@@ -61,6 +61,14 @@ export default function SettingsPage() {
   // Bank List Dropdown State
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [bankSearchQuery, setBankSearchQuery] = useState("");
+  
+  // MoMo List Dropdown State
+  const [showMomoDropdown, setShowMomoDropdown] = useState(false);
+  const [momoSearchQuery, setMomoSearchQuery] = useState("");
+  const momoList = [
+    "MTN Ghana", "Telecel / Vodafone", "AT / AirtelTigo"
+  ];
+  
   const bankList = [
     // Global & US
     "Bank of America", "Barclays", "Citigroup", "Goldman Sachs", "HSBC", "JPMorgan Chase", "Morgan Stanley", "Wells Fargo",
@@ -339,16 +347,61 @@ export default function SettingsPage() {
                       <div>
                         <label className="text-[9px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Network Provider</label>
                         <div className="relative">
-                          <select
-                            value={payoutProvider}
-                            onChange={(e) => setPayoutProvider(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 pr-8 text-white focus:outline-none focus:border-primary text-xs appearance-none cursor-pointer"
-                          >
-                            <option value="MTN" className="bg-card">MTN Ghana</option>
-                            <option value="Telecel" className="bg-card">Telecel / Vodafone</option>
-                            <option value="AirtelTigo" className="bg-card">AT / AirtelTigo</option>
-                          </select>
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={payoutProvider}
+                              onChange={(e) => {
+                                setPayoutProvider(e.target.value);
+                                setMomoSearchQuery(e.target.value);
+                                setShowMomoDropdown(true);
+                              }}
+                              onFocus={() => {
+                                setMomoSearchQuery(""); // Clear search to show full list
+                                setShowMomoDropdown(true);
+                              }}
+                              onBlur={() => setTimeout(() => setShowMomoDropdown(false), 200)}
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 pr-8 text-white focus:outline-none focus:border-primary text-xs"
+                              placeholder="Select or type network..."
+                            />
+                            <ChevronDown 
+                              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 cursor-pointer" 
+                              onClick={() => {
+                                setMomoSearchQuery(""); // Clear search to show full list
+                                setShowMomoDropdown(!showMomoDropdown);
+                              }}
+                            />
+                          </div>
+                          
+                          <AnimatePresence>
+                            {showMomoDropdown && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: -5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5 }}
+                                className="absolute z-20 w-full mt-2 bg-[#0B1221] border border-white/10 rounded-xl max-h-48 overflow-y-auto shadow-2xl overflow-hidden"
+                              >
+                                {momoList.filter(momo => momo.toLowerCase().includes(momoSearchQuery.toLowerCase())).map(momo => (
+                                  <div 
+                                    key={momo} 
+                                    className="px-4 py-3 text-xs text-white hover:bg-primary/20 hover:text-primary transition-colors cursor-pointer border-b border-white/5 last:border-0"
+                                    onClick={() => {
+                                      setPayoutProvider(momo);
+                                      setMomoSearchQuery(""); // reset search
+                                      setShowMomoDropdown(false);
+                                    }}
+                                  >
+                                    {momo}
+                                  </div>
+                                ))}
+                                {momoList.filter(momo => momo.toLowerCase().includes(momoSearchQuery.toLowerCase())).length === 0 && (
+                                  <div className="px-4 py-3 text-xs text-gray-500 italic">
+                                    Press "Save Settings" to use custom network "{payoutProvider}"
+                                  </div>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       </div>
                       <div>
