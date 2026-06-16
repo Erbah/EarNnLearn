@@ -148,7 +148,7 @@ export default function DashboardPage() {
         <StatCard
           title="Wallet Balance"
           value={wallet ? `${Number(wallet.balance).toFixed(2)} ${wallet.currency || 'GHS'}` : "LOADING..."}
-          trend={wallet?.recent_change || "0%"}
+          trend={transactions.length > 0 ? "+Active" : "0%"}
           isPositive={true}
           icon={Wallet}
           delay={0.1}
@@ -157,7 +157,7 @@ export default function DashboardPage() {
         <StatCard
           title="Activations"
           value={user?.product_codes?.length ? String(user.product_codes.length) : "0"}
-          trend="Direct"
+          trend={user?.product_codes?.length ? "+Growing" : "0"}
           isPositive={true}
           icon={KeyRound}
           delay={0.3}
@@ -165,8 +165,8 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Total Earned"
-          value={wallet ? `${Number(wallet.balance).toFixed(2)} ${wallet.currency || 'GHS'}` : "0.00"}
-          trend="Live"
+          value={wallet ? `${transactions.reduce((sum, t) => t.type === 'CREDIT' ? sum + Number(t.amount) : sum, 0).toFixed(2)} ${wallet.currency || 'GHS'}` : "0.00"}
+          trend={transactions.some(t => t.type === 'CREDIT') ? "+Earning" : "New"}
           isPositive={true}
           icon={DollarSign}
           delay={0.4}
