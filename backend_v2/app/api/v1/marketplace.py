@@ -291,7 +291,7 @@ def create_course(
         new_note = Notification(
             title="New Course Submitted",
             message=f"Creator {current_user.name} submitted '{course.title}' for review. Link: {course.playlist_url}",
-            link=f"/admin/courses/review/{course.id}",
+            link=f"/admin/content",
             type="PENDING_COURSE"
         )
         db.add(new_note)
