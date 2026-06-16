@@ -50,6 +50,7 @@ const navItems = [
   { name: "Dashboard",     href: "/dashboard", icon: LayoutDashboard,  roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Activate Code", href: "/activate",  icon: KeyRound,         roles: ["USER"] },
   { name: "Wallet",        href: "/wallet",    icon: Wallet,           roles: ["USER"] },
+  { name: "Majors",        href: "/tracks",    icon: Network,          roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Courses",       href: "/courses",   icon: GraduationCap,    roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Creator",       href: "/creator",   icon: ArrowRightLeft,   roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Settings",      href: "/settings",  icon: Settings,         roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Star, Users, BookOpen, PlayCircle, ChevronDown, ChevronRight,
@@ -132,11 +133,20 @@ export default function CourseDetailPage() {
           {course.description && <p className="text-gray-400 max-w-2xl mb-6">{course.description}</p>}
 
           <div className="flex items-center gap-6 mb-6">
+            {course.creator_rid && (
+              <Link href={`/instructors/${course.creator_rid}`} className="flex items-center gap-1.5 text-[#d4af37] hover:underline group">
+                <Users className="w-5 h-5" /> 
+                <span className="font-semibold" style={{ fontFamily: "Georgia, serif" }}>
+                  By {course.creator_name || "Faculty Member"}
+                </span>
+                <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </Link>
+            )}
             <span className="flex items-center gap-1.5 text-yellow-400">
-              <Star className="w-5 h-5 fill-yellow-400" /> {course.avg_rating.toFixed(1)}
+              <Star className="w-5 h-5 fill-yellow-400" /> {course.avg_rating?.toFixed(1) || "0.0"}
             </span>
             <span className="flex items-center gap-1.5 text-gray-400">
-              <Users className="w-5 h-5" /> {course.enrollment_count} enrolled
+              <Users className="w-5 h-5" /> {course.enrollment_count || 0} enrolled
             </span>
             <span className="flex items-center gap-1.5 text-gray-400">
               <PlayCircle className="w-5 h-5" /> {totalVideos} videos
