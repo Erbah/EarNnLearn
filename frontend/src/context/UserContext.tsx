@@ -36,9 +36,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchUser = useCallback(async (signal?: AbortSignal) => {
+  const fetchUser = useCallback(async (signal?: AbortSignal, isBackground: boolean = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) {
+        setLoading(true);
+      }
       setError(null);
       
       // Check if token exists before making request
@@ -87,7 +89,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUser]);
 
   const refetchUser = useCallback(async () => {
-    await fetchUser();
+    await fetchUser(undefined, true);
   }, [fetchUser]);
 
   const contextValue = useMemo(() => ({
