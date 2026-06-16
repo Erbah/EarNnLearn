@@ -52,3 +52,19 @@ class Video(Base):
     duration = Column(Integer)
     position = Column(Integer)
     is_preview = Column(Boolean, default=False)
+
+class LearningTrack(Base):
+    __tablename__ = "learning_tracks"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    title = Column(String, nullable=False)
+    description = Column(String)
+    badge_name = Column(String)
+    is_published = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class TrackCourse(Base):
+    __tablename__ = "track_courses"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    track_id = Column(String, ForeignKey("learning_tracks.id"), index=True)
+    course_id = Column(String, ForeignKey("courses.id"), index=True)
+    position = Column(Integer)

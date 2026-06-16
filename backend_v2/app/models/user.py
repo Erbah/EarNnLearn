@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, CheckConstraint
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, CheckConstraint, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -70,3 +70,12 @@ class User(Base):
 
     # Relationships
     codes = relationship("Code", primaryjoin="User.rid == Code.owner_rid", foreign_keys="[Code.owner_rid]", overlaps="codes")
+
+class InstructorProfile(Base):
+    __tablename__ = "instructor_profiles"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_rid = Column(String, ForeignKey("users.rid"), unique=True, index=True)
+    title = Column(String)
+    bio = Column(String)
+    credentials = Column(String)
+    avatar_url = Column(String)

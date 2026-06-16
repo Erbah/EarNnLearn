@@ -7,7 +7,7 @@ from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from sqlalchemy import text
 from app.core.config import settings, sanitize_secrets
 from app.core.database import Base, engine
-from app.api.v1 import auth, wallet, codes, referral, admin, marketplace, learning, ai, payments, education, users, engagement
+from app.api.v1 import auth, wallet, codes, referral, admin, marketplace, learning, ai, payments, education, users, engagement, tracks, instructors
 
 # Import all models so Base.metadata knows about them
 from app.models.user import User
@@ -245,6 +245,8 @@ def create_app() -> FastAPI:
     app.include_router(education.router, prefix=f"{settings.API_V1_STR}/education", tags=["Education Management"])
     app.include_router(engagement.router, prefix=f"{settings.API_V1_STR}/engagement", tags=["Engagement & Quizzes"])
     app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["User Profile & Onboarding"])
+    app.include_router(tracks.router, prefix=f"{settings.API_V1_STR}/tracks", tags=["Learning Tracks"])
+    app.include_router(instructors.router, prefix=f"{settings.API_V1_STR}/instructors", tags=["Instructors"])
 
     @app.get("/health")
     def health_check():
