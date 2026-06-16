@@ -5,9 +5,10 @@ import { ROLES, ACCESS_LEVELS } from './lib/roles';
 
 // The secret must be the same as the backend's SECRET_KEY
 // In a real app, this would be an environment variable
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
-if (!process.env.JWT_SECRET) {
-  console.warn("JWT_SECRET environment variable is not set! Middleware security may be compromised.");
+const secretString = process.env.JWT_SECRET || process.env.SECRET_KEY || "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD";
+const SECRET = new TextEncoder().encode(secretString);
+if (!process.env.JWT_SECRET && !process.env.SECRET_KEY) {
+  console.warn("Neither JWT_SECRET nor SECRET_KEY environment variables are set! Middleware is using the development fallback secret.");
 }
 
 export async function middleware(request: NextRequest) {
