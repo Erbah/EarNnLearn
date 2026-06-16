@@ -40,7 +40,7 @@ class AITutorEngine:
             return True
 
         wallet = db.query(Wallet).filter(Wallet.user_rid == user_rid).first()
-        if not wallet or wallet.balance < cost:
+        if not wallet or wallet.withdrawable_balance <= 0:
             return False # Payment Required - AI Access Denied
             
         # Deduct Cost
