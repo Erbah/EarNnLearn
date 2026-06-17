@@ -44,8 +44,17 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
     if normalized_phone and db.query(User).filter(User.phone == normalized_phone).first():
         raise HTTPException(status_code=400, detail="Phone number already registered")
 
-    if user_in.email and db.query(User).filter(User.email == user_in.email).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
+    if user_in.email:
+        from email_validator import validate_email, EmailNotValidError
+        try:
+            # check_deliverability=True performs DNS lookups to ensure the domain has valid MX records.
+            valid_email = validate_email(user_in.email, check_deliverability=True)
+            user_in.email = valid_email.normalized
+        except EmailNotValidError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid or inactive email: {str(e)}")
+            
+        if db.query(User).filter(User.email == user_in.email).first():
+            raise HTTPException(status_code=400, detail="Email already registered")
 
     # 2. Validate activation code
     code = db.query(Code).filter(
