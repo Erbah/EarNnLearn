@@ -28,8 +28,9 @@ export function LandingHeader() {
   ];
 
   return (
-    <header
-      className={`sticky top-0 z-50 w-full transition-all duration-300 ${
+    <>
+      <header
+        className={`sticky top-0 z-50 w-full transition-all duration-300 ${
         scrolled
           ? "bg-background/90 backdrop-blur-lg border-b border-primary/20 py-4 shadow-[0_10px_30px_rgba(0,224,255,0.08)]"
           : "bg-background/30 backdrop-blur-md border-b border-white/10 py-5"
