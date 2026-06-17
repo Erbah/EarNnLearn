@@ -477,7 +477,24 @@ function RegisterForm() {
             </div>
           </div>
         ) : (
-          <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-5" onSubmit={(e) => {
+            e.preventDefault();
+            if (isCurrentStepValid()) {
+              if (step === 2) {
+                const amount = parseFloat(formData.purchaseAmount);
+                const minAmount = codeMetadata ? codeMetadata.price * (exchangeRates[formData.preferredCurrency] || 1) : 0;
+                if (amount < minAmount) {
+                  const confirmAdjust = window.confirm(`The minimum activation price is ${formData.preferredCurrency} ${minAmount.toFixed(2)}.\n\nYour entered amount of ${formData.preferredCurrency} ${amount.toFixed(2)} is lower than the minimum selling price.\n\nDo you agree to automatically adjust your payment to ${formData.preferredCurrency} ${minAmount.toFixed(2)} to proceed?`);
+                  if (confirmAdjust) {
+                    setFormData({ ...formData, purchaseAmount: minAmount.toFixed(2) });
+                    setStep(3);
+                  }
+                  return;
+                }
+              }
+              step < 3 ? setStep(step + 1) : handleRegister();
+            }
+          }}>
             <AnimatePresence mode="wait">
               {step === 1 && (
                 <motion.div
@@ -519,7 +536,7 @@ function RegisterForm() {
                           type="text"
                           aria-label="First Name"
                           value={formData.firstName}
-                          onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                          onChange={(e) => { setFormData({ ...formData, firstName: e.target.value }); setSubmitError(null); }}
                           className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 focus:outline-none focus:border-primary/50 text-white"
                           placeholder="John"
                         />
@@ -533,7 +550,7 @@ function RegisterForm() {
                           type="text"
                           aria-label="Last Name"
                           value={formData.lastName}
-                          onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                          onChange={(e) => { setFormData({ ...formData, lastName: e.target.value }); setSubmitError(null); }}
                           className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 focus:outline-none focus:border-primary/50 text-white"
                           placeholder="Doe"
                         />
@@ -549,7 +566,7 @@ function RegisterForm() {
                         type="text"
                         aria-label="Email or Phone Number"
                         value={formData.identifier}
-                        onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
+                        onChange={(e) => { setFormData({ ...formData, identifier: e.target.value }); setSubmitError(null); }}
                         className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 focus:outline-none focus:border-primary/50 text-white"
                         placeholder="john@example.com or 054 123 4567"
                         required
@@ -566,7 +583,7 @@ function RegisterForm() {
                         type={showPassword ? "text" : "password"}
                         aria-label="Password"
                         value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setSubmitError(null); }}
                         className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-12 focus:outline-none focus:border-primary/50 text-white"
                         placeholder="••••••••"
                       />
@@ -1016,14 +1033,18 @@ function RegisterForm() {
                 onClick={() => {
                   if (submitError.toLowerCase().includes('email')) {
                     setStep(1);
-                    setSubmitError(null);
                   }
                 }}
               >
                 <p className="text-xs text-red-400 font-bold">{submitError}</p>
-                {submitError.toLowerCase().includes('email') && (
+                {submitError.toLowerCase().includes('email') && step !== 1 && (
                   <span className="text-[10px] text-red-400/80 mt-1 flex items-center gap-1 group-hover:text-red-300 transition-colors">
                     <ChevronLeft className="w-3 h-3" /> Click here to go back and fix it
+                  </span>
+                )}
+                {submitError.toLowerCase().includes('email') && step === 1 && (
+                  <span className="text-[10px] text-red-400/80 mt-1 flex items-center gap-1">
+                    Please update your email address above.
                   </span>
                 )}
               </motion.div>
