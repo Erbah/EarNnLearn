@@ -77,9 +77,9 @@ def get_current_user(
     except jwt.JWTError:
         raise credentials_exception
     
-    # sub can be either email (pre-activation) or rid (post-activation)
+    # sub can be either email, phone (pre-activation), or rid (post-activation)
     user = db.query(User).filter(
-        (User.rid == sub) | (User.email == sub)
+        (User.rid == sub) | (User.email == sub) | (User.phone == sub)
     ).first()
     if user is None:
         raise credentials_exception

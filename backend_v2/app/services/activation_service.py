@@ -63,12 +63,22 @@ def run_activation_engine(db: Session, user: User, target_code: Code, transactio
         )
         db.add(transaction)
 
+    # Determine the price of the newly generated code
+    # It should be the amount the user paid (if available), with a platform minimum
+    from app.models.admin import SystemSetting
+    setting = db.query(SystemSetting).filter(SystemSetting.key == "min_product_code_price").first()
+    system_min_price = float(setting.value) if setting else 20.0
+
+    base_price = max(float(target_code.price), system_min_price)
+    if transaction and transaction.amount:
+        base_price = max(float(transaction.amount), system_min_price)
+
     # 5. Generate 1 new resalable product code
     new_product = Code(
         product_code=generate_product_code(),
         owner_rid=new_rid,
         parent_rid=seller_rid,
-        price=target_code.price,
+        price=base_price,
         tier_type=target_code.tier_type
     )
     db.add(new_product)

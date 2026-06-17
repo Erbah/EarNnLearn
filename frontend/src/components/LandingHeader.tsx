@@ -89,75 +89,76 @@ export function LandingHeader() {
 
         </div>
       </div>
-
-      {/* Mobile Navigation Drawer */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
-            />
-            {/* Drawer */}
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed right-0 top-0 bottom-0 w-80 bg-background/95 backdrop-blur-md border-l border-white/10 z-50 p-6 flex flex-col justify-between md:hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]"
-            >
-              <div className="space-y-8">
-                <div className="flex items-center justify-between">
-                  <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                    EarNnLearN
-                  </span>
-                  <button
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <nav className="flex flex-col gap-4">
-                  {navLinks.map((link) => (
-                    <Link
-                      key={link.name}
-                      href={link.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="text-base font-semibold text-gray-200 hover:text-primary transition-colors py-2 border-b border-white/5"
-                    >
-                      {link.name}
-                    </Link>
-                  ))}
-                </nav>
-              </div>
-
-              <div className="flex flex-col gap-4 mt-auto">
-                <Link
-                  href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center text-sm font-semibold text-white hover:text-primary transition-colors py-3 rounded-full border border-white/10 bg-white/5"
-                >
-                  Login
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center text-sm font-bold text-background bg-primary hover:bg-primary/95 transition-all py-3 rounded-full flex items-center justify-center gap-1.5 shadow-[0_0_20px_rgba(0,224,255,0.4)]"
-                >
-                  Get Started
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </header>
+
+    {/* Mobile Navigation Drawer */}
+    <AnimatePresence>
+      {mobileMenuOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] md:hidden"
+          />
+          {/* Drawer */}
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed right-0 top-0 bottom-0 w-80 bg-background/95 backdrop-blur-xl border-l border-white/10 z-[70] p-6 flex flex-col justify-between md:hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+          >
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  EarNnLearN
+                </span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <nav className="flex flex-col gap-4">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.name}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-base font-semibold text-gray-200 hover:text-primary transition-colors py-2 border-b border-white/5"
+                  >
+                    {link.name}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            <div className="flex flex-col gap-4 mt-auto">
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-center text-sm font-semibold text-white hover:text-primary transition-colors py-3 rounded-full border border-white/10 bg-white/5"
+              >
+                Login
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-center text-sm font-bold text-background bg-primary hover:bg-primary/95 transition-all py-3 rounded-full flex items-center justify-center gap-1.5 shadow-[0_0_20px_rgba(0,224,255,0.4)]"
+              >
+                Get Started
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  </>
   );
 }

@@ -412,8 +412,7 @@ function RegisterForm() {
     if (step === 2) {
       const codeValid = formData.manualCode.trim() !== "" && codeMetadata !== null;
       const amount = parseFloat(formData.purchaseAmount);
-      const minAmount = codeMetadata ? codeMetadata.price * (exchangeRates[formData.preferredCurrency] || 1) : 0;
-      const amountValid = !isNaN(amount) && amount >= minAmount;
+      const amountValid = !isNaN(amount) && amount > 0;
       const paymentValid = formData.paymentNumber.trim() !== "";
       return codeValid && amountValid && paymentValid;
     }
@@ -1048,7 +1047,21 @@ function RegisterForm() {
               <button
                 type="button"
                 aria-label={step === 3 ? "Launch Account" : "Next Phase"}
-                onClick={() => step < 3 ? setStep(step + 1) : handleRegister()}
+                onClick={() => {
+                  if (step === 2) {
+                    const amount = parseFloat(formData.purchaseAmount);
+                    const minAmount = codeMetadata ? codeMetadata.price * (exchangeRates[formData.preferredCurrency] || 1) : 0;
+                    if (amount < minAmount) {
+                      const confirmAdjust = window.confirm(`The minimum activation price is ${formData.preferredCurrency} ${minAmount.toFixed(2)}.\n\nYour entered amount of ${formData.preferredCurrency} ${amount.toFixed(2)} is lower than the minimum selling price.\n\nDo you agree to automatically adjust your payment to ${formData.preferredCurrency} ${minAmount.toFixed(2)} to proceed?`);
+                      if (confirmAdjust) {
+                        setFormData({ ...formData, purchaseAmount: minAmount.toFixed(2) });
+                        setStep(3);
+                      }
+                      return;
+                    }
+                  }
+                  step < 3 ? setStep(step + 1) : handleRegister();
+                }}
                 disabled={loading || !isCurrentStepValid()}
                 className={`flex-1 py-4 bg-white text-background font-black text-xs uppercase tracking-widest rounded-xl hover:bg-gray-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center justify-center group disabled:opacity-50`}
               >
