@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
+import { useUser } from "@/context/UserContext";
 import { API_BASE_URL, api } from "@/lib/api";
 
 const API = `${API_BASE_URL}/api/v1`;
@@ -45,6 +46,9 @@ interface WithdrawalRequest {
 }
 
 export default function WalletPage() {
+  const { user } = useUser();
+  const minW = user?.min_withdrawal || 50;
+  
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
@@ -54,7 +58,7 @@ export default function WalletPage() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showAddFundsModal, setShowAddFundsModal] = useState(false);
   const [addAmount, setAddAmount] = useState(100);
-  const [withdrawAmount, setWithdrawAmount] = useState(50);
+  const [withdrawAmount, setWithdrawAmount] = useState(minW);
   const [bankCode, setBankCode] = useState("MTN");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
@@ -349,7 +353,7 @@ export default function WalletPage() {
                           <RefreshCcw className={`w-4 h-4 ${w.status === 'PENDING' ? 'animate-spin-slow' : ''}`} />
                         </div>
                         <div>
-                          <div className="font-bold text-sm text-white">{w.amount} GHS</div>
+                          <div className="font-bold text-sm text-white">{w.amount} {wallet?.currency || user?.default_currency || 'GHS'}</div>
                           <div className="text-[10px] text-gray-500 uppercase tracking-widest">{w.payout_method} • {new Date(w.created_at).toLocaleDateString()}</div>
                         </div>
                       </div>
@@ -382,16 +386,16 @@ export default function WalletPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Amount (GHS)</label>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Amount ({wallet?.currency || user?.default_currency || 'GHS'})</label>
                 <input
                   type="number"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(+e.target.value)}
                   aria-label="Withdrawal Amount"
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary"
-                  placeholder="Min. 50 GHS"
+                  placeholder={`Min. ${minW} ${wallet?.currency || 'GHS'}`}
                 />
-                <p className="text-[10px] text-gray-500 mt-2">Available for withdrawal: <span className="text-emerald-500 font-bold">{wallet?.withdrawable_balance} GHS</span></p>
+                <p className="text-[10px] text-gray-500 mt-2">Available for withdrawal: <span className="text-emerald-500 font-bold">{wallet?.withdrawable_balance} {wallet?.currency || user?.default_currency || 'GHS'}</span></p>
               </div>
 
               <div>
@@ -436,7 +440,7 @@ export default function WalletPage() {
 
               <button
                 onClick={handleWithdraw}
-                disabled={withdrawAmount < 50 || withdrawAmount > (wallet?.withdrawable_balance || 0)}
+                disabled={withdrawAmount < minW || withdrawAmount > (wallet?.withdrawable_balance || 0)}
                 className="w-full bg-primary text-background py-4 rounded-2xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100 mt-4"
               >
                 Submit Request
@@ -463,7 +467,7 @@ export default function WalletPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Amount (GHS)</label>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Amount ({wallet?.currency || user?.default_currency || 'GHS'})</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -472,7 +476,7 @@ export default function WalletPage() {
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary text-2xl font-bold"
                     placeholder="50"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">GHS</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">{wallet?.currency || user?.default_currency || 'GHS'}</span>
                 </div>
               </div>
 
@@ -483,7 +487,7 @@ export default function WalletPage() {
                     onClick={() => setAddAmount(amt)}
                     className={`py-2 rounded-xl text-xs font-bold transition-all ${addAmount === amt ? 'bg-primary text-background' : 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10'}`}
                   >
-                    {amt} GHS
+                    {amt} {wallet?.currency || user?.default_currency || 'GHS'}
                   </button>
                 ))}
               </div>

@@ -90,7 +90,7 @@ def run_activation_engine(db: Session, user: User, target_code: Code, transactio
         from app.services.profit_engine import distribute_profit, credit_wallet
         from decimal import Decimal
 
-        payouts = distribute_profit(seller_rid, Decimal(str(transaction.amount)))
+        payouts = distribute_profit(db, seller_rid, Decimal(str(transaction.amount)), target_code=target_code)
 
         credit_wallet(db, payouts["seller"]["rid"], payouts["seller"]["amount"],
                       "CREDIT_PROFIT_SELLER", f"Sale profit from buyer {new_rid}")
@@ -102,7 +102,7 @@ def run_activation_engine(db: Session, user: User, target_code: Code, transactio
 
         transaction.status = "processed"
         db.commit()
-        print(f"✅ Profit distributed: seller={payouts['seller']['amount']}, platform={payouts['platform']['amount']}, family={len(payouts['family'])} recipients")
+        print(f"[SUCCESS] Profit distributed: seller={payouts['seller']['amount']}, platform={payouts['platform']['amount']}, family={len(payouts['family'])} recipients")
     except Exception as e:
         print(f"[ERROR] Profit distribution failed: {e}")
         db.commit()  # Ensure activation state is saved even if profit calc fails

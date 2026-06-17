@@ -19,6 +19,11 @@ interface User {
   preferred_style?: string;
   last_onboarding_step?: number;
   is_beta_user?: boolean;
+  seller_percentage?: number;
+  activation_price?: number;
+  min_withdrawal?: number;
+  withdrawal_fee?: number;
+  default_currency?: string;
   [key: string]: any;
 }
 

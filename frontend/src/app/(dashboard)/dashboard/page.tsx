@@ -98,7 +98,7 @@ export default function DashboardPage() {
             <Share2 className="w-3 h-3" /> Growth Engine
           </div>
           <h2 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">
-            Invite & Earn 70% Instantly
+            Invite & Earn {user?.seller_percentage ? user.seller_percentage * 100 : 70}% Instantly
           </h2>
           <p className="text-gray-400 text-sm max-w-xl leading-relaxed">
             Share your unique access link below. When someone registers using it, the system automatically tags them to your network and credits your wallet matching your tier.

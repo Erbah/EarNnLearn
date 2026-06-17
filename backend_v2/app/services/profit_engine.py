@@ -11,11 +11,11 @@ from sqlalchemy.orm import Session
 from app.models.wallet import Wallet, WalletTransaction
 from decimal import Decimal, ROUND_DOWN
 
-# ─── Distribution Ratios (New 3-Way Split) ───
-PLATFORM_RATIO = Decimal('0.40')
-SELLER_RATIO   = Decimal('0.30')
-FAMILY_RATIO   = Decimal('0.30')
-MASTER_RID     = "ACNIRP"  # Deployment Platform Account
+# ─── Default Distribution Ratios ───
+DEFAULT_PLATFORM_RATIO = Decimal('0.15')
+DEFAULT_SELLER_RATIO   = Decimal('0.70')
+DEFAULT_FAMILY_RATIO   = Decimal('0.15')
+MASTER_RID             = "ACNIRP"  # Deployment Platform Account
 
 
 def get_relatives(parent_rid: str) -> list[str]:
@@ -52,11 +52,34 @@ def select_valid_relatives(relatives: list[str], family_profit: Decimal) -> list
     return []
 
 
-def distribute_profit(parent_rid: str, price: Decimal, platform_r: Decimal = PLATFORM_RATIO, seller_r: Decimal = SELLER_RATIO, family_r: Decimal = FAMILY_RATIO) -> dict:
+def distribute_profit(db: Session, parent_rid: str, price: Decimal, target_code=None) -> dict:
     """
     Complete profit distribution calculation.
-    Returns the full payout structure without touching the database.
+    Fetches ratios from target_code overrides, then SystemSetting, then defaults.
     """
+    from app.models.admin import SystemSetting
+    
+    platform_r = DEFAULT_PLATFORM_RATIO
+    seller_r = DEFAULT_SELLER_RATIO
+    family_r = DEFAULT_FAMILY_RATIO
+
+    if target_code:
+        if target_code.platform_share is not None: platform_r = Decimal(str(target_code.platform_share))
+        if target_code.seller_share is not None: seller_r = Decimal(str(target_code.seller_share))
+        if target_code.family_share is not None: family_r = Decimal(str(target_code.family_share))
+
+    if not target_code or target_code.platform_share is None:
+        s_plat = db.query(SystemSetting).filter(SystemSetting.key == "master_percentage").first()
+        if s_plat: platform_r = Decimal(str(s_plat.value))
+        
+    if not target_code or target_code.seller_share is None:
+        s_sell = db.query(SystemSetting).filter(SystemSetting.key == "seller_percentage").first()
+        if s_sell: seller_r = Decimal(str(s_sell.value))
+        
+    if not target_code or target_code.family_share is None:
+        s_fam = db.query(SystemSetting).filter(SystemSetting.key == "family_percentage").first()
+        if s_fam: family_r = Decimal(str(s_fam.value))
+
     platform_profit = (price * platform_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
     seller_profit   = (price * seller_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
     family_profit   = (price * family_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)

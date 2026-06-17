@@ -39,10 +39,13 @@ def simulate_payment_webhook(tx_id: str, code_id: str, user_id: str):
 def register_user(response: Response, user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     from app.utils.phone import normalize_phone
     normalized_phone = normalize_phone(user_in.phone) if user_in.phone else None
-
-    # 1. Check if user exists
-    if normalized_phone and db.query(User).filter(User.phone == normalized_phone).first():
-        raise HTTPException(status_code=400, detail="Phone number already registered")
+    
+    if normalized_phone:
+        existing_phone = db.query(User).filter(
+            (User.phone == normalized_phone) | (User.phone == user_in.phone)
+        ).first()
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="Phone number already registered")
 
     if user_in.email:
         from email_validator import validate_email, EmailNotValidError
@@ -188,13 +191,16 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
     identifier = login_data.identifier
     
     # Try normalizing as a phone number
-    normalized_phone = normalize_phone(identifier) if identifier.replace('+', '').isdigit() else identifier
+    is_phone = identifier.replace('+', '').isdigit()
+    normalized_phone = normalize_phone(identifier) if is_phone else identifier
     
-    user = db.query(User).filter(
-        (User.email == identifier) | 
-        (User.phone == normalized_phone) | 
-        (User.phone == identifier)
-    ).first()
+    user = db.query(User).filter(User.email == identifier).first()
+    
+    if not user and is_phone and normalized_phone:
+        user = db.query(User).filter(User.phone == normalized_phone).first()
+        
+    if not user:
+        user = db.query(User).filter(User.phone == identifier).first()
     
     if user:
         if user.locked_until and user.locked_until > datetime.utcnow():
@@ -254,9 +260,18 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
 def read_users_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Extract just the codes as strings
     resp = UserResponse.from_orm(current_user)
-    # Direct query to avoid relationship issues
     codes = db.query(Code).filter(Code.owner_rid == current_user.rid).all()
     resp.product_codes = [c.product_code for c in codes if c.product_code]
+    
+    from app.models.admin import SystemSetting
+    settings_dict = {s.key: s.value for s in db.query(SystemSetting).all()}
+    
+    if "seller_percentage" in settings_dict: resp.seller_percentage = float(settings_dict["seller_percentage"])
+    if "activation_price" in settings_dict: resp.activation_price = float(settings_dict["activation_price"])
+    if "min_withdrawal" in settings_dict: resp.min_withdrawal = float(settings_dict["min_withdrawal"])
+    if "withdrawal_fee" in settings_dict: resp.withdrawal_fee = float(settings_dict["withdrawal_fee"])
+    if "default_currency" in settings_dict: resp.default_currency = settings_dict["default_currency"]
+        
     return resp
 
 @router.post("/retry-activation")

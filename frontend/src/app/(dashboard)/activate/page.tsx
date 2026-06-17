@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUser } from "@/context/UserContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2,
@@ -25,6 +26,7 @@ import { api } from "@/lib/api";
 const API = "/api/v1";
 
 export default function ActivateCodePage() {
+  const { user } = useUser();
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [code, setCode] = useState("");
@@ -38,7 +40,7 @@ export default function ActivateCodePage() {
 
   // Consolidated states
   const [walletBalance, setWalletBalance] = useState(0);
-  const [minPrice, setMinPrice] = useState(20);
+  const [minPrice, setMinPrice] = useState(user?.activation_price || 20);
   const [currency, setCurrency] = useState("GHS");
   const [userCodes, setUserCodes] = useState<any[]>([]);
 

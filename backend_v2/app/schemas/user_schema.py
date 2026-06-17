@@ -44,6 +44,11 @@ class UserResponse(BaseModel):
     status: str
     preferred_payment_method: str
     product_codes: list[str] = []
+    seller_percentage: float | None = 0.70
+    activation_price: float | None = 20.0
+    min_withdrawal: float | None = 50.0
+    withdrawal_fee: float | None = 2.0
+    default_currency: str | None = "GHS"
     
     # Elite Personalization
     learning_goal: str | None = "General Exploration"
