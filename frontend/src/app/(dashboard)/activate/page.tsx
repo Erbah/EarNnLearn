@@ -114,10 +114,11 @@ export default function ActivateCodePage() {
     }
   }
 
-  async function handleDeposit() {
+  async function handleDeposit(amountOverride?: number) {
     setLoading(true);
     try {
-      const amountToAdd = Math.max(minPrice - walletBalance, minPrice);
+      const targetAmount = amountOverride ?? minPrice;
+      const amountToAdd = Math.max(targetAmount - walletBalance, targetAmount);
       const res = await api.post(`${API}/wallet/deposit`, {
         amount: amountToAdd
       });
@@ -136,22 +137,34 @@ export default function ActivateCodePage() {
     }
   }
 
-  async function handleSubmitPayment() {
-    if (!reference) return;
-    setLoading(true);
-    try {
-      const res = await api.post(`${API}/codes/submit-payment`, {
-        product_code: code,
-        payment_reference: reference
-      });
+  async function buySponsor() {
+    if (!sellerInfo) return;
+    
+    if (walletBalance < sellerInfo.amount) {
+      const amountNeeded = Math.max(sellerInfo.amount - walletBalance, sellerInfo.amount);
+      const proceed = window.confirm(
+        `Insufficient wallet balance (${walletBalance.toFixed(2)} GHS).\n\nYou need ${sellerInfo.amount.toFixed(2)} GHS to purchase this sponsor code.\nWould you like to top up the remaining ${amountNeeded.toFixed(2)} GHS via Momo/Card?`
+      );
+      if (proceed) {
+        return handleDeposit(sellerInfo.amount);
+      }
+      return;
+    }
 
+    setLoading(true);
+    setStatus("idle");
+    try {
+      const res = await api.post(`${API}/codes/buy-sponsor`, { product_code: code });
       if (res.status === 200) {
-        setStatus("pending");
-        setStep(4);
+        setStatus("success");
+        setAffiliateCode(res.data.product_code);
+        await loadUserCodes();
+        api.get(`${API}/wallet/`).then(res => setWalletBalance(Number(res.data.balance) || 0)).catch(() => { });
+        setStep(1); // Reset step, the active code UI will show up since activeCode will be populated
       }
     } catch (err: any) {
       setStatus("error");
-      setMessage(err.response?.data?.detail || "Failed to submit reference.");
+      setMessage(err.response?.data?.detail || "Failed to buy sponsor code.");
     } finally {
       setLoading(false);
     }
@@ -257,18 +270,12 @@ export default function ActivateCodePage() {
                 {step === 2 && sellerInfo && (
                   <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                     <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-                      <h3 className="text-xl font-bold text-white mb-4">Send Payment To</h3>
+                      <h3 className="text-xl font-bold text-white mb-4">Sponsor Details</h3>
                       <div className="space-y-4">
                         <div className="flex justify-between items-center bg-background/40 p-4 rounded-xl border border-white/5">
                           <div>
                             <p className="text-[10px] text-gray-500 uppercase">Seller</p>
                             <p className="text-sm font-bold text-white">{sellerInfo.seller_name}</p>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center bg-background/40 p-4 rounded-xl border border-white/5">
-                          <div>
-                            <p className="text-[10px] text-gray-500 uppercase">Provider / Account</p>
-                            <p className="text-sm font-bold text-white">{sellerInfo.provider} ({sellerInfo.account_number})</p>
                           </div>
                         </div>
                         <div className="flex justify-between items-center bg-primary/10 p-4 rounded-xl border border-primary/20">
@@ -279,35 +286,9 @@ export default function ActivateCodePage() {
                         </div>
                       </div>
                     </div>
-                    <button onClick={() => setStep(3)} className="w-full py-4 bg-white text-background font-bold rounded-xl hover:bg-gray-200 transition-all">
-                      I've Made the Payment
+                    <button onClick={buySponsor} disabled={loading} className="w-full py-4 bg-primary text-background font-bold rounded-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2 group">
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Pay with Wallet"}
                     </button>
-                  </motion.div>
-                )}
-
-                {step === 3 && (
-                  <motion.div key="s3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-400 mb-2">Transaction Reference</label>
-                      <input
-                        type="text"
-                        value={reference}
-                        onChange={(e) => setReference(e.target.value)}
-                        placeholder="e.g. 293148502"
-                        className="w-full bg-background/50 border border-white/10 rounded-xl py-4 px-4 text-white focus:outline-none focus:border-primary transition-all"
-                      />
-                    </div>
-                    <button onClick={handleSubmitPayment} disabled={loading || !reference} className="w-full py-4 bg-primary text-background font-bold rounded-xl">
-                      {loading ? <Loader2 className="animate-spin" /> : "Verify Submission"}
-                    </button>
-                  </motion.div>
-                )}
-                
-                {step === 4 && (
-                  <motion.div key="s4" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
-                    <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-6" />
-                    <h3 className="text-xl font-bold text-white mb-2">Verifying Payment</h3>
-                    <p className="text-gray-400 text-sm">Admin is currently reviewing your submission. This takes 5-15 minutes.</p>
                   </motion.div>
                 )}
               </AnimatePresence>

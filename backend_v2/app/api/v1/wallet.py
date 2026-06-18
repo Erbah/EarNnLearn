@@ -113,6 +113,14 @@ def request_withdrawal(body: WithdrawalRequestCreate, current_user: User = Depen
         description=f"Withdrawal request for {body.amount} (Fee: {fee}) via {body.payout_method}"
     ))
     
+    from app.services.notification_service import notification_service
+    notification_service.send_in_app_notification(
+        db=db, user_rid=current_user.rid, 
+        title="Withdrawal Requested", 
+        message=f"Your request to withdraw {body.amount} GHS via {body.payout_method} has been submitted.", 
+        type="WALLET", link="/settings"
+    )
+    
     # Optional: Route through automated payout system if enabled
     auto_payout_setting = db.query(SystemSetting).filter(SystemSetting.key == "automated_withdrawals").first()
     if auto_payout_setting and auto_payout_setting.value.lower() == "true":

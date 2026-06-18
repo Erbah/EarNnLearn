@@ -145,7 +145,7 @@ def create_app() -> FastAPI:
                 )
                 db.add(root_user)
                 db.add(ReferralIndex(user_rid=root_rid, parent_rid=None, path=root_rid, depth=0))
-                db.add(Wallet(user_rid=root_rid, balance=1000, withdrawable_balance=1000))
+                db.add(Wallet(user_rid=root_rid, balance=0, withdrawable_balance=0))
                 db.add(Code(product_code="CT-ROOT-SEED", owner_rid=root_rid, price=20.00, tier_type="public"))
                 
                 # Seed default system settings
@@ -174,12 +174,13 @@ def create_app() -> FastAPI:
                     ("Programming", "💻"), ("Entrepreneurship", "🚀"),
                     ("Finance", "💰"), ("Personal Development", "🧠"),
                     ("Design", "🎨"), ("Data Science", "📊"),
+                    ("Science", "🔬"), ("Maths", "📐"), ("Technology", "🖥️"),
                 ]
                 for i, (name, icon) in enumerate(categories):
                     db.add(CourseCategory(name=name, icon=icon, position=i))
                 
                 db.commit()
-                print("Seeded root + settings + tiers + 8 categories")
+                print("Seeded root + settings + tiers + 11 categories")
             
             # Seed Learning Forest (The Skill Tree) - Run independently
             if not db.query(SkillNode).first():

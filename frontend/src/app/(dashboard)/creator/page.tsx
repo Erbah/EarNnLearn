@@ -26,6 +26,7 @@ export default function CreatorPage() {
     playlist_url: "",
     is_free: true 
   });
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [fetchingMetadata, setFetchingMetadata] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [myCourses, setMyCourses] = useState<any[]>([]);
@@ -72,7 +73,11 @@ export default function CreatorPage() {
   async function createCourse() {
     setCreating(true);
     try {
-      const res = await api.post(`${API}/courses/create`, form);
+      const payload = {
+        ...form,
+        price: Number(form.price) || 0
+      };
+      const res = await api.post(`${API}/courses/create`, payload);
       if (res.status === 200 || res.status === 201) {
         const course = res.data;
         setMyCourses(prev => [...prev, { 
@@ -94,22 +99,36 @@ export default function CreatorPage() {
   }
 
   async function handleUrlBlur() {
-    if (!form.playlist_url || (!form.title && !form.description && !form.creator_name)) {
-      if (form.playlist_url) {
-        setFetchingMetadata(true);
+    if (form.playlist_url && (!form.title || !form.description || !form.creator_name || !form.category || form.category === "General")) {
+      setFetchingMetadata(true);
         try {
           const res = await api.post(`${API}/marketplace/youtube-metadata`, { url: form.playlist_url });
-          setForm(prev => ({
-            ...prev,
-            title: prev.title || res.data.title || "",
-            description: prev.description || res.data.description || "",
-            creator_name: prev.creator_name || res.data.creator_name || ""
-          }));
+          setForm(prev => {
+            let matchedCategory = prev.category;
+            if (res.data.category && (!matchedCategory || matchedCategory === "General")) {
+              const ytCat = res.data.category.toLowerCase();
+              const match = categories.find(c => 
+                ytCat.includes(c.name.toLowerCase()) || 
+                c.name.toLowerCase().includes(ytCat) ||
+                (ytCat.includes("science") && c.name === "Science") ||
+                (ytCat.includes("technology") && c.name === "Technology")
+              );
+              if (match) {
+                matchedCategory = match.name;
+              }
+            }
+            return {
+              ...prev,
+              title: prev.title || res.data.title || "",
+              description: prev.description || res.data.description || "",
+              creator_name: prev.creator_name || res.data.creator_name || "",
+              category: matchedCategory
+            };
+          });
         } catch (e) {
           console.error("Failed to fetch metadata", e);
         }
         setFetchingMetadata(false);
-      }
     }
   }
 
@@ -353,6 +372,54 @@ export default function CreatorPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-6">
                     <div>
+                      <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 block">Subject Category</label>
+                      {!isCustomCategory ? (
+                        <div className="relative">
+                          <select 
+                            value={form.category} 
+                            onChange={e => {
+                              if (e.target.value === "custom_new") {
+                                setIsCustomCategory(true);
+                                setForm({ ...form, category: "" });
+                              } else {
+                                setForm({ ...form, category: e.target.value });
+                              }
+                            }}
+                            className="w-full px-5 py-4 pr-12 bg-white/[0.02] border border-white/10 rounded-2xl text-white focus:outline-none focus:border-primary/50 focus:bg-white/[0.04] transition-all appearance-none cursor-pointer"
+                          >
+                            <option value="General" className="bg-[#111827] text-white">Select a Subject / Category</option>
+                            {categories.map((cat: any) => (
+                              <option key={cat.id} value={cat.name} className="bg-[#111827] text-white">
+                                {cat.name}
+                              </option>
+                            ))}
+                            <option value="custom_new" className="bg-[#111827] text-primary font-bold">+ Enter Custom Category</option>
+                          </select>
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <input 
+                            value={form.category} 
+                            onChange={e => setForm({ ...form, category: e.target.value })}
+                            placeholder="Type custom subject..."
+                            className="flex-1 px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl text-white focus:outline-none focus:border-primary/50 focus:bg-white/[0.04] transition-all"
+                            autoFocus
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => { setIsCustomCategory(false); setForm({...form, category: "General"}); }}
+                            className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-gray-400 hover:text-white transition-all flex items-center justify-center"
+                            title="Cancel custom category"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
                       <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 block">Foundational Title</label>
                       <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
                         placeholder="e.g. AI Marketing Masterclass"
@@ -403,12 +470,17 @@ export default function CreatorPage() {
                       <div className={`transition-all duration-300 ${form.is_free ? "opacity-30 pointer-events-none" : "opacity-100"}`}>
                         <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2 block">Price (GHS)</label>
                         <input 
-                          type="number" 
+                          type="text" 
+                          inputMode="decimal"
                           value={form.price} 
-                          onChange={e => setForm({ ...form, price: parseFloat(e.target.value) || 0 })}
+                          onChange={e => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            setForm({ ...form, price: val as any });
+                          }}
+                          placeholder="e.g. 150.00"
                           title="Price in GHS"
                           disabled={form.is_free}
-                          className="w-full px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl text-white focus:outline-none focus:border-primary/50 outline-none"
+                          className="w-full px-5 py-4 bg-white/[0.02] border border-white/10 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-primary/50 focus:bg-white/[0.04] transition-all"
                         />
                       </div>
                     </div>

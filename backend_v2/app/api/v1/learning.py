@@ -164,6 +164,14 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
         db.add(CourseEnrollment(course_id=course_id, user_rid=current_user.rid))
         course.enrollment_count = (course.enrollment_count or 0) + 1
         db.commit()
+        
+        from app.services.notification_service import notification_service
+        notification_service.send_in_app_notification(
+            db=db, user_rid=current_user.rid, 
+            title="Course Enrollment", 
+            message=f"You have successfully enrolled in {course.title}.", 
+            type="ENROLLMENT", link=f"/learn/{course.id}"
+        )
         return {"status": "Enrolled (free)", "payment_method": "free"}
 
     total_videos = count_course_videos(db, course_id)
@@ -181,7 +189,6 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
             amount=-price, description=f"Course: {course.title}"
         ))
 
-        # Credit creator
         creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).first()
         if creator_wallet:
             creator_share = (price * CREATOR_CUT).quantize(Decimal("0.01"))
@@ -191,6 +198,15 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
                 user_rid=course.creator_rid, type="CREDIT_COURSE_SALE",
                 amount=creator_share, description=f"Course sale: {course.title}"
             ))
+            
+            # Notify the creator
+            from app.models.user import User
+            from app.services.notification_service import notification_service
+            creator = db.query(User).filter(User.rid == course.creator_rid).first()
+            if creator:
+                msg = f"Good news! You just earned {creator_share} GHS from an upfront purchase of '{course.title}'."
+                notification_service.send_alert(creator, "New Course Sale!", msg)
+                notification_service.send_in_app_notification(db, creator.rid, "New Earnings! 💰", msg, type="WALLET")
 
         db.add(CoursePayment(
             id=generate_uuid(),
@@ -203,6 +219,14 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
         db.add(CourseEnrollment(course_id=course_id, user_rid=current_user.rid))
         course.enrollment_count = (course.enrollment_count or 0) + 1
         db.commit()
+        
+        from app.services.notification_service import notification_service
+        notification_service.send_in_app_notification(
+            db=db, user_rid=current_user.rid, 
+            title="Course Enrollment", 
+            message=f"You have successfully enrolled in {course.title}.", 
+            type="ENROLLMENT", link=f"/learn/{course.id}"
+        )
         return {"status": "Enrolled (paid upfront)", "amount": float(price)}
 
     # ── EARN-TO-LEARN ──
@@ -224,6 +248,15 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
     db.add(CourseEnrollment(course_id=course_id, user_rid=current_user.rid))
     course.enrollment_count = (course.enrollment_count or 0) + 1
     db.commit()
+    
+    from app.services.notification_service import notification_service
+    notification_service.send_in_app_notification(
+        db=db, user_rid=current_user.rid, 
+        title="Earn-to-Learn Enrolled", 
+        message=f"You are now enrolled in {course.title} using Earn-to-Learn.", 
+        type="ENROLLMENT", link=f"/learn/{course.id}"
+    )
+    
     return {
         "status": "Enrolled (earn-to-learn)",
         "ppc": float(ppc),
@@ -400,6 +433,15 @@ def watch_video(course_id: str, body: WatchVideoRequest, current_user: User = De
                         user_rid=course.creator_rid, type="CREDIT_PPC",
                         amount=creator_share, description="PPC from learner"
                     ))
+                    
+                    # Notify the creator
+                    from app.models.user import User
+                    from app.services.notification_service import notification_service
+                    creator = db.query(User).filter(User.rid == course.creator_rid).first()
+                    if creator:
+                        msg = f"You earned {creator_share} GHS from a student learning '{course.title}' (Earn-To-Learn)."
+                        notification_service.send_alert(creator, "New Learning Earnings!", msg)
+                        notification_service.send_in_app_notification(db, creator.rid, "Learning Earnings 📈", msg, type="WALLET")
 
             if payment.remaining <= 0:
                 payment.status = "completed"
@@ -613,6 +655,14 @@ def claim_certificate(course_id: str, current_user: User = Depends(get_current_u
     db.add(cert)
     db.commit()
     db.refresh(cert)
+    
+    from app.services.notification_service import notification_service
+    notification_service.send_in_app_notification(
+        db=db, user_rid=current_user.rid, 
+        title="Certificate Earned! 🎉", 
+        message=f"Congratulations! You have completed {course.title} with a grade of {cert.grade_percentage}%.", 
+        type="CERTIFICATE", link=f"/certificates/{cert.id}"
+    )
     
     return {
         "status": "Success",

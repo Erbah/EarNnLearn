@@ -321,10 +321,14 @@ def get_youtube_metadata(body: YoutubeMetadataRequest, current_user: User = Depe
             if not info:
                 raise HTTPException(status_code=400, detail="Could not extract info from URL")
             
+            categories = info.get('categories', [])
+            yt_category = categories[0] if categories else ''
+            
             return {
                 "title": info.get('title', ''),
                 "description": info.get('description', ''),
-                "creator_name": info.get('uploader', '') or info.get('channel', '')
+                "creator_name": info.get('uploader', '') or info.get('channel', ''),
+                "category": yt_category
             }
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -403,6 +407,15 @@ def enroll_in_course(course_id: str, current_user: User = Depends(get_current_us
     course = db.query(Course).filter(Course.id == course_id).first()
     if course:
         course.enrollment_count = (course.enrollment_count or 0) + 1
+        
+        from app.services.notification_service import notification_service
+        notification_service.send_in_app_notification(
+            db=db, user_rid=current_user.rid, 
+            title="Course Enrollment", 
+            message=f"You have successfully enrolled in {course.title}.", 
+            type="ENROLLMENT", link=f"/learn/{course.id}"
+        )
+        
     db.commit()
     return {"status": "Enrolled successfully"}
 

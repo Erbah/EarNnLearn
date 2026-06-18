@@ -5,16 +5,17 @@ from app.core.database import Base
 
 class Notification(Base):
     """
-    Notifications for Admins (Approvals, etc.)
+    Notifications for Admins (Approvals, etc.) and Users (Alerts, Progress)
     """
     __tablename__ = "notifications"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_rid = Column(String, nullable=True) # If null, it's a global/admin notification
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)
-    link = Column(String, nullable=True) # Link to the relevant admin page/course
+    link = Column(String, nullable=True) # Link to the relevant page/course
     
-    # "PENDING_COURSE" | "SYSTEM" | "ALERT"
+    # "PENDING_COURSE" | "SYSTEM" | "ALERT" | "ENROLLMENT" | "CERTIFICATE" | "WALLET"
     type = Column(String, default="SYSTEM")
     
     is_read = Column(Boolean, default=False)

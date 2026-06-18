@@ -142,3 +142,49 @@ def get_public_portfolio(rid: str, db: Session = Depends(get_db)):
         "total_certificates": len(cert_list),
         "certificates": cert_list
     }
+
+# ── NOTIFICATIONS ──
+
+from app.models.notification import Notification
+
+@router.get("/me/notifications")
+def get_my_notifications(limit: int = 20, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Returns the current user's notifications, as well as global announcements (user_rid is NULL).
+    """
+    from sqlalchemy import or_, desc
+    notes = db.query(Notification).filter(
+        or_(Notification.user_rid == current_user.rid, Notification.user_rid == None)
+    ).order_by(desc(Notification.created_at)).limit(limit).all()
+    
+    return notes
+
+@router.post("/me/notifications/{note_id}/read")
+def mark_notification_read(note_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Marks a specific user notification as read.
+    Cannot mark global announcements (user_rid = NULL) as read to avoid affecting all users.
+    """
+    note = db.query(Notification).filter(
+        Notification.id == note_id,
+        Notification.user_rid == current_user.rid
+    ).first()
+    
+    if not note:
+        raise HTTPException(status_code=404, detail="Notification not found or access denied")
+        
+    note.is_read = True
+    db.commit()
+    return {"status": "success"}
+
+@router.post("/me/notifications/read-all")
+def mark_all_notifications_read(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """
+    Marks all of the user's specific notifications as read.
+    """
+    db.query(Notification).filter(
+        Notification.user_rid == current_user.rid,
+        Notification.is_read == False
+    ).update({"is_read": True})
+    db.commit()
+    return {"status": "success"}

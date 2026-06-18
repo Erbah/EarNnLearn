@@ -3,11 +3,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Bell, User, Home, Menu } from "lucide-react";
+import { Search, Bell, User, Home, Menu, Check, CheckCircle2 } from "lucide-react";
 import { useGamification } from "@/hooks/useGamification";
 import { useUser } from "@/context/UserContext";
-import { motion } from "framer-motion";
-import { API_BASE_URL } from "@/lib/api";
+import { motion, AnimatePresence } from "framer-motion";
+import { API_BASE_URL, api } from "@/lib/api";
 import { useSidebar } from "@/components/Sidebar";
 
 const API = `${API_BASE_URL}/api/v1`;
@@ -19,9 +19,51 @@ export const Topbar = React.memo(function Topbar() {
   const { hud, loading: hudLoading } = useGamification();
   const { user } = useUser();
 
-  const handleNotificationsClick = useCallback(() => {
-    alert("Notifications coming soon!");
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await api.get(`${API}/users/me/notifications?limit=15`);
+      setNotifications(res.data);
+    } catch (err) {
+      console.error("Failed to fetch notifications", err);
+    }
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      // Optional polling or websocket could go here
+    }
+  }, [user, fetchNotifications]);
+
+  const handleNotificationsClick = useCallback(() => {
+    setShowNotifications(prev => !prev);
+  }, []);
+
+  const markAsRead = async (noteId: string, link: string | null) => {
+    try {
+      await api.post(`${API}/users/me/notifications/${noteId}/read`);
+      setNotifications(prev => prev.map(n => n.id === noteId ? { ...n, is_read: true } : n));
+    } catch (err) {
+      console.error(err);
+    }
+    if (link) {
+      router.push(link);
+      setShowNotifications(false);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await api.post(`${API}/users/me/notifications/read-all`);
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleProfileClick = useCallback(() => {
     router.push("/settings");
@@ -95,15 +137,92 @@ export const Topbar = React.memo(function Topbar() {
           <Home className="w-6 h-6 text-gray-400 group-hover:text-white transition-colors" />
         </Link>
 
-        <button
-          onClick={handleNotificationsClick}
-          className="relative p-2 rounded-full hover:bg-white/5 transition-colors group cursor-pointer"
-          aria-label="Notifications"
-          title="Notifications"
-        >
-          <Bell className="w-6 h-6 text-gray-400 group-hover:text-white transition-colors" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full animate-pulse shadow-[0_0_8px_rgba(0,224,255,0.8)]"></span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={handleNotificationsClick}
+            className={`relative p-2 rounded-full transition-colors group cursor-pointer ${showNotifications ? 'bg-white/10' : 'hover:bg-white/5'}`}
+            aria-label="Notifications"
+            title="Notifications"
+          >
+            <Bell className={`w-6 h-6 transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)] border-2 border-background"></span>
+            )}
+          </button>
+
+          <AnimatePresence>
+            {showNotifications && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowNotifications(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-full right-0 mt-3 w-80 sm:w-96 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden"
+                >
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-white/5">
+                    <h3 className="text-white font-semibold">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button 
+                        onClick={markAllAsRead}
+                        className="text-xs text-primary hover:text-cyan-400 font-medium transition-colors flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3" /> Mark all read
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col max-h-[400px] overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="py-8 text-center text-gray-500 text-sm">
+                        You're all caught up!
+                      </div>
+                    ) : (
+                      notifications.map(note => (
+                        <button
+                          key={note.id}
+                          onClick={() => markAsRead(note.id, note.link)}
+                          className={`w-full text-left px-5 py-4 border-b border-white/5 hover:bg-white/5 transition-colors flex gap-3 items-start ${!note.is_read ? 'bg-primary/5' : ''}`}
+                        >
+                          <div className="mt-0.5 flex-shrink-0">
+                            {!note.is_read ? (
+                              <div className="w-2 h-2 rounded-full bg-primary mt-2 shadow-[0_0_5px_rgba(0,224,255,0.5)]" />
+                            ) : (
+                              <CheckCircle2 className="w-4 h-4 text-gray-600 mt-1" />
+                            )}
+                          </div>
+                          <div>
+                            <p className={`text-sm ${!note.is_read ? 'text-white font-medium' : 'text-gray-300'}`}>
+                              {note.title}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1 leading-snug">
+                              {note.message}
+                            </p>
+                            <p className="text-[10px] text-gray-600 mt-2 font-medium">
+                              {new Date(note.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  
+                  {notifications.length >= 15 && (
+                    <div className="px-5 py-3 border-t border-white/10 text-center bg-white/5">
+                      <Link href="/settings" onClick={() => setShowNotifications(false)} className="text-xs text-gray-400 hover:text-white font-medium transition-colors">
+                        View all notifications
+                      </Link>
+                    </div>
+                  )}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
         <div className="h-8 w-[1px] bg-white/10"></div>
         <button
           onClick={handleProfileClick}

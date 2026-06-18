@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.code import Code
 from app.models.wallet import Wallet, WalletTransaction
 from app.models.transaction import Transaction, ReferralIndex
-from app.schemas.code_schema import CodeResponse, ActivationRequest, SellerInfoResponse, PaymentSubmission, BuyCodeRequest, LegacyActivationRequest, SimulationRequest
+from app.schemas.code_schema import CodeResponse, ActivationRequest, SellerInfoResponse, PaymentSubmission, BuyCodeRequest, BuySponsorRequest, LegacyActivationRequest, SimulationRequest
 from app.services.activation_service import run_activation_engine
 from decimal import Decimal
 
@@ -201,6 +201,90 @@ def buy_product_code(req: BuyCodeRequest, current_user: User = Depends(get_curre
         # Update Video Progress
         db.query(VideoProgress).filter(VideoProgress.user_rid == old_rid).update({VideoProgress.user_rid: new_rid})
         
+        db.commit()
+
+    return user_code
+
+
+@router.post("/buy-sponsor", response_model=CodeResponse)
+def buy_sponsor_code(req: BuySponsorRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Purchase a specific sponsor code using wallet balance.
+    This replaces the manual MoMo payment flow.
+    """
+    if current_user.status == "pending" and not current_user.rid:
+        raise HTTPException(status_code=400, detail="Please complete your initial activation before purchasing.")
+
+    # Check if user already has an active (unused) product code
+    existing_code = db.query(Code).filter(
+        Code.owner_rid == current_user.rid,
+        Code.used == False,
+        Code.product_code != None
+    ).first()
+    
+    if existing_code:
+        raise HTTPException(status_code=400, detail="You already have an active product code for this season.")
+
+    # Find the requested sponsor code
+    target_code = db.query(Code).filter(Code.product_code == req.product_code).first()
+    if not target_code:
+        raise HTTPException(status_code=404, detail="Product code not found.")
+        
+    if target_code.used:
+        raise HTTPException(status_code=400, detail="This product code has already been used.")
+
+    # ─── PAYMENT VERIFICATION ───
+    # 1. Fetch Wallet
+    wallet = db.query(Wallet).filter(Wallet.user_rid == current_user.rid).first()
+    if not wallet:
+        wallet = Wallet(user_rid=current_user.rid)
+        db.add(wallet)
+        db.commit()
+    
+    # 2. Check Balance
+    code_price = target_code.price
+    if wallet.balance < code_price:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Insufficient wallet balance. You need {code_price} {target_code.currency} but have {wallet.balance} {wallet.currency}."
+        )
+    
+    # 3. Deduct Funds
+    wallet.balance -= code_price
+    wallet.withdrawable_balance -= code_price
+    
+    db.add(WalletTransaction(
+        user_rid=current_user.rid,
+        type="DEBIT_CODE_PURCHASE",
+        amount=code_price,
+        description=f"Purchased Sponsor Code: {target_code.product_code}"
+    ))
+
+    # Log standard Transaction record for profit tracking
+    transaction = Transaction(
+        code_id=target_code.id,
+        buyer_rid=current_user.rid,  # Will be updated to new_rid in activation
+        seller_rid=target_code.owner_rid,
+        amount=code_price,
+        currency=target_code.currency,
+        payment_method="WALLET",
+        status="success"
+    )
+    db.add(transaction)
+    
+    old_rid = current_user.rid
+    if current_user.rid:
+        current_user.rid = None 
+
+    # Activate the user using the sponsor code
+    user_code = run_activation_engine(db, current_user, target_code, transaction=transaction)
+    new_rid = current_user.rid
+    
+    # MIGRATION
+    if old_rid and new_rid and old_rid != new_rid:
+        from app.models.learning import CoursePayment, VideoProgress
+        db.query(CoursePayment).filter(CoursePayment.user_rid == old_rid).update({CoursePayment.user_rid: new_rid})
+        db.query(VideoProgress).filter(VideoProgress.user_rid == old_rid).update({VideoProgress.user_rid: new_rid})
         db.commit()
 
     return user_code

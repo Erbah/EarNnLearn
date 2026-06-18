@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     MASTER_PERCENTAGE: float = 0.05
     FAMILY_PERCENTAGE: float = 0.25
 
+    # Notification Costs
+    SMS_COST: float = 0.05
+    EMAIL_COST: float = 0.005
+
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
         # Prefer explicit DATABASE_URL (set by Railway/Heroku)

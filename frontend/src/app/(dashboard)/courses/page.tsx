@@ -4,11 +4,13 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Search, Filter, Star, Users, BookOpen, ChevronRight, 
+  Search, Filter, Star, Users, BookOpen, ChevronRight, ChevronDown,
   Sparkles, TrendingUp, Clock
 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
 import { useDebounce } from "@/hooks/useDebounce";
+
+import { CATEGORY_TOPICS } from "@/lib/courseTopics";
 
 const API = `${API_BASE_URL}/api/v1`;
 
@@ -41,6 +43,9 @@ export default function CoursesPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [loading, setLoading] = useState(true);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [isSortOpen, setIsSortOpen] = useState(false);
 
   const loadCourses = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -114,59 +119,167 @@ export default function CoursesPage() {
         </Link>
       </div>
 
-      {/* Search + Sort */}
-      <div className="flex gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search courses..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-primary/50 transition-all"
-          />
-        </div>
-        <div className="relative">
-          <label id="lbl-sort" className="sr-only">Sort by</label>
-          <select
-            value={sort}
-            onChange={e => setSort(e.target.value)}
-            title="Sort by"
-            aria-labelledby="lbl-sort"
-            className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white appearance-none cursor-pointer focus:outline-none focus:border-primary/50"
+      {/* Unified Search Header */}
+      <div className="flex w-full gap-4 relative z-50">
+        
+        {/* Categories Dropdown & Search Wrapper */}
+        <div className="flex flex-1 items-center bg-white/5 border border-white/10 rounded-xl transition-all focus-within:border-primary/50 focus-within:bg-white/10 relative">
+          
+          {/* Categories Button */}
+          <div 
+            className="relative h-full"
+            onMouseEnter={() => setIsDropdownOpen(true)}
+            onMouseLeave={() => setIsDropdownOpen(false)}
           >
-            <option value="popular" className="bg-sidebar">Most Popular</option>
-            <option value="rating" className="bg-sidebar">Top Rated</option>
-            <option value="newest" className="bg-sidebar">Newest</option>
-          </select>
-        </div>
-      </div>
+            <button 
+              className={`flex items-center h-full gap-2 px-5 text-sm font-medium transition-colors border-r border-white/10 ${isDropdownOpen || activeCategory ? 'text-primary' : 'text-gray-300 hover:text-white'}`}
+            >
+              {activeCategory ? activeCategory : "Explore"}
+              <ChevronDown className={`w-4 h-4 ml-1 opacity-70 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-      {/* Categories */}
-      <div className="flex gap-3 flex-wrap">
-        <button
-          onClick={() => setActiveCategory(null)}
-          className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-            !activeCategory 
-              ? "bg-primary/20 text-primary border border-primary/30" 
-              : "bg-white/5 text-gray-400 border border-white/10 hover:border-white/20"
-          }`}
+            {/* Dropdown Menu */}
+            <AnimatePresence>
+              {isDropdownOpen && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-full left-0 mt-2 w-72 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-2 flex z-50"
+                >
+                  {/* Main Subjects Pane */}
+                  <div className="w-full">
+                    <button
+                      onClick={() => {
+                        setActiveCategory(null);
+                        setSearch("");
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-5 py-3 text-sm transition-colors text-left ${!activeCategory ? 'text-primary bg-primary/10' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                    >
+                      <span className="font-medium">All Courses</span>
+                    </button>
+                    {Array.isArray(categories) && categories.map(cat => {
+                      const topics = CATEGORY_TOPICS[cat.name] || [];
+                      const isActive = activeCategory === cat.name;
+                      return (
+                        <div 
+                          key={cat.id}
+                          className="relative group"
+                          onMouseEnter={() => setHoveredCategory(cat.name)}
+                        >
+                          <button
+                            onClick={() => {
+                              setActiveCategory(cat.name);
+                              setIsDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-5 py-3 text-sm transition-colors text-left ${isActive ? 'text-primary bg-primary/10' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                          >
+                            <span className="flex items-center gap-3">
+                              <span className="text-lg">{cat.icon}</span> 
+                              <span className="font-medium">{cat.name}</span>
+                            </span>
+                            {topics.length > 0 && (
+                              <ChevronRight className={`w-4 h-4 transition-transform ${hoveredCategory === cat.name ? 'translate-x-1' : ''} ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-white'}`} />
+                            )}
+                          </button>
+
+                          {/* Topics Flyout Pane */}
+                          {hoveredCategory === cat.name && topics.length > 0 && (
+                            <div className="absolute top-0 left-full ml-1 w-64 bg-[#222] border border-white/10 rounded-xl shadow-2xl py-2 z-50">
+                              <div className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/10 mb-1">
+                                {cat.name} Topics
+                              </div>
+                              {topics.map(topic => (
+                                <button
+                                  key={topic}
+                                  onClick={() => {
+                                    setActiveCategory(cat.name);
+                                    setSearch(topic);
+                                    setIsDropdownOpen(false);
+                                  }}
+                                  className="w-full px-5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left font-medium"
+                                >
+                                  {topic}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Search Input */}
+          <div className="flex-1 relative flex items-center">
+            <Search className="absolute left-4 w-5 h-5 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search for anything..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-12 pr-4 py-4 bg-transparent text-white placeholder-gray-500 focus:outline-none"
+            />
+            {search && (
+              <button 
+                onClick={() => setSearch("")}
+                className="absolute right-4 text-xs font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sort Dropdown */}
+        <div 
+          className="relative h-full"
+          onMouseEnter={() => setIsSortOpen(true)}
+          onMouseLeave={() => setIsSortOpen(false)}
         >
-          All
-        </button>
-        {Array.isArray(categories) && categories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setActiveCategory(activeCategory === cat.name ? null : cat.name)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              activeCategory === cat.name 
-                ? "bg-primary/20 text-primary border border-primary/30" 
-                : "bg-white/5 text-gray-400 border border-white/10 hover:border-white/20"
-            }`}
+          <button 
+            className={`flex items-center justify-between h-full px-5 py-4 min-w-[160px] bg-white/5 border border-white/10 rounded-xl text-sm font-medium transition-all ${isSortOpen ? 'border-primary/50 bg-white/10' : 'hover:bg-white/10'}`}
           >
-            {cat.icon} {cat.name}
+            <span className="text-gray-300">
+              {sort === 'popular' ? 'Most Popular' : sort === 'rating' ? 'Top Rated' : 'Newest'}
+            </span>
+            <ChevronRight className={`w-4 h-4 text-gray-500 transition-transform ${isSortOpen ? 'rotate-90 text-primary' : 'rotate-90'}`} />
           </button>
-        ))}
+
+          <AnimatePresence>
+            {isSortOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full right-0 mt-2 w-full bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-2 flex flex-col z-50 overflow-hidden"
+              >
+                {[
+                  { value: 'popular', label: 'Most Popular' },
+                  { value: 'rating', label: 'Top Rated' },
+                  { value: 'newest', label: 'Newest' }
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      setSort(option.value);
+                      setIsSortOpen(false);
+                    }}
+                    className={`w-full px-5 py-3 text-sm transition-colors text-left font-medium ${sort === option.value ? 'text-primary bg-primary/10' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Skill Level */}

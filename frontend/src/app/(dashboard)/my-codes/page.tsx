@@ -4,11 +4,13 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QrCode, Copy, CheckCircle, Share2, MessageCircle, Send, Plus, CreditCard } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api";
+import { useUser } from "@/context/UserContext";
 
 const API = `${API_BASE_URL}/api/v1`;
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001';
 
 export default function MyCodesPage() {
+  const { user } = useUser();
   const [codes, setCodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -103,7 +105,7 @@ export default function MyCodesPage() {
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">My Product Codes</h1>
-          <p className="text-gray-400 mt-1">Share these codes to grow your network and earn 70% commission</p>
+          <p className="text-gray-400 mt-1">Share these codes to grow your network and earn {user?.seller_percentage ? user.seller_percentage * 100 : 70}% commission</p>
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-400 mb-1">Wallet Balance</p>

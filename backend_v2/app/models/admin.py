@@ -83,3 +83,18 @@ class CodeGenerationSession(Base):
     seller_share = Column(Numeric(5, 2), nullable=False)
     family_share = Column(Numeric(5, 2), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class PlatformExpense(Base):
+    """
+    Records operational expenses such as SMS, WhatsApp, and Email notification costs.
+    Allows the AI finance aspect to tabulate and analyze costs per season.
+    """
+    __tablename__ = "platform_expenses"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    expense_type = Column(String, nullable=False)  # e.g., 'SMS', 'WHATSAPP', 'EMAIL', 'INFRASTRUCTURE'
+    amount = Column(Numeric(12, 4), nullable=False) # In GHS or USD. Use 4 decimals for micro-cents
+    currency = Column(String, default="GHS")
+    season_number = Column(Integer, nullable=True) # Link to season for tabulation
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

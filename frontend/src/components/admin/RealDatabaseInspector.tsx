@@ -160,10 +160,10 @@ export const RealDatabaseInspector = React.memo(function RealDatabaseInspector({
 
                 <div className="flex-1 overflow-auto border border-white/10 rounded-2xl bg-black/40 shadow-inner">
                   <table className="w-full text-left text-[11px] border-collapse">
-                    <thead className="bg-white/5 sticky top-0 z-10">
+                    <thead className="bg-[#0A0C10] sticky top-0 z-20 shadow-sm shadow-black/50">
                       <tr>
                         {tableData?.columns?.map((col: string) => (
-                          <th key={col} className="px-4 py-3 font-bold text-gray-500 border-b border-white/10 uppercase tracking-tighter">{col}</th>
+                          <th key={col} className="px-4 py-3 font-bold text-gray-300 bg-[#0A0C10] border-b border-white/10 uppercase tracking-widest">{col}</th>
                         ))}
                       </tr>
                     </thead>

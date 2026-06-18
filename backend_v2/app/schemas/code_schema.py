@@ -38,6 +38,9 @@ class BuyCodeRequest(BaseModel):
     min_price: float
     currency: str
 
+class BuySponsorRequest(BaseModel):
+    product_code: str
+
 class LegacyActivationRequest(BaseModel):
     activation_code: str
     code_type: str = "rid"

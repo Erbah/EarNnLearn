@@ -121,3 +121,16 @@ def credit_wallet(db: Session, user_rid: str, amount: Decimal, tx_type: str, des
         amount=amount,
         description=description
     ))
+
+    # Send notifications for profit payouts
+    if tx_type in ["CREDIT_PROFIT_SELLER", "CREDIT_PROFIT_FAMILY"] and amount > 0:
+        from app.models.user import User
+        from app.services.notification_service import notification_service
+        user = db.query(User).filter(User.rid == user_rid).first()
+        if user:
+            title = "New Code Sale! 💰" if tx_type == "CREDIT_PROFIT_SELLER" else "Network Bonus! 🌳"
+            msg_prefix = "A product code you sold was activated" if tx_type == "CREDIT_PROFIT_SELLER" else "Someone in your network activated a code"
+            msg = f"{msg_prefix}. You have earned {amount} GHS!"
+            
+            notification_service.send_alert(user, title, msg)
+            notification_service.send_in_app_notification(db, user_rid, title, msg, type="WALLET")

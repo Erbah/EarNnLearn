@@ -312,6 +312,87 @@ def get_analytics(current_user: Annotated[User, Depends(require_super_admin)], d
         top_promoters=top_promoters
     )
 
+@router.get("/finance/notification-expenses")
+def get_notification_expenses(
+    current_user: Annotated[User, Depends(require_super_admin)],
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    season_number: int | None = None,
+    db: Session = Depends(get_db)
+):
+    """AI Finance Dashboard: Get tabulated notification costs."""
+    from app.models.admin import PlatformExpense
+    
+    query = db.query(PlatformExpense).filter(
+        PlatformExpense.expense_type.in_(["SMS_WHATSAPP_NOTIFICATION", "EMAIL_NOTIFICATION"])
+    )
+    
+    if start_date:
+        query = query.filter(PlatformExpense.created_at >= start_date)
+    if end_date:
+        query = query.filter(PlatformExpense.created_at <= end_date)
+    if season_number is not None:
+        query = query.filter(PlatformExpense.season_number == season_number)
+        
+    expenses = query.order_by(desc(PlatformExpense.created_at)).all()
+    
+    sms_cost = sum(float(e.amount) for e in expenses if e.expense_type == "SMS_WHATSAPP_NOTIFICATION")
+    email_cost = sum(float(e.amount) for e in expenses if e.expense_type == "EMAIL_NOTIFICATION")
+    
+    latest_20 = [{
+        "id": e.id,
+        "type": e.expense_type,
+        "amount": float(e.amount),
+        "currency": e.currency,
+        "season_number": e.season_number,
+        "description": e.description,
+        "created_at": e.created_at.isoformat() if e.created_at else None
+    } for e in expenses[:20]]
+    
+    return {
+        "total_sms_whatsapp_cost": sms_cost,
+        "total_email_cost": email_cost,
+        "total_notification_cost": sms_cost + email_cost,
+        "season_number_filtered": season_number,
+        "record_count": len(expenses),
+        "latest_records": latest_20
+    }
+
+
+
+# ═══════════════════════════════════════
+#  SYSTEM DATABASE EXPLORER
+# ═══════════════════════════════════════
+@router.get("/tables")
+def list_tables(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """List all application tables in the database."""
+    from sqlalchemy import text
+    result = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
+    tables = [row[0] for row in result.fetchall()]
+    return tables
+
+@router.get("/tables/{table_name}")
+def get_table_data(table_name: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """Get raw data from a specific table."""
+    from sqlalchemy import text
+    import re
+    if not re.match(r'^[a-zA-Z0-9_]+$', table_name):
+        raise HTTPException(status_code=400, detail="Invalid table name")
+        
+    try:
+        pragma_res = db.execute(text(f"PRAGMA table_info({table_name})"))
+        columns = [row[1] for row in pragma_res.fetchall()]
+        
+        result = db.execute(text(f"SELECT * FROM {table_name} LIMIT 500"))
+        rows = result.fetchall()
+        
+        data = []
+        for row in rows:
+            data.append(dict(zip(columns, row)))
+            
+        return {"columns": columns, "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ═══════════════════════════════════════
 #  SYSTEM SETTINGS

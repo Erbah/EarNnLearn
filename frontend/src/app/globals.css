@@ -49,4 +49,27 @@ input:-webkit-autofill:active{
     -webkit-text-fill-color: white !important;
     transition: background-color 5000s ease-in-out 0s;
 }
+/* Global Clickable Animations */
+button, 
+a, 
+[role="button"],
+input[type="submit"],
+input[type="button"] {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
+button:active:not(:disabled), 
+a:active, 
+[role="button"]:active,
+input[type="submit"]:active:not(:disabled),
+input[type="button"]:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+button:hover:not(:disabled), 
+a:hover, 
+[role="button"]:hover,
+input[type="submit"]:hover:not(:disabled),
+input[type="button"]:hover:not(:disabled) {
+  filter: brightness(1.1);
+}

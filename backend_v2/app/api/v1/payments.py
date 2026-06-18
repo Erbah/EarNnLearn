@@ -130,6 +130,15 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
             amount=amount,
             description=f"Wallet deposit via Paystack ({reference})"
         ))
+        
+        from app.services.notification_service import notification_service
+        notification_service.send_in_app_notification(
+            db=db, user_rid=user_rid, 
+            title="Deposit Successful", 
+            message=f"Your deposit of {amount} GHS has been credited to your wallet.", 
+            type="WALLET", link="/settings"
+        )
+        
         db.commit()
         return {"status": "success", "message": "Wallet funded"}
 
@@ -147,7 +156,6 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         # Mark transaction success
         tx.status = "success"
         
-        # Credit creator (direct purchase logic)
         creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).first()
         if creator_wallet:
             amount = Decimal(str(data.get("amount", 0))) / 100
@@ -161,6 +169,15 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
                 amount=creator_share,
                 description=f"Direct sale: {course.title}"
             ))
+            
+            # Notify the creator
+            from app.models.user import User
+            from app.services.notification_service import notification_service
+            creator = db.query(User).filter(User.rid == course.creator_rid).first()
+            if creator:
+                msg = f"Good news! You just earned {creator_share} GHS from a direct purchase of '{course.title}'."
+                notification_service.send_alert(creator, "New Course Sale!", msg)
+                notification_service.send_in_app_notification(db, creator.rid, "New Earnings! 💰", msg, type="WALLET")
 
         # Create enrollment and payment record
         db.add(CoursePayment(
@@ -176,6 +193,14 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         ))
         db.add(CourseEnrollment(course_id=course_id, user_rid=user_rid))
         course.enrollment_count = (course.enrollment_count or 0) + 1
+        
+        from app.services.notification_service import notification_service
+        notification_service.send_in_app_notification(
+            db=db, user_rid=user_rid, 
+            title="Course Purchased", 
+            message=f"You have successfully purchased and enrolled in {course.title}.", 
+            type="ENROLLMENT", link=f"/learn/{course.id}"
+        )
         
         db.commit()
         return {"status": "success", "message": "Course purchased and enrolled"}

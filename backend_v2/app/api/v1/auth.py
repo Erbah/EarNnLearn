@@ -260,19 +260,21 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
 def read_users_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Extract just the codes as strings
     resp = UserResponse.from_orm(current_user)
+    resp_dict = resp.model_dump()
+    
     codes = db.query(Code).filter(Code.owner_rid == current_user.rid).all()
-    resp.product_codes = [c.product_code for c in codes if c.product_code]
+    resp_dict["product_codes"] = [c.product_code for c in codes if c.product_code]
     
     from app.models.admin import SystemSetting
     settings_dict = {s.key: s.value for s in db.query(SystemSetting).all()}
     
-    if "seller_percentage" in settings_dict: resp.seller_percentage = float(settings_dict["seller_percentage"])
-    if "activation_price" in settings_dict: resp.activation_price = float(settings_dict["activation_price"])
-    if "min_withdrawal" in settings_dict: resp.min_withdrawal = float(settings_dict["min_withdrawal"])
-    if "withdrawal_fee" in settings_dict: resp.withdrawal_fee = float(settings_dict["withdrawal_fee"])
-    if "default_currency" in settings_dict: resp.default_currency = settings_dict["default_currency"]
+    if "seller_percentage" in settings_dict: resp_dict["seller_percentage"] = float(settings_dict["seller_percentage"])
+    if "activation_price" in settings_dict: resp_dict["activation_price"] = float(settings_dict["activation_price"])
+    if "min_withdrawal" in settings_dict: resp_dict["min_withdrawal"] = float(settings_dict["min_withdrawal"])
+    if "withdrawal_fee" in settings_dict: resp_dict["withdrawal_fee"] = float(settings_dict["withdrawal_fee"])
+    if "default_currency" in settings_dict: resp_dict["default_currency"] = settings_dict["default_currency"]
         
-    return resp
+    return resp_dict
 
 @router.post("/retry-activation")
 def retry_activation(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
