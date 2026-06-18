@@ -109,6 +109,7 @@ const HistoryRow = React.memo(function HistoryRow({ session, onDelete }: History
 
 export const CodesPanel = React.memo(function CodesPanel() {
   const [configs, setConfigs] = useState<any[]>([{ tier_type: 'public', count: 10, price: 20, platform_share: 40, seller_share: 30, family_share: 30 }]);
+  const [defaultPrice, setDefaultPrice] = useState(20);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showInspector, setShowInspector] = useState(false);
@@ -129,6 +130,29 @@ export const CodesPanel = React.memo(function CodesPanel() {
   useEffect(() => {
     const controller = new AbortController();
     loadHistory(controller.signal);
+
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get(`${API}/settings`, { signal: controller.signal });
+        const actPriceSetting = res.data.find((s: any) => s.key === 'activation_price');
+        if (actPriceSetting) {
+          const price = parseFloat(actPriceSetting.value);
+          if (!isNaN(price)) {
+            setDefaultPrice(price);
+            setConfigs(prev => {
+              if (prev.length === 1 && prev[0].price === 20) {
+                return [{ ...prev[0], price }];
+              }
+              return prev;
+            });
+          }
+        }
+      } catch (e) {
+        if (axios.isCancel(e)) return;
+      }
+    };
+    fetchSettings();
+
     return () => controller.abort();
   }, [loadHistory]);
 
@@ -160,8 +184,8 @@ export const CodesPanel = React.memo(function CodesPanel() {
   }, [configs, loadHistory]);
 
   const handleAddTier = useCallback(() => {
-    setConfigs(prev => [...prev, { tier_type: 'public', count: 10, price: 20, platform_share: 40, seller_share: 30, family_share: 30 }]);
-  }, []);
+    setConfigs(prev => [...prev, { tier_type: 'public', count: 10, price: defaultPrice, platform_share: 40, seller_share: 30, family_share: 30 }]);
+  }, [defaultPrice]);
 
   const handleRemoveTier = useCallback((idx: number) => {
     setConfigs(prev => prev.filter((_, i) => i !== idx));

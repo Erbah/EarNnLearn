@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { X, Database, Table, Zap, Loader2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { API_BASE_URL, api } from '@/lib/api';
 import axios from 'axios';
 
@@ -40,6 +41,9 @@ export const RealDatabaseInspector = React.memo(function RealDatabaseInspector({
   const [tableData, setTableData] = useState<any>(null);
   const [formattedRows, setFormattedRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -109,7 +113,9 @@ export const RealDatabaseInspector = React.memo(function RealDatabaseInspector({
     }
   }, [selectedTable, loadTable]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[160] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 md:p-8">
       <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-[#0A0C10] border border-white/10 w-full max-w-6xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden relative">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/50 via-primary to-primary/50" />
@@ -185,7 +191,8 @@ export const RealDatabaseInspector = React.memo(function RealDatabaseInspector({
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 });
 

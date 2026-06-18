@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Eye, Smile, CheckCircle2, Zap, ShoppingBag, Trash2, Loader2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { API_BASE_URL, api } from '@/lib/api';
 import axios from 'axios';
 import { AdminStatCard } from './AdminStatCard';
@@ -80,6 +81,9 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
   const [sharingCode, setSharingCode] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deletingBulk, setDeletingBulk] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const loadData = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -118,7 +122,9 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
       const res = await api.delete(`${API}/codes/purge-unused`);
       alert(`Purged ${res.data.deleted_count} unused RIDs.`);
       loadData();
-    } catch (e) {}
+    } catch (e: any) {
+      alert("Failed to purge codes: " + (e.response?.data?.detail || e.message));
+    }
   }, [loadData]);
 
   const handleDeleteBulk = useCallback(async () => {
@@ -175,7 +181,9 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
   const unusedCodesCount = useMemo(() => codes.filter(c => !c.is_used).length, [codes]);
   const isAllSelected = useMemo(() => selectedIds.length > 0 && selectedIds.length === unusedCodesCount, [selectedIds, unusedCodesCount]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 text-white"
@@ -270,7 +278,8 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
         </div>
       </motion.div>
       <AnimatePresence>{sharingCode && <ShareModal code={sharingCode} onClose={handleCloseShare} />}</AnimatePresence>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 });
 

@@ -765,6 +765,13 @@ def update_code_tier(code_id: str, body: CodeUpdate, current_user: Annotated[Use
     db.commit()
     return {"status": "success"}
 
+@router.delete("/codes/purge-unused")
+def purge_all_unused_codes(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    deleted_count = db.query(Code).filter(Code.used == False).delete(synchronize_session=False)
+    db.add(AdminLog(admin_rid=current_user.rid, action="Purged all unused RIDs", details={"deleted_count": deleted_count}))
+    db.commit()
+    return {"status": "success", "deleted_count": deleted_count}
+
 @router.delete("/codes/{code_id}")
 def delete_individual_code(code_id: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     try:
@@ -811,12 +818,7 @@ def delete_generation_session(session_id: str, current_user: Annotated[User, Dep
     db.commit()
     return {"status": "success", "message": msg, "deleted_count": deleted_count, "kept_used": used_count}
 
-@router.delete("/codes/purge-unused")
-def purge_all_unused_codes(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
-    deleted_count = db.query(Code).filter(Code.used == False).delete(synchronize_session=False)
-    db.add(AdminLog(admin_rid=current_user.rid, action="Purged all unused RIDs", details={"deleted_count": deleted_count}))
-    db.commit()
-    return {"status": "success", "deleted_count": deleted_count}
+
 
 
 # ═══════════════════════════════════════
