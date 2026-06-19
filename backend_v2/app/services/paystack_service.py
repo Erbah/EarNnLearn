@@ -11,7 +11,7 @@ class PaystackService:
         return settings.PAYSTACK_SECRET_KEY
 
     @classmethod
-    def initialize_transaction(cls, email: str, amount: Decimal, metadata: dict = None):
+    def initialize_transaction(cls, email: str, amount: Decimal, metadata: dict = None, callback_url: str = None):
         """
         Paystack expects amount in KOBO/PESEWAS (cents).
         1.00 GHS = 100 Pesewas.
@@ -34,6 +34,8 @@ class PaystackService:
             "amount": int(float(amount) * 100),
             "metadata": metadata or {}
         }
+        if callback_url:
+            payload["callback_url"] = callback_url
         headers = {
             "Authorization": f"Bearer {secret_key}",
             "Content-Type": "application/json"

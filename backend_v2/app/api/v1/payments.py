@@ -62,7 +62,9 @@ def verify_payment_simulator(reference: str, db: Session = Depends(get_db)):
         "first_product_code": activated_code.product_code
     }
 
-@router.post("/webhook/paystack")
+from app.core.rate_limit import payment_verify_limiter
+
+@router.post("/webhook/paystack", dependencies=[Depends(payment_verify_limiter)])
 async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Handles Paystack event notifications (e.g. charge.success).
@@ -91,14 +93,20 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     if not reference:
         raise HTTPException(status_code=400, detail="Missing payment reference")
 
-    # 3. Find Transaction
+    # 3. Find Transaction with Row-Level Lock
     tx = db.query(Transaction).filter(
-        Transaction.payment_reference == reference,
-        Transaction.status == "pending"
-    ).first()
+        Transaction.payment_reference == reference
+    ).with_for_update().first()
 
     if not tx:
-        return {"message": "Transaction already processed or not found"}
+        return {"message": "Transaction tracking token mismatch or not found"}
+
+    # 3b. Idempotency Check: Evaluate State safely post-lock
+    if tx.status != "pending":
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Duplicate webhook intercepted for reference {reference}. Transaction already fully reconciled.")
+        return {"status": "success", "message": "Transaction already fully reconciled."}
 
     # 4. Handle based on metadata or transaction type
     metadata = data.get("metadata", {})
@@ -114,96 +122,114 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
         return {"status": "success", "message": "Account activated"}
 
     elif payment_type == "WALLET_DEPOSIT":
-        user_rid = metadata.get("user_rid")
-        wallet = db.query(Wallet).filter(Wallet.user_rid == user_rid).first()
-        if not wallet: return {"message": "Wallet not found"}
-        
-        from decimal import Decimal
-        amount = Decimal(str(data.get("amount", 0))) / 100
-        wallet.balance += amount
-        wallet.withdrawable_balance += amount
-        tx.status = "success"
-        
-        db.add(WalletTransaction(
-            user_rid=user_rid,
-            type="CREDIT_DEPOSIT",
-            amount=amount,
-            description=f"Wallet deposit via Paystack ({reference})"
-        ))
-        
-        from app.services.notification_service import notification_service
-        notification_service.send_in_app_notification(
-            db=db, user_rid=user_rid, 
-            title="Deposit Successful", 
-            message=f"Your deposit of {amount} GHS has been credited to your wallet.", 
-            type="WALLET", link="/settings"
-        )
-        
-        db.commit()
-        return {"status": "success", "message": "Wallet funded"}
-
-    elif payment_type == "COURSE_PURCHASE":
-        course_id = metadata.get("course_id")
-        user_rid = metadata.get("user_rid")
-        
-        from app.models.course import Course
-        from app.models.marketplace import CourseEnrollment
-        from app.models.learning import CoursePayment, generate_uuid, get_now
-        
-        course = db.query(Course).filter(Course.id == uuid.UUID(course_id)).first()
-        if not course: return {"message": "Course not found"}
-        
-        # Mark transaction success
-        tx.status = "success"
-        
-        creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).first()
-        if creator_wallet:
+        try:
+            user_rid = metadata.get("user_rid")
+            wallet = db.query(Wallet).filter(Wallet.user_rid == user_rid).with_for_update().first()
+            if not wallet: 
+                db.rollback()
+                return {"message": "Wallet not found"}
+            
+            from decimal import Decimal
             amount = Decimal(str(data.get("amount", 0))) / 100
-            from app.api.v1.learning import CREATOR_CUT
-            creator_share = (amount * CREATOR_CUT).quantize(Decimal("0.01"))
-            creator_wallet.balance += creator_share
-            creator_wallet.withdrawable_balance += creator_share
+            wallet.balance += amount
+            wallet.withdrawable_balance += amount
+            tx.status = "success"
+            
             db.add(WalletTransaction(
-                user_rid=course.creator_rid,
-                type="CREDIT_COURSE_SALE",
-                amount=creator_share,
-                description=f"Direct sale: {course.title}"
+                user_rid=user_rid,
+                type="CREDIT_DEPOSIT",
+                amount=amount,
+                description=f"Wallet deposit via Paystack ({reference})"
             ))
             
-            # Notify the creator
-            from app.models.user import User
             from app.services.notification_service import notification_service
-            creator = db.query(User).filter(User.rid == course.creator_rid).first()
-            if creator:
-                msg = f"Good news! You just earned {creator_share} GHS from a direct purchase of '{course.title}'."
-                notification_service.send_alert(creator, "New Course Sale!", msg)
-                notification_service.send_in_app_notification(db, creator.rid, "New Earnings! 💰", msg, type="WALLET")
+            notification_service.send_in_app_notification(
+                db=db, user_rid=user_rid, 
+                title="Deposit Successful", 
+                message=f"Your deposit of {amount} GHS has been credited to your wallet.", 
+                type="WALLET", link="/settings"
+            )
+            
+            db.commit()
+            return {"status": "success", "message": "Wallet funded"}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Transactional integrity failure during runtime ingestion."
+            )
 
-        # Create enrollment and payment record
-        db.add(CoursePayment(
-            id=generate_uuid(),
-            user_rid=user_rid,
-            course_id=course_id,
-            total_price=course.price,
-            amount_paid=course.price,
-            remaining=0,
-            payment_method="paystack_direct",
-            status="completed",
-            created_at=get_now()
-        ))
-        db.add(CourseEnrollment(course_id=course_id, user_rid=user_rid))
-        course.enrollment_count = (course.enrollment_count or 0) + 1
-        
-        from app.services.notification_service import notification_service
-        notification_service.send_in_app_notification(
-            db=db, user_rid=user_rid, 
-            title="Course Purchased", 
-            message=f"You have successfully purchased and enrolled in {course.title}.", 
-            type="ENROLLMENT", link=f"/learn/{course.id}"
-        )
-        
-        db.commit()
-        return {"status": "success", "message": "Course purchased and enrolled"}
+    elif payment_type == "COURSE_PURCHASE":
+        try:
+            course_id = metadata.get("course_id")
+            user_rid = metadata.get("user_rid")
+            
+            from app.models.course import Course
+            from app.models.marketplace import CourseEnrollment
+            from app.models.learning import CoursePayment, generate_uuid, get_now
+            
+            course = db.query(Course).filter(Course.id == uuid.UUID(course_id)).first()
+            if not course: 
+                db.rollback()
+                return {"message": "Course not found"}
+            
+            # Mark transaction success
+            tx.status = "success"
+            
+            creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).with_for_update().first()
+            if creator_wallet:
+                amount = Decimal(str(data.get("amount", 0))) / 100
+                from app.api.v1.learning import CREATOR_CUT
+                creator_share = (amount * CREATOR_CUT).quantize(Decimal("0.01"))
+                creator_wallet.balance += creator_share
+                creator_wallet.withdrawable_balance += creator_share
+                db.add(WalletTransaction(
+                    user_rid=course.creator_rid,
+                    type="CREDIT_COURSE_SALE",
+                    amount=creator_share,
+                    description=f"Direct sale: {course.title}"
+                ))
+                
+                # Notify the creator
+                from app.models.user import User
+                from app.services.notification_service import notification_service
+                creator = db.query(User).filter(User.rid == course.creator_rid).first()
+                if creator:
+                    msg = f"Good news! You just earned {creator_share} GHS from a direct purchase of '{course.title}'."
+                    notification_service.send_alert(creator, "New Course Sale!", msg)
+                    notification_service.send_in_app_notification(db, creator.rid, "New Earnings! 💰", msg, type="WALLET")
+
+            # Create enrollment and payment record
+            db.add(CoursePayment(
+                id=generate_uuid(),
+                user_rid=user_rid,
+                course_id=course_id,
+                total_price=course.price,
+                amount_paid=course.price,
+                remaining=0,
+                payment_method="paystack_direct",
+                status="completed",
+                created_at=get_now()
+            ))
+            db.add(CourseEnrollment(course_id=course_id, user_rid=user_rid))
+            course.enrollment_count = (course.enrollment_count or 0) + 1
+            
+            from app.services.notification_service import notification_service
+            notification_service.send_in_app_notification(
+                db=db, user_rid=user_rid, 
+                title="Course Purchased", 
+                message=f"You have successfully purchased and enrolled in {course.title}.", 
+                type="ENROLLMENT", link=f"/learn/{course.id}"
+            )
+            
+            db.commit()
+            return {"status": "success", "message": "Course purchased and enrolled"}
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Transactional integrity failure during runtime ingestion."
+            )
 
     return {"message": "Unknown payment type"}
 
@@ -216,4 +242,4 @@ def verify_paystack_signature(payload: bytes, signature: str) -> bool:
         payload,
         hashlib.sha512
     ).hexdigest()
-    return expected == signature
+    return hmac.compare_digest(expected, signature)

@@ -12,9 +12,6 @@ from app.services.activation_service import run_activation_engine
 from decimal import Decimal
 
 router = APIRouter()
-legacy_router = APIRouter()
-
-legacy_payments = {}
 
 @router.get("/seller-payment/{product_code}", response_model=SellerInfoResponse)
 def get_seller_payment_info(product_code: str, db: Session = Depends(get_db)):
@@ -290,67 +287,3 @@ def buy_sponsor_code(req: BuySponsorRequest, current_user: User = Depends(get_cu
     return user_code
 
 
-# ═══════════════════════════════════════
-#  LEGACY / SIMULATION ENDPOINTS
-# ═══════════════════════════════════════
-
-@legacy_router.post("/payments/simulate/initialize")
-async def initialize_payment(req: SimulationRequest):
-    import uuid
-    reference = f"MOCK_{uuid.uuid4().hex[:12].upper()}"
-    legacy_payments[reference] = {
-        "amount": req.amount,
-        "currency": req.currency,
-        "status": "pending",
-        "transaction_id": None
-    }
-    return {"reference": reference, "status": "pending"}
-
-@legacy_router.post("/payments/simulate/callback/{reference}")
-async def simulate_callback(reference: str):
-    if reference not in legacy_payments:
-        raise HTTPException(status_code=404, detail=f"Reference {reference} not found")
-    
-    import uuid
-    transaction_id = f"TXN_{uuid.uuid4().hex[:16].upper()}"
-    legacy_payments[reference]["status"] = "success"
-    legacy_payments[reference]["transaction_id"] = transaction_id
-    return {"message": "Payment successful", "transaction_id": transaction_id}
-
-@legacy_router.post("/activate")
-def legacy_activate_code(req: LegacyActivationRequest, db: Session = Depends(get_db)):
-    ref = req.payment_reference
-    if ref not in legacy_payments or legacy_payments[ref]["status"] != "success":
-        return {"error": "Payment is still pending"}
-    
-    target_code = db.query(Code).filter(
-        (Code.generated_rid == req.activation_code) |
-        (Code.product_code == req.activation_code)
-    ).first()
-    
-    if not target_code:
-        return {"error": "Activation code not found"}
-        
-    if target_code.used:
-        return {"error": "Activation code already used"}
-
-    import random, string
-    username_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
-    dummy_user = User(
-        email=f"test_{username_suffix}@ceditrees.com",
-        name=f"Test User {username_suffix.upper()}",
-        password_hash="mock_hash",
-        role="USER",
-        status="pending"
-    )
-    db.add(dummy_user)
-    db.flush()
-    
-    try:
-        activated_code = run_activation_engine(db, dummy_user, target_code)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Activation error: {str(e)}")
-        
-    return {"message": "Activation successful", "product_code": activated_code.product_code}

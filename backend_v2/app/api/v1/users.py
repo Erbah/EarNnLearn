@@ -102,6 +102,11 @@ def update_profile(
 
     db.commit()
     db.refresh(current_user)
+    
+    # Invalidate Portfolio Cache
+    from app.services.cache_service import cache_service
+    cache_service.invalidate(f"portfolio:{current_user.rid}")
+    
     return current_user
 
 @router.get("/{rid}/portfolio")
@@ -112,15 +117,26 @@ def get_public_portfolio(rid: str, db: Session = Depends(get_db)):
     Returns Gamification stats and earned certificates for a user.
     Hides all sensitive financial and contact details.
     """
+    from app.services.cache_service import cache_service
+    cache_key = f"portfolio:{rid}"
+    cached = cache_service.get_json(cache_key)
+    if cached:
+        return cached
+
     user = db.query(User).filter(User.rid == rid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
     certificates = db.query(Certificate).filter(Certificate.user_rid == rid).order_by(Certificate.issued_at.desc()).all()
     
+    # N+1 Fix: Bulk query all related courses
+    course_ids = [c.course_id for c in certificates]
+    courses = db.query(Course).filter(Course.id.in_(course_ids)).all() if course_ids else []
+    course_map = {c.id: c for c in courses}
+    
     cert_list = []
     for cert in certificates:
-        course = db.query(Course).filter(Course.id == cert.course_id).first()
+        course = course_map.get(cert.course_id)
         cert_list.append({
             "certificate_id": cert.id,
             "course_title": course.title if course else "Unknown Course",
@@ -131,7 +147,7 @@ def get_public_portfolio(rid: str, db: Session = Depends(get_db)):
             "certificate_url": cert.certificate_url
         })
         
-    return {
+    response_data = {
         "profile": {
             "name": user.name,
             "learning_goal": user.learning_goal,
@@ -142,6 +158,11 @@ def get_public_portfolio(rid: str, db: Session = Depends(get_db)):
         "total_certificates": len(cert_list),
         "certificates": cert_list
     }
+    
+    # Cache for 1 hour (3600 seconds)
+    cache_service.set_json(cache_key, response_data, 3600)
+    
+    return response_data
 
 # ── NOTIFICATIONS ──
 

@@ -48,6 +48,7 @@ class RateLimiter:
             _, _, count, _ = pipeline.execute()
             
             if count > self.limit:
+                logger.warning(f"Rate limit exceeded for {self.key_prefix} from IP {client_ip}")
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail="Too many requests. Please try again later."
@@ -66,6 +67,7 @@ class RateLimiter:
             
             if len(timestamps) >= self.limit:
                 self._memory_storage[client_ip] = timestamps
+                logger.warning(f"Memory Rate limit exceeded for {self.key_prefix} from IP {client_ip}")
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail="Too many requests. Please try again later."
@@ -77,3 +79,6 @@ class RateLimiter:
 # Instantiations as dependencies
 login_rate_limiter = RateLimiter(limit=5, window_seconds=60, key_prefix="rate_limit:login")
 register_rate_limiter = RateLimiter(limit=3, window_seconds=60, key_prefix="rate_limit:register")
+otp_rate_limiter = RateLimiter(limit=3, window_seconds=60, key_prefix="rate_limit:otp")
+upload_rate_limiter = RateLimiter(limit=5, window_seconds=60, key_prefix="rate_limit:upload")
+payment_verify_limiter = RateLimiter(limit=5, window_seconds=60, key_prefix="rate_limit:payment_verify")

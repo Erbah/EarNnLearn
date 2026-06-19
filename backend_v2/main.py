@@ -7,7 +7,7 @@ from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from sqlalchemy import text
 from app.core.config import settings, sanitize_secrets
 from app.core.database import Base, engine
-from app.api.v1 import auth, wallet, codes, referral, admin, marketplace, learning, ai, payments, education, users, engagement, tracks, instructors
+from app.api.v1 import auth, wallet, codes, referral, admin_auth, admin_settings, admin_ai, admin_codes, admin_analytics, marketplace, learning, ai, payments, education, users, engagement, tracks, instructors
 
 # Import all models so Base.metadata knows about them
 from app.models.user import User
@@ -235,9 +235,12 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
     app.include_router(wallet.router, prefix=f"{settings.API_V1_STR}/wallet", tags=["Wallet"])
     app.include_router(codes.router, prefix=f"{settings.API_V1_STR}/codes", tags=["Codes Economy"])
-    app.include_router(codes.legacy_router, prefix=f"{settings.API_V1_STR}", tags=["Legacy Codes"])
     app.include_router(referral.router, prefix=f"{settings.API_V1_STR}/network", tags=["Network"])
-    app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Control Center"])
+    app.include_router(admin_auth.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Control Center"])
+    app.include_router(admin_settings.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Control Center"])
+    app.include_router(admin_ai.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Control Center"])
+    app.include_router(admin_codes.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Control Center"])
+    app.include_router(admin_analytics.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Control Center"])
     app.include_router(marketplace.router, prefix=f"{settings.API_V1_STR}/marketplace", tags=["Learning Marketplace"])
     app.include_router(marketplace.router, prefix=f"{settings.API_V1_STR}/courses", tags=["Course Discovery"])
     app.include_router(learning.router, prefix=f"{settings.API_V1_STR}/learn", tags=["Pay-As-You-Learn"])

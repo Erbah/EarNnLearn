@@ -1083,7 +1083,9 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-@router.post("/knowledge/upload")
+from app.core.rate_limit import upload_rate_limiter
+
+@router.post("/knowledge/upload", dependencies=[Depends(upload_rate_limiter)])
 async def upload_knowledge_source(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -1092,29 +1094,18 @@ async def upload_knowledge_source(
 ):
     """Upload a book or document to the Global AI Library."""
     validate_uploaded_file(file)
-    ext = os.path.splitext(file.filename)[1].lower()
-
-    import uuid as _uuid
-    safe_name = f"{_uuid.uuid4().hex}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, safe_name)
-
-    with open(file_path, "wb") as buf:
-        shutil.copyfileobj(file.file, buf)
-
-    file_size = os.path.getsize(file_path)
-    title = os.path.splitext(file.filename)[0].replace("_", " ").replace("-", " ").title()
-
-    # 🛡️ Anti-Duplicate Logic: Check if this file already exists
+    # We don't have file size easily before reading, but we can get it from the fastAPI upload file
+    file.file.seek(0, os.SEEK_END)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    
+    # 🛡️ Anti-Duplicate Logic: Check if this file already exists BEFORE uploading
     existing = db.query(KnowledgeSource).filter(
         KnowledgeSource.filename == file.filename,
         KnowledgeSource.file_size_bytes == file_size
     ).first()
 
     if existing:
-        # If it exists, just return the existing one instead of creating a duplicate
-        # Optional: delete the temp file we just wrote
-        try: os.remove(file_path)
-        except: pass
         return {
             "id": existing.id,
             "title": existing.title,
@@ -1125,13 +1116,19 @@ async def upload_knowledge_source(
             "message": "Source already exists in library. Using existing record."
         }
 
+    from app.services.storage_service import storage_service
+    # Upload to S3 (or local fallback)
+    file_url = await storage_service.upload_file(file)
+    
+    title = os.path.splitext(file.filename)[0].replace("_", " ").replace("-", " ").title()
+
     source = KnowledgeSource(
         uploader_rid=user.rid,
         title=title,
         filename=file.filename,
-        file_type=ext.lstrip("."),
+        file_type=os.path.splitext(file.filename)[1].lower().lstrip("."),
         file_size_bytes=file_size,
-        file_path=file_path,
+        file_path=file_url,
         status="uploaded",
         source_type="user_upload",
         is_shared=True
@@ -1220,12 +1217,22 @@ async def get_knowledge_source(
     if not source.is_shared and source.uploader_rid != user.rid and user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
         raise HTTPException(status_code=403, detail="Access denied to this knowledge source")
 
+    from app.services.storage_service import storage_service
+    
+    if source.is_shared:
+        # Public asset gets a CDN URL
+        resolved_url = storage_service.get_public_url(source.file_path)
+    else:
+        # Premium/Protected asset gets a time-limited presigned URL
+        resolved_url = storage_service.get_presigned_url(source.file_path, expires_in=3600)
+
     return {
         "id": source.id,
         "title": source.title,
         "filename": source.filename,
         "file_type": source.file_type,
         "file_size_bytes": source.file_size_bytes,
+        "file_url": resolved_url,
         "author": source.author,
         "isbn": source.isbn,
         "subject": source.subject,
@@ -1358,11 +1365,26 @@ def list_public_roadmaps(
     """
     Search the global Knowledge Library for high-quality subject roadmaps.
     """
+    from app.services.cache_service import cache_service
+    cache_key = f"roadmaps:{subject or 'all'}:{limit}"
+    cached = cache_service.get_json(cache_key)
+    if cached:
+        return cached
+
     query = db.query(SubjectRoadmap).filter(SubjectRoadmap.is_public == True)
     if subject:
         query = query.filter(SubjectRoadmap.subject.ilike(f"%{subject}%"))
     
-    return query.order_by(SubjectRoadmap.popularity_score.desc()).limit(limit).all()
+    results = query.order_by(SubjectRoadmap.popularity_score.desc()).limit(limit).all()
+    
+    # Need to convert SQLAlchemy objects to dict before caching
+    # A simple conversion works if the models don't have complex relationships loaded here
+    from fastapi.encoders import jsonable_encoder
+    json_results = jsonable_encoder(results)
+    
+    # Cache for 15 minutes (900 seconds)
+    cache_service.set_json(cache_key, json_results, 900)
+    return results
 
 @router.get("/library/lessons")
 def list_public_lessons(
@@ -1374,11 +1396,24 @@ def list_public_lessons(
     """
     Search the global Knowledge Library for high-quality AI lessons.
     """
+    from app.services.cache_service import cache_service
+    cache_key = f"lessons:{topic or 'all'}:{limit}"
+    cached = cache_service.get_json(cache_key)
+    if cached:
+        return cached
+
     query = db.query(AILesson).filter(AILesson.is_public == True)
     if topic:
         query = query.filter(AILesson.topic.ilike(f"%{topic}%"))
         
-    return query.order_by(AILesson.popularity_score.desc()).limit(limit).all()
+    results = query.order_by(AILesson.popularity_score.desc()).limit(limit).all()
+    
+    from fastapi.encoders import jsonable_encoder
+    json_results = jsonable_encoder(results)
+    
+    # Cache for 15 minutes (900 seconds)
+    cache_service.set_json(cache_key, json_results, 900)
+    return results
 
 @router.post("/library/roadmaps/{roadmap_id}/remix")
 def remix_roadmap(

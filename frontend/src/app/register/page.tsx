@@ -32,11 +32,11 @@ function RegisterForm() {
     password: "",
     manualCode: "",
     // Payment (Pay-in)
-    paymentMethod: "mobile_money",
-    paymentProvider: "MTN",
+    paymentMethod: "paystack",
+    paymentProvider: "",
     paymentNumber: "",
     // Payout (Earnings)
-    payoutMethod: "mobile_money",
+    payoutMethod: "paystack",
     payoutProvider: "MTN",
     payoutNumber: "",
     payoutName: "",
@@ -264,12 +264,18 @@ function RegisterForm() {
     if (codeMetadata && Object.keys(exchangeRates).length > 0) {
       const rate = exchangeRates[formData.preferredCurrency] || 1;
       const converted = codeMetadata.price * rate;
-      // Only set if not already set or if less than minimum (prevents overwriting user inputs unless necessary)
-      if (!formData.purchaseAmount || parseFloat(formData.purchaseAmount) < converted) {
-        setFormData(prev => ({ ...prev, purchaseAmount: converted.toFixed(2) }));
-      }
+      
+      setFormData(prev => {
+        // Only auto-fill if empty. We don't auto-correct lower amounts while typing 
+        // so the user can actually see the "Insufficient Amount" warning.
+        // If they leave it too low, it's caught by the prompt when they click "Make Payment".
+        if (!prev.purchaseAmount) {
+          return { ...prev, purchaseAmount: converted.toFixed(2) };
+        }
+        return prev;
+      });
     }
-  }, [codeMetadata, exchangeRates, formData.preferredCurrency, formData.purchaseAmount]);
+  }, [codeMetadata, exchangeRates, formData.preferredCurrency]);
 
   // Robust Sync Logic: Keep payout in sync with payment if toggle is on
   useEffect(() => {
@@ -413,11 +419,7 @@ function RegisterForm() {
       const codeValid = formData.manualCode.trim() !== "" && codeMetadata !== null;
       const amount = parseFloat(formData.purchaseAmount);
       const amountValid = !isNaN(amount) && amount > 0;
-      const paymentValid = formData.paymentNumber.trim() !== "";
-      return codeValid && amountValid && paymentValid;
-    }
-    if (step === 3) {
-      return formData.payoutNumber.trim() !== "";
+      return codeValid && amountValid;
     }
     return true;
   };
@@ -444,13 +446,13 @@ function RegisterForm() {
         className="w-full max-w-lg p-6 sm:p-8 rounded-3xl bg-card border border-white/10 shadow-2xl glass relative z-10"
       >
         <div className="flex justify-between mb-8 px-4">
-          {!isActivating && [1, 2, 3].map((s) => (
+          {!isActivating && [1, 2].map((s) => (
             <div key={s} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${step >= s ? "bg-primary text-background" : "bg-white/10 text-gray-500 border border-white/10"
                 }`}>
                 {step > s ? <CheckCircle className="w-5 h-5" /> : s}
               </div>
-              {s < 3 && <div className={`w-12 sm:w-16 h-[2px] mx-2 ${step > s ? "bg-primary" : "bg-white/10"}`} />}
+              {s < 2 && <div className={`w-12 sm:w-16 h-[2px] mx-2 ${step > s ? "bg-primary" : "bg-white/10"}`} />}
             </div>
           ))}
           {isActivating && (
@@ -487,12 +489,14 @@ function RegisterForm() {
                   const confirmAdjust = window.confirm(`The minimum activation price is ${formData.preferredCurrency} ${minAmount.toFixed(2)}.\n\nYour entered amount of ${formData.preferredCurrency} ${amount.toFixed(2)} is lower than the minimum selling price.\n\nDo you agree to automatically adjust your payment to ${formData.preferredCurrency} ${minAmount.toFixed(2)} to proceed?`);
                   if (confirmAdjust) {
                     setFormData({ ...formData, purchaseAmount: minAmount.toFixed(2) });
-                    setStep(3);
+                    handleRegister();
                   }
                   return;
                 }
+                handleRegister();
+              } else {
+                setStep(step + 1);
               }
-              step < 3 ? setStep(step + 1) : handleRegister();
             }
           }}>
             <AnimatePresence mode="wait">
@@ -529,29 +533,35 @@ function RegisterForm() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">First Name</label>
+                      <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-2">First Name</label>
                       <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
                         <input
+                          id="firstName"
+                          name="firstName"
+                          autoComplete="given-name"
                           type="text"
                           aria-label="First Name"
                           value={formData.firstName}
                           onChange={(e) => { setFormData({ ...formData, firstName: e.target.value }); setSubmitError(null); }}
-                          className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 focus:outline-none focus:border-primary/50 text-white"
+                          className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 caret-primary focus:outline-none focus:border-primary/50 text-white"
                           placeholder="John"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Last Name</label>
+                      <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-2">Last Name</label>
                       <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
                         <input
+                          id="lastName"
+                          name="lastName"
+                          autoComplete="family-name"
                           type="text"
                           aria-label="Last Name"
                           value={formData.lastName}
                           onChange={(e) => { setFormData({ ...formData, lastName: e.target.value }); setSubmitError(null); }}
-                          className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 focus:outline-none focus:border-primary/50 text-white"
+                          className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 caret-primary focus:outline-none focus:border-primary/50 text-white"
                           placeholder="Doe"
                         />
                       </div>
@@ -559,15 +569,18 @@ function RegisterForm() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Email Address or Phone Number <span className="text-red-400">*</span></label>
+                    <label htmlFor="identifier" className="block text-sm font-medium text-gray-300 mb-2">Email Address or Phone Number <span className="text-red-400">*</span></label>
                     <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
                       <input
+                        id="identifier"
+                        name="username"
+                        autoComplete="username"
                         type="text"
                         aria-label="Email or Phone Number"
                         value={formData.identifier}
                         onChange={(e) => { setFormData({ ...formData, identifier: e.target.value }); setSubmitError(null); }}
-                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 focus:outline-none focus:border-primary/50 text-white"
+                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 caret-primary focus:outline-none focus:border-primary/50 text-white"
                         placeholder="john@example.com or 054 123 4567"
                         required
                       />
@@ -576,15 +589,18 @@ function RegisterForm() {
 
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
                       <input
+                        id="password"
+                        name="password"
+                        autoComplete="new-password"
                         type={showPassword ? "text" : "password"}
                         aria-label="Password"
                         value={formData.password}
                         onChange={(e) => { setFormData({ ...formData, password: e.target.value }); setSubmitError(null); }}
-                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-12 focus:outline-none focus:border-primary/50 text-white"
+                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-12 caret-primary focus:outline-none focus:border-primary/50 text-white"
                         placeholder="••••••••"
                       />
                       <button
@@ -725,14 +741,14 @@ function RegisterForm() {
 
                   <div className="space-y-4">
                     <div className="relative">
-                      <KeyRound className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${entryMethod === "rid" ? "text-primary" : "text-secondary"}`} />
+                      <KeyRound className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 pointer-events-none ${entryMethod === "rid" ? "text-primary" : "text-secondary"}`} />
                       <input
                         type="text"
                         aria-label="Access Code"
                         value={formData.manualCode}
                         onChange={(e) => handleCodeChange(e.target.value)}
                         placeholder="Enter or select a code..."
-                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-white focus:outline-none focus:border-primary/50 text-sm font-mono placeholder:font-sans"
+                        className="w-full bg-background/50 border border-white/10 rounded-xl py-3 pl-12 pr-10 text-white caret-primary focus:outline-none focus:border-primary/50 text-sm font-mono placeholder:font-sans"
                       />
                       {isValidating && (
                         <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 animate-spin" />
@@ -807,27 +823,9 @@ function RegisterForm() {
                             )}
                           </div>
 
-                          {/* Transaction explanation Banner */}
-                          <div className="bg-secondary/5 border border-secondary/20 p-3 rounded-xl flex gap-3">
-                            <Info className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
-                            <div className="space-y-1">
-                              <h4 className="text-[10px] font-black text-secondary uppercase tracking-tight">Financial Security</h4>
-                              <p className="text-[9px] text-gray-400 leading-relaxed">
-                                Activation (pay-in) is separate from earnings (pay-out). We use secure gateways like **Paystack** to ensure your data is protected.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Choose Payment Method</label>
+                          <div className="space-y-4 pt-2">
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment Method</label>
                             <div className="grid grid-cols-3 gap-1 bg-background/80 rounded-xl p-1 border border-white/5">
-                              <button
-                                type="button"
-                                onClick={() => setFormData({ ...formData, paymentMethod: "mobile_money" })}
-                                className={`py-2 rounded-lg text-[10px] font-bold transition-all ${formData.paymentMethod === "mobile_money" ? "bg-primary text-background shadow-lg" : "text-gray-500 hover:text-white"}`}
-                              >
-                                LOCAL
-                              </button>
                               <button
                                 type="button"
                                 onClick={() => setFormData({ ...formData, paymentMethod: "paystack" })}
@@ -837,67 +835,33 @@ function RegisterForm() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setFormData({ ...formData, paymentMethod: "stripe" })}
-                                className={`py-2 rounded-lg text-[10px] font-bold transition-all ${formData.paymentMethod === "stripe" ? "bg-primary text-background shadow-lg" : "text-gray-500 hover:text-white"}`}
+                                disabled
+                                className="py-2 rounded-lg text-[10px] font-bold transition-all text-gray-600 opacity-50 cursor-not-allowed flex flex-col items-center justify-center gap-0.5"
                               >
-                                GLOBAL
+                                <span>STRIPE</span>
+                                <span className="text-[7px] text-primary/70 uppercase">Coming Soon</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled
+                                className="py-2 rounded-lg text-[10px] font-bold transition-all text-gray-600 opacity-50 cursor-not-allowed flex flex-col items-center justify-center gap-0.5"
+                              >
+                                <span>PAYPAL</span>
+                                <span className="text-[7px] text-primary/70 uppercase">Coming Soon</span>
                               </button>
                             </div>
-
-                            {formData.paymentMethod === "mobile_money" && (
-                              <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <div className="grid grid-cols-3 gap-2">
-                                  {["MTN", "Vodafone", "AirtelTigo"].map(p => (
-                                    <button
-                                      key={p}
-                                      type="button"
-                                      onClick={() => setFormData({ ...formData, paymentProvider: p })}
-                                      className={`py-2 rounded-lg border text-[9px] font-black transition-all ${formData.paymentProvider === p ? "bg-primary/20 border-primary text-white" : "bg-white/5 border-white/10 text-gray-500"}`}
-                                    >
-                                      {p.toUpperCase()}
-                                    </button>
-                                  ))}
-                                </div>
-                                <div className="relative">
-                                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                  <input
-                                    type="text"
-                                    aria-label="Payment Phone Number"
-                                    value={formData.paymentNumber}
-                                    onChange={(e) => setFormData({ ...formData, paymentNumber: e.target.value })}
-                                    placeholder="Confirm payment phone"
-                                    className="w-full bg-background/80 border border-white/10 rounded-lg py-3 pl-10 text-xs text-white focus:outline-none focus:border-primary/40"
-                                  />
-                                </div>
-                              </div>
-                            )}
 
                             {formData.paymentMethod === "paystack" && (
                               <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                                 <div className="bg-primary/5 p-3 rounded-lg border border-primary/20">
-                                  <p className="text-[9px] text-gray-400 leading-relaxed uppercase font-bold">Paystack Secure</p>
-                                  <p className="text-[8px] text-gray-500 mb-1.5">Supports Card, MoMo, & Bank Transfer</p>
-                                  <p className="text-[8px] text-primary/70 font-mono">Receipt email: {formData.identifier}</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {formData.paymentMethod === "stripe" && (
-                              <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <div className="relative">
-                                  <ShoppingCart className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                  <input
-                                    type="text"
-                                    aria-label="Payment Account ID"
-                                    value={formData.paymentNumber}
-                                    onChange={(e) => setFormData({ ...formData, paymentNumber: e.target.value })}
-                                    placeholder="Email/Card Account for payment"
-                                    className="w-full bg-background/80 border border-white/10 rounded-lg py-3 pl-10 text-xs text-white focus:outline-none focus:border-primary/40"
-                                  />
+                                  <p className="text-[9px] text-gray-400 leading-relaxed uppercase font-bold">Paystack Secure Checkout</p>
+                                  <p className="text-[8px] text-gray-500 mb-1.5">Supports Card, MoMo, & Bank Transfer globally.</p>
+                                  <p className="text-[8px] text-primary/70 font-mono">Receipt email: {formData.identifier || "Enter email above"}</p>
                                 </div>
                               </div>
                             )}
                           </div>
+
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -905,122 +869,6 @@ function RegisterForm() {
                 </motion.div>
               )}
 
-              {step === 3 && (
-                <motion.div
-                  key="step3"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-6"
-                >
-                  <div className="text-center mb-6">
-                    <h2 className="text-xl font-bold text-white">Earnings Setup</h2>
-                    <p className="text-sm text-gray-400">Where you want to receive your profits.</p>
-                  </div>
-
-                  <div
-                    onClick={() => setFormData({ ...formData, syncPayout: !formData.syncPayout })}
-                    className="bg-primary/10 border border-primary/20 p-4 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-primary/15 transition-all shadow-[0_0_20px_rgba(var(--primary-rgb),0.05)]"
-                  >
-                    <div className="flex gap-3">
-                      <RefreshCw className={`w-5 h-5 text-primary ${formData.syncPayout ? "animate-spin-[duration:10s]" : ""}`} />
-                      <div>
-                        <h4 className="text-xs font-bold text-white uppercase tracking-tight">Sync Financial Identity</h4>
-                        <p className="text-[10px] text-primary/70">Use my payment info for earning rewards.</p>
-                      </div>
-                    </div>
-                    <div className={`w-10 h-6 rounded-full p-1 transition-all ${formData.syncPayout ? "bg-primary" : "bg-white/10"}`}>
-                      <div className={`w-4 h-4 bg-white rounded-full transition-all ${formData.syncPayout ? "ml-4" : "ml-0"}`} />
-                    </div>
-                  </div>
-
-                  {!formData.syncPayout ? (
-                    <div className="space-y-5 animate-in slide-in-from-top-4 duration-500">
-                      <div className="grid grid-cols-4 gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
-                        {[
-                          { id: "mobile_money", label: "MOMO" },
-                          { id: "paystack", label: "PAYSTACK" },
-                          { id: "paypal", label: "PAYPAL" },
-                          { id: "bank", label: "BANK" }
-                        ].map(m => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, payoutMethod: m.id })}
-                            className={`py-2 rounded-lg text-[8px] font-black transition-all ${formData.payoutMethod === m.id ? "bg-secondary text-background" : "text-gray-500 hover:text-white"}`}
-                          >
-                            {m.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {formData.payoutMethod === "mobile_money" && (
-                        <div className="space-y-4 animate-in fade-in duration-300">
-                          <div className="grid grid-cols-3 gap-2">
-                            {["MTN", "Vodafone", "AirtelTigo"].map(p => (
-                              <button
-                                key={p}
-                                type="button"
-                                onClick={() => setFormData({ ...formData, payoutProvider: p })}
-                                className={`py-2 rounded-lg border text-[9px] font-black transition-all ${formData.payoutProvider === p ? "bg-secondary/20 border-secondary text-white" : "bg-white/5 border-white/10 text-gray-500"}`}
-                              >
-                                {p}
-                              </button>
-                            ))}
-                          </div>
-                          <input
-                            type="text"
-                            aria-label="Payout Phone Number"
-                            value={formData.payoutNumber}
-                            onChange={(e) => setFormData({ ...formData, payoutNumber: e.target.value })}
-                            placeholder="Phone Number (024...)"
-                            className="w-full bg-background/50 border border-white/10 rounded-xl py-3 px-4 text-xs text-secondary focus:outline-none focus:border-secondary/50 placeholder:text-gray-600 shadow-inner"
-                          />
-                        </div>
-                      )}
-
-                      {formData.payoutMethod === "paystack" && (
-                        <div className="space-y-4 animate-in fade-in duration-300">
-                          <div className="bg-secondary/10 p-3 rounded-lg border border-secondary/20">
-                            <p className="text-[9px] text-secondary/70 uppercase font-black">Paystack Transfer</p>
-                            <p className="text-[8px] text-gray-500 leading-tight">Fast settlements directly to your bank or wallet.</p>
-                            <p className="text-[8px] text-secondary/70 font-mono mt-1.5">Registered Email: {formData.identifier}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {(formData.payoutMethod === "paypal" || formData.payoutMethod === "bank") && (
-                        <div className="space-y-3 animate-in fade-in duration-300">
-                          <input
-                            type="text"
-                            aria-label="Payout Account ID"
-                            value={formData.payoutNumber}
-                            onChange={(e) => setFormData({ ...formData, payoutNumber: e.target.value })}
-                            placeholder={formData.payoutMethod === "paypal" ? "PayPal Email" : "Bank Account Number"}
-                            className="w-full bg-background/50 border border-white/10 rounded-xl py-3 px-4 text-xs text-secondary focus:outline-none focus:border-secondary/50 placeholder:text-gray-600 shadow-inner"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-2 opacity-80 backdrop-blur-sm shadow-inner">
-                      <div className="flex justify-between items-center mb-1">
-                        <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Financial Summary</p>
-                        <Zap className="w-3 h-3 text-primary animate-pulse" />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-white text-sm font-mono flex items-center gap-2">
-                          {formData.paymentMethod === "mobile_money" ? <Smartphone className="w-4 h-4 text-primary" /> : <ShieldCheck className="w-4 h-4 text-primary" />}
-                          {maskIdentifier(formData.paymentNumber) || <span className="text-gray-600 text-[10px] italic">No details entered</span>}
-                        </p>
-                        <span className="text-[9px] font-black text-primary/80 bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20 uppercase">
-                          {formData.paymentMethod === "paystack" ? "Paystack" : (formData.paymentProvider || "Global")}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              )}
             </AnimatePresence>
 
             {submitError && (
@@ -1067,7 +915,7 @@ function RegisterForm() {
 
               <button
                 type="button"
-                aria-label={step === 3 ? "Launch Account" : "Next Phase"}
+                aria-label={step === 2 ? "Make Payment" : "Next Phase"}
                 onClick={() => {
                   if (step === 2) {
                     const amount = parseFloat(formData.purchaseAmount);
@@ -1076,17 +924,19 @@ function RegisterForm() {
                       const confirmAdjust = window.confirm(`The minimum activation price is ${formData.preferredCurrency} ${minAmount.toFixed(2)}.\n\nYour entered amount of ${formData.preferredCurrency} ${amount.toFixed(2)} is lower than the minimum selling price.\n\nDo you agree to automatically adjust your payment to ${formData.preferredCurrency} ${minAmount.toFixed(2)} to proceed?`);
                       if (confirmAdjust) {
                         setFormData({ ...formData, purchaseAmount: minAmount.toFixed(2) });
-                        setStep(3);
+                        handleRegister();
                       }
                       return;
                     }
+                    handleRegister();
+                  } else {
+                    setStep(step + 1);
                   }
-                  step < 3 ? setStep(step + 1) : handleRegister();
                 }}
                 disabled={loading || !isCurrentStepValid()}
                 className={`flex-1 py-4 bg-white text-background font-black text-xs uppercase tracking-widest rounded-xl hover:bg-gray-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.15)] flex items-center justify-center group disabled:opacity-50`}
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : step === 3 ? "Launch Account" : "Next Phase"}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : step === 2 ? "Make Payment" : "Next Phase"}
                 {!loading && <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />}
               </button>
             </div>

@@ -72,6 +72,19 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     }
   }, [user, refetchUser]);
 
+  // Auto-verify if returning from Paystack
+  useEffect(() => {
+    if (typeof window !== "undefined" && user && user.status === "pending") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const hasRef = searchParams.get('reference') || searchParams.get('trxref');
+      if (hasRef) {
+        // Clean URL to prevent multiple calls
+        window.history.replaceState({}, document.title, window.location.pathname);
+        handleRetry();
+      }
+    }
+  }, [user, handleRetry]);
+
   // --- 🚨 Elite Hardening: Beta Access Gate ---
   const isBetaAuthorized = user?.is_beta_user || user?.role === 'SUPER_ADMIN';
   const isPublicRoute = pathname?.startsWith('/admin/launch-dashboard'); // Allow admin to see dashboard

@@ -374,16 +374,29 @@ def watch_video(course_id: str, body: WatchVideoRequest, current_user: User = De
     if progress and progress.watched:
         return {"status": "Already completely watched", "deduction": 0}
 
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+
     if not progress:
         progress = VideoProgress(
             user_rid=current_user.rid, course_id=course_id,
-            video_id=body.video_id, watch_time=0, watched=False
+            video_id=body.video_id, watch_time=0, watched=False,
+            last_pinged_at=now
         )
         db.add(progress)
 
     # 4. UPDATE WATCH TIME
-    # We allow the client to report incremental watch time (or final).
+    # We allow the client to report incremental watch time, but validate it.
+    if progress.last_pinged_at:
+        seconds_since_last_ping = (now - progress.last_pinged_at.replace(tzinfo=timezone.utc)).total_seconds()
+        
+        # Buffer of 10 seconds for latency. If they claim more watch time than
+        # physically possible since the last ping, we reject it.
+        if body.watch_time - (progress.watch_time or 0) > (seconds_since_last_ping + 10):
+            raise HTTPException(status_code=400, detail="Watch time manipulation detected. Sync rate exceeded.")
+
     progress.watch_time = max(progress.watch_time or 0, body.watch_time)
+    progress.last_pinged_at = now
     
     # 5. CHECK 90% COMPLETION THRESHOLD
     completion_threshold = body.duration * 0.90
@@ -505,6 +518,60 @@ def payment_status(course_id: str, current_user: User = Depends(get_current_user
         "starts_at_season": payment.start_season,
         "current_season": current_season
     }
+
+
+@router.get("/video/{video_id}/url")
+def get_video_url(video_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Returns the secure, pre-signed URL (or CDN URL) for a video, provided the user has access.
+    """
+    from app.services.storage_service import storage_service
+    
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+        
+    # Free previews get public URL (if it's an S3 key, it returns CDN link or S3 link)
+    if video.is_preview:
+        url = storage_service.get_public_url(video.youtube_id)
+        return {"url": url, "type": "public"}
+        
+    module = db.query(Module).filter(Module.id == video.module_id).first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+        
+    course_id = module.course_id
+    
+    # Check if creator
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if course and course.creator_rid == current_user.rid:
+        return {"url": storage_service.get_presigned_url(video.youtube_id), "type": "presigned"}
+        
+    # Check admin
+    if current_user.role in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+        return {"url": storage_service.get_presigned_url(video.youtube_id), "type": "presigned"}
+        
+    # Check enrollment
+    enrollment = db.query(CourseEnrollment).filter(
+        CourseEnrollment.user_rid == current_user.rid,
+        CourseEnrollment.course_id == course_id
+    ).first()
+    
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="Enroll in the course to access premium videos.")
+        
+    # User is enrolled, check if their payment is paused
+    payment = db.query(CoursePayment).filter(
+        CoursePayment.user_rid == current_user.rid,
+        CoursePayment.course_id == course_id
+    ).first()
+    
+    if payment and payment.status == "paused":
+        raise HTTPException(status_code=402, detail="Payment paused. Please settle balance to continue watching.")
+        
+    # Verified! Generate pre-signed URL
+    url = storage_service.get_presigned_url(video.youtube_id)
+    return {"url": url, "type": "presigned"}
 
 
 # ═══════════════════════════════════════

@@ -59,6 +59,7 @@ class VideoProgress(Base):
     deduction_amount = Column(Numeric(12, 2), default=0)
     
     watched_at = Column(DateTime, default=get_now)
+    last_pinged_at = Column(DateTime, nullable=True)
 
 # ═══════════════════════════════════════
 #  SKILL TREE (THE FOREST)

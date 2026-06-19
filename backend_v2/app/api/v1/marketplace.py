@@ -25,8 +25,14 @@ from app.models.transaction import ReferralIndex
 from app.models.notification import Notification
 from app.services.currency_engine import currency_engine
 from app.services.ingestion_service import ingestion_service
+from app.models.code import Code
+from app.models.admin import SystemSetting
 
 router = APIRouter()
+
+def get_system_setting(db: Session, key: str, default: float) -> float:
+    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    return float(setting.value) if setting else default
 
 
 # ═══════════════════════════════════════
@@ -119,6 +125,8 @@ def get_marketplace_pool(limit: int = 5, db: Session = Depends(get_db)):
     Returns a list of unactivated public product codes that users can buy
     if they don't have a direct sponsor.
     """
+    min_price = get_system_setting(db, "min_product_code_price", 20.0)
+
     codes = db.query(Code).filter(
         Code.used == False,
         Code.tier_type == "public",
@@ -128,7 +136,7 @@ def get_marketplace_pool(limit: int = 5, db: Session = Depends(get_db)):
     return [
         {
             "code": c.product_code,
-            "price": float(c.price),
+            "price": max(float(c.price), min_price),
             "owner": c.owner_rid,
             "tier": c.tier_type
         } for c in codes
@@ -147,6 +155,8 @@ def get_rid_pool(limit: int = 10, db: Session = Depends(get_db)):
     """
     Returns a list of unactivated RIDs (Direct Keys).
     """
+    activation_price = get_system_setting(db, "activation_price", 20.0)
+
     codes = db.query(Code).filter(
         Code.used == False,
         Code.generated_rid != None
@@ -155,7 +165,7 @@ def get_rid_pool(limit: int = 10, db: Session = Depends(get_db)):
     return [
         {
             "code": c.generated_rid,
-            "price": float(c.price),
+            "price": activation_price,
             "owner": c.owner_rid,
             "tier": c.tier_type
         } for c in codes
@@ -167,6 +177,8 @@ def get_product_code_pool(limit: int = 10, db: Session = Depends(get_db)):
     """
     Returns a list of unactivated Product Codes (Referral links).
     """
+    min_price = get_system_setting(db, "min_product_code_price", 20.0)
+
     codes = db.query(Code).filter(
         Code.used == False,
         Code.product_code != None
@@ -175,7 +187,7 @@ def get_product_code_pool(limit: int = 10, db: Session = Depends(get_db)):
     return [
         {
             "code": c.product_code,
-            "price": float(c.price),
+            "price": max(float(c.price), min_price),
             "owner": c.owner_rid,
             "tier": c.tier_type
         } for c in codes
@@ -193,10 +205,17 @@ def check_code(code: str, db: Session = Depends(get_db)):
     ).first()
 
     if target:
+        is_rid = target.generated_rid == code
+        if is_rid:
+            price = get_system_setting(db, "activation_price", 20.0)
+        else:
+            min_price = get_system_setting(db, "min_product_code_price", 20.0)
+            price = max(float(target.price), min_price)
+
         return {
             "valid": not target.used,
-            "type": "rid" if target.generated_rid == code else "product_code",
-            "price": float(target.price),
+            "type": "rid" if is_rid else "product_code",
+            "price": price,
             "currency": target.currency
         }
     
@@ -240,7 +259,7 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
         quizzes = db.query(Quiz).filter(Quiz.module_id == m.id).all()
         module_data.append({
             "id": m.id, "title": m.title, "position": m.position,
-            "videos": [{"id": v.id, "title": v.title, "youtube_id": v.youtube_id, "duration": v.duration, "is_preview": v.is_preview} for v in videos],
+            "videos": [{"id": v.id, "title": v.title, "youtube_id": v.youtube_id if v.is_preview else None, "duration": v.duration, "is_preview": v.is_preview} for v in videos],
             "quizzes": [{"id": q.id, "title": q.title, "question_count": len(q.questions)} for q in quizzes]
         })
 

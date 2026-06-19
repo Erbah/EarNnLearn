@@ -1,6 +1,6 @@
 import uuid
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Response
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
@@ -36,7 +36,7 @@ def simulate_payment_webhook(tx_id: str, code_id: str, user_id: str):
         db.close()
 
 @router.post("/register", response_model=RegistrationResponse, dependencies=[Depends(register_rate_limiter)])
-def register_user(response: Response, user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+def register_user(request: Request, response: Response, user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     from app.utils.phone import normalize_phone
     normalized_phone = normalize_phone(user_in.phone) if user_in.phone else None
     
@@ -165,10 +165,15 @@ def register_user(response: Response, user_in: UserCreate, background_tasks: Bac
             clean_phone = new_user.phone.replace('+', '')
             dynamic_paystack_email = f"u{clean_phone}@users.learnnearn.com"
             
+        origin = request.headers.get("origin") or request.headers.get("referer", "").rstrip("/")
+        # Optional: default to a known URL if missing, but it's usually present in browsers.
+        callback_url = f"{origin}/dashboard" if origin else None
+
         ps_res = paystack_service.initialize_transaction(
             email=dynamic_paystack_email,
             amount=Decimal(str(new_tx.amount)),
-            metadata=metadata
+            metadata=metadata,
+            callback_url=callback_url
         )
         if ps_res.get("status") and ps_res["data"].get("authorization_url"):
             # Update the pending transaction with the real Paystack reference
@@ -301,6 +306,20 @@ def retry_activation(current_user: User = Depends(get_current_user), db: Session
         raise HTTPException(status_code=404, detail="Activation code not found.")
         
     if current_user.preferred_payment_method == "paystack":
+        # 1. Try to verify the existing transaction first
+        if tx.payment_reference:
+            verify_res = paystack_service.verify_transaction(tx.payment_reference)
+            if verify_res.get("status"):
+                payment_status = verify_res.get("data", {}).get("status")
+                if payment_status == "success":
+                    try:
+                        run_activation_engine(db, current_user, code, tx)
+                        return {"status": "success", "message": "Activation successful."}
+                    except Exception as e:
+                        db.rollback()
+                        raise HTTPException(status_code=500, detail=f"Activation failed during verification: {str(e)}")
+        
+        # 2. If no success, initialize a new transaction
         metadata = {
             "type": "ACTIVATION",
             "user_id": str(current_user.id),
@@ -313,6 +332,9 @@ def retry_activation(current_user: User = Depends(get_current_user), db: Session
             clean_phone = current_user.phone.replace('+', '')
             dynamic_paystack_email = f"u{clean_phone}@users.learnnearn.com"
             
+        # Get origin for callback url if possible
+        # Note: request is not in the function signature for retry_activation
+        # We can just leave callback_url blank to use Paystack dashboard default
         ps_res = paystack_service.initialize_transaction(
             email=dynamic_paystack_email,
             amount=Decimal(str(tx.amount)),

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: dark;
+}
+
 @theme {
   --color-background: #020617;
   --color-surface: #0f172a;
@@ -16,6 +20,10 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+input, textarea, select {
+  caret-color: #22d3ee !important;
 }
 
 /* Glassmorphism utilities */
@@ -41,13 +49,16 @@ body {
   letter-spacing: 0.02em;
 }
 
-/* Fix Chrome Autofill white background */
+/* Ultimate Chrome Autofill Fix for Dark Mode */
 input:-webkit-autofill,
 input:-webkit-autofill:hover, 
 input:-webkit-autofill:focus, 
-input:-webkit-autofill:active{
+input:-webkit-autofill:active {
     -webkit-text-fill-color: white !important;
-    transition: background-color 5000s ease-in-out 0s;
+    caret-color: #22d3ee !important;
+    color: #22d3ee !important; /* Forces the caret to inherit cyan even if browser ignores caret-color */
+    -webkit-box-shadow: 0 0 0px 1000px #0f172a inset !important;
+    box-shadow: 0 0 0px 1000px #0f172a inset !important;
 }
 /* Global Clickable Animations */
 button, 
