@@ -80,7 +80,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   }, []);
 
   return (
-    <div className="w-64 h-full flex flex-col bg-surface border-r border-white/5 glass">
+    <div className="w-64 h-full flex flex-col bg-[#0f172a] border-r border-white/5 shadow-2xl relative z-50">
       {/* Header */}
       <div className="p-6 flex items-center justify-between">
         {mounted ? (
@@ -185,7 +185,7 @@ export const AdminSidebar = React.memo(function AdminSidebar() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+              className="fixed inset-0 bg-black/60 z-50 lg:hidden"
               onClick={close}
             />
 
@@ -196,7 +196,7 @@ export const AdminSidebar = React.memo(function AdminSidebar() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed top-0 left-0 h-full z-50 lg:hidden"
+              className="fixed top-0 left-0 h-full z-[60] lg:hidden"
             >
               <SidebarContent onClose={close} />
             </motion.aside>

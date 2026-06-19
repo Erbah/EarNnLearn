@@ -171,7 +171,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       <div className="flex-1 lg:ml-64 flex flex-col relative overflow-x-hidden">
         <div className="absolute top-0 left-0 w-full h-[500px] bg-primary/5 rounded-full blur-[120px] -z-10 opacity-50 pointer-events-none" />
         <Topbar />
-        <main className="flex-1 px-4 lg:px-8 py-6 lg:py-8 w-full max-w-7xl mx-auto">
+        <main className="flex-1 px-3 sm:px-4 lg:px-8 py-4 lg:py-8 w-full max-w-7xl mx-auto">
           {children}
         </main>
       </div>

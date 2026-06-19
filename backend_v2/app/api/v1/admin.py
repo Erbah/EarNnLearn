@@ -729,11 +729,13 @@ def get_code_stats(current_user: Annotated[User, Depends(require_super_admin)], 
     total = db.query(func.count(Code.id)).scalar() or 0
     used = db.query(func.count(Code.id)).filter(Code.used == True).scalar() or 0
     unused = total - used
+    total_value = db.query(func.sum(Code.price)).scalar() or 0
     
     return {
         "total": total,
         "used": used,
-        "unused": unused
+        "unused": unused,
+        "total_value": float(total_value)
     }
 
 import uuid

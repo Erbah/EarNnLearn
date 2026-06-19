@@ -24,12 +24,14 @@ class PayoutService:
                 name = payout_details.get("name")
                 account_number = payout_details.get("account_number")
                 bank_code = payout_details.get("bank_code")
+                # 'mobile_money' for MoMo, 'ghipss' for Ghana bank accounts
+                recipient_type = payout_details.get("recipient_type", "mobile_money")
                 
                 if not name or not account_number or not bank_code:
                     return {"success": False, "reference": None, "message": "Missing required payout_details: name, account_number, or bank_code."}
                     
                 # 1. Create Transfer Recipient
-                recipient_res = paystack_service.create_transfer_recipient(name, account_number, bank_code)
+                recipient_res = paystack_service.create_transfer_recipient(name, account_number, bank_code, recipient_type)
                 if not recipient_res.get("status"):
                     return {"success": False, "reference": None, "message": f"Failed to create recipient: {recipient_res.get('message', 'Unknown Error')}"}
                     

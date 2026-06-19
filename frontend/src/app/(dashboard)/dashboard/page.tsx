@@ -78,36 +78,36 @@ export default function DashboardPage() {
   }, [userLoading, fetchDashboardData]);
 
   return (
-    <div className="flex flex-col gap-8 pb-12 pt-4">
+    <div className="flex flex-col gap-6 lg:gap-8 pb-12 pt-2 lg:pt-4">
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">
+          <h1 className="text-2xl lg:text-3xl font-bold text-white tracking-tight">
             Welcome back, {user?.name?.split(" ")[0] || "Member"}!
           </h1>
-          <p className="text-gray-400 mt-1">Ready to continue your learning journey?</p>
+          <p className="text-gray-400 mt-1 text-sm lg:text-base">Ready to continue your learning journey?</p>
         </div>
       </div>
 
       {/* Invite & Earn Header Banner */}
-      <div className="bg-gradient-to-r from-primary/10 via-background to-secondary/10 border border-primary/20 rounded-2xl p-6 lg:p-8 shadow-[0_0_40px_rgba(0,224,255,0.05)] relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8">
+      <div className="bg-gradient-to-r from-primary/10 via-background to-secondary/10 border border-primary/20 rounded-2xl p-4 lg:p-8 shadow-[0_0_40px_rgba(0,224,255,0.05)] relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 lg:gap-8">
         <div className="absolute -top-32 -left-32 w-64 h-64 bg-primary/20 blur-[100px] rounded-full pointer-events-none" />
         <div className="relative z-10 flex-1">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black tracking-widest uppercase mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black tracking-widest uppercase mb-3 lg:mb-4">
             <Share2 className="w-3 h-3" /> Growth Engine
           </div>
-          <h2 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">
+          <h2 className="text-xl md:text-2xl lg:text-3xl font-black text-white mb-2 lg:mb-3 tracking-tight">
             Invite & Earn {user?.seller_percentage ? user.seller_percentage * 100 : 70}% Instantly
           </h2>
-          <p className="text-gray-400 text-sm max-w-xl leading-relaxed">
+          <p className="text-gray-400 text-xs lg:text-sm max-w-xl leading-relaxed">
             Share your unique access link below. When someone registers using it, the system automatically tags them to your network and credits your wallet matching your tier.
           </p>
         </div>
 
         <div className="relative z-10 flex flex-col gap-3 w-full md:w-[400px]">
-          <div className="bg-background/90 border border-white/20 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xl">
-            <div className="truncate font-mono text-white text-lg md:text-xl font-black tracking-widest">
+          <div className="bg-background/90 border border-white/20 rounded-2xl p-3 lg:p-4 flex items-center justify-between gap-3 lg:gap-4 shadow-xl">
+            <div className="truncate font-mono text-white text-sm md:text-lg lg:text-xl font-black tracking-widest min-w-0">
               {user?.product_codes?.[0] || "GENERATING..."}
             </div>
             <motion.button
@@ -144,7 +144,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
         <StatCard
           title="Wallet Balance"
           value={wallet ? `${Number(wallet.balance).toFixed(2)} ${wallet.currency || 'GHS'}` : "LOADING..."}

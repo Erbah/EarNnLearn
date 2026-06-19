@@ -204,7 +204,7 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
             <AdminStatCard icon={<Smile />} label="Total" value={stats?.total || 0} color="blue" />
             <AdminStatCard icon={<CheckCircle2 />} label="Available" value={stats?.unused || 0} color="emerald" />
             <AdminStatCard icon={<Zap />} label="Used" value={stats?.used || 0} color="orange" />
-            <AdminStatCard icon={<ShoppingBag />} label="Value" value={`₵${(stats?.total * 20) || 0}`} color="purple" />
+            <AdminStatCard icon={<ShoppingBag />} label="Value" value={`₵${stats?.total_value?.toFixed(2) || 0}`} color="purple" />
             <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-4 flex flex-col justify-center gap-2">
               <div className="text-[10px] uppercase font-bold text-red-400 tracking-widest text-center">Batch Reset</div>
               <button 

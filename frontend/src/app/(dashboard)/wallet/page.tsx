@@ -13,7 +13,9 @@ import {
   ShieldCheck,
   X,
   Plus,
-  ChevronDown
+  ChevronDown,
+  Smartphone,
+  Landmark
 } from "lucide-react";
 import axios from "axios";
 
@@ -62,6 +64,9 @@ export default function WalletPage() {
   const [bankCode, setBankCode] = useState("MTN");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
+  const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [payoutType, setPayoutType] = useState<'momo' | 'bank'>('momo');
 
   const fetchWalletData = useCallback(async (signal?: any) => {
     const abortSignal = signal instanceof AbortSignal ? signal : undefined;
@@ -115,36 +120,52 @@ export default function WalletPage() {
   }
 
   async function handleWithdraw() {
+    const isMomo = payoutType === 'momo';
+    if (!accountName.trim() || !accountNumber.trim()) {
+      setWithdrawError("Please fill in all fields.");
+      return;
+    }
+    if (isMomo && accountNumber.length < 10) {
+      setWithdrawError("MoMo number must be 10 digits.");
+      return;
+    }
+    if (!isMomo && accountNumber.length < 5) {
+      setWithdrawError("Please enter a valid bank account number.");
+      return;
+    }
+    setSubmittingWithdrawal(true);
+    setWithdrawError(null);
     try {
       const res = await api.post(`${API}/wallet/withdraw`, {
         amount: withdrawAmount,
         payout_method: "paystack",
         payout_details: { 
-          name: accountName,
-          account_number: accountNumber,
-          bank_code: bankCode
+          name: accountName.trim(),
+          account_number: accountNumber.trim(),
+          bank_code: bankCode,
+          recipient_type: isMomo ? 'mobile_money' : 'ghipss'
         }
       });
 
       if (res.status === 200) {
-        alert("Withdrawal request submitted!");
         setShowWithdrawModal(false);
+        setAccountNumber("");
+        setAccountName("");
+        setWithdrawAmount(minW);
+        setWithdrawError(null);
         fetchWalletData();
-      } else {
-        const err = res.data;
-        const detail = err.detail;
-        let errMsg = "Unknown error";
-        if (Array.isArray(detail)) {
-          errMsg = detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ");
-        } else if (typeof detail === 'string') {
-          errMsg = detail;
-        } else if (detail) {
-          errMsg = JSON.stringify(detail);
-        }
-        alert(`Error: ${errMsg}`);
       }
-    } catch (err) {
-      alert("Failed to submit request");
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      let errMsg = "Failed to submit withdrawal request. Please try again.";
+      if (Array.isArray(detail)) {
+        errMsg = detail.map((d: any) => d.msg || JSON.stringify(d)).join("; ");
+      } else if (typeof detail === 'string') {
+        errMsg = detail;
+      }
+      setWithdrawError(errMsg);
+    } finally {
+      setSubmittingWithdrawal(false);
     }
   }
 
@@ -377,74 +398,200 @@ export default function WalletPage() {
           <motion.div
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
-            className="bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl p-8 space-y-6"
+            className="bg-card border border-white/10 w-full max-w-md rounded-3xl shadow-2xl p-6 lg:p-8 space-y-5 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex justify-between items-center text-white">
-              <h3 className="text-xl font-bold">Request Withdrawal</h3>
-              <button onClick={() => setShowWithdrawModal(false)} className="p-2 hover:bg-white/5 rounded-full text-gray-400"><X className="w-5 h-5" /></button>
+              <div>
+                <h3 className="text-xl font-bold">Withdraw Funds</h3>
+                <p className="text-xs text-gray-500 mt-1">Choose your preferred withdrawal method</p>
+              </div>
+              <button onClick={() => { setShowWithdrawModal(false); setWithdrawError(null); }} className="p-2 hover:bg-white/5 rounded-full text-gray-400"><X className="w-5 h-5" /></button>
             </div>
 
+            {/* MoMo / Bank Tab Switcher */}
+            <div className="flex bg-white/5 rounded-2xl p-1 border border-white/10">
+              <button
+                onClick={() => { setPayoutType('momo'); setBankCode('MTN'); setAccountNumber(''); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  payoutType === 'momo' ? 'bg-primary text-background shadow-lg' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Smartphone className="w-4 h-4" />
+                Mobile Money
+              </button>
+              <button
+                onClick={() => { setPayoutType('bank'); setBankCode(''); setAccountNumber(''); }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                  payoutType === 'bank' ? 'bg-primary text-background shadow-lg' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Landmark className="w-4 h-4" />
+                Bank Account
+              </button>
+            </div>
+
+            {withdrawError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{withdrawError}</span>
+              </div>
+            )}
+
             <div className="space-y-4">
+              {/* Provider / Bank Select */}
               <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Amount ({wallet?.currency || user?.default_currency || 'GHS'})</label>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">
+                  {payoutType === 'momo' ? 'Mobile Network' : 'Bank'}
+                </label>
+                <div className="relative">
+                  <select
+                    value={bankCode}
+                    onChange={(e) => setBankCode(e.target.value)}
+                    title={payoutType === 'momo' ? 'Select Network' : 'Select Bank'}
+                    aria-label={payoutType === 'momo' ? 'Select Network' : 'Select Bank'}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-12 text-white focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                  >
+                    {payoutType === 'momo' ? (
+                      <>
+                        <option value="MTN" className="bg-card">MTN Mobile Money</option>
+                        <option value="VOD" className="bg-card">Telecel (Vodafone) Cash</option>
+                        <option value="ATL" className="bg-card">AirtelTigo Money</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="" className="bg-card" disabled>Select a bank...</option>
+                        <option value="030100" className="bg-card">Absa Bank Ghana</option>
+                        <option value="280100" className="bg-card">Access Bank Ghana</option>
+                        <option value="080100" className="bg-card">ADB Bank Limited</option>
+                        <option value="070101" className="bg-card">ARB Apex Bank</option>
+                        <option value="210100" className="bg-card">Bank of Africa Ghana</option>
+                        <option value="140100" className="bg-card">CAL Bank Limited</option>
+                        <option value="340100" className="bg-card">Consolidated Bank Ghana</option>
+                        <option value="130100" className="bg-card">Ecobank Ghana</option>
+                        <option value="200100" className="bg-card">FBNBank Ghana</option>
+                        <option value="240100" className="bg-card">Fidelity Bank Ghana</option>
+                        <option value="170100" className="bg-card">First Atlantic Bank</option>
+                        <option value="330100" className="bg-card">First National Bank Ghana</option>
+                        <option value="040100" className="bg-card">GCB Bank Limited</option>
+                        <option value="230100" className="bg-card">Guaranty Trust Bank (Ghana)</option>
+                        <option value="050100" className="bg-card">National Investment Bank</option>
+                        <option value="360100" className="bg-card">OmniBSCI Bank</option>
+                        <option value="180100" className="bg-card">Prudential Bank</option>
+                        <option value="110100" className="bg-card">Republic Bank Ghana</option>
+                        <option value="090100" className="bg-card">Société Générale Ghana</option>
+                        <option value="190100" className="bg-card">Stanbic Bank Ghana</option>
+                        <option value="020100" className="bg-card">Standard Chartered Bank Ghana</option>
+                        <option value="060100" className="bg-card">United Bank for Africa Ghana</option>
+                        <option value="100100" className="bg-card">Universal Merchant Bank</option>
+                        <option value="120100" className="bg-card">Zenith Bank Ghana</option>
+                      </>
+                    )}
+                  </select>
+                  <ChevronDown className="w-5 h-5 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Account Number */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">
+                  {payoutType === 'momo' ? 'MoMo Number' : 'Account Number'}
+                </label>
+                <input
+                  type={payoutType === 'momo' ? 'tel' : 'text'}
+                  value={accountNumber}
+                  onChange={(e) => {
+                    if (payoutType === 'momo') {
+                      setAccountNumber(e.target.value.replace(/[^0-9]/g, '').slice(0, 10));
+                    } else {
+                      setAccountNumber(e.target.value.replace(/[^0-9]/g, '').slice(0, 16));
+                    }
+                  }}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary"
+                  placeholder={payoutType === 'momo' ? 'e.g. 0241234567' : 'e.g. 1234567890123'}
+                  maxLength={payoutType === 'momo' ? 10 : 16}
+                />
+              </div>
+
+              {/* Account Name */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Account Holder Name</label>
+                <input
+                  type="text"
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary"
+                  placeholder={payoutType === 'momo' ? 'Name on MoMo account' : 'Name on bank account'}
+                />
+              </div>
+
+              {/* Amount */}
+              <div>
+                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Amount ({wallet?.currency || 'GHS'})</label>
                 <input
                   type="number"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(+e.target.value)}
                   aria-label="Withdrawal Amount"
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary"
-                  placeholder={`Min. ${minW} ${wallet?.currency || 'GHS'}`}
+                  placeholder={`Min. ${minW}`}
+                  min={minW}
                 />
-                <p className="text-[10px] text-gray-500 mt-2">Available for withdrawal: <span className="text-emerald-500 font-bold">{wallet?.withdrawable_balance} {wallet?.currency || user?.default_currency || 'GHS'}</span></p>
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Network / Bank</label>
-                <div className="relative">
-                  <select
-                    value={bankCode}
-                    onChange={(e) => setBankCode(e.target.value)}
-                    title="Select Network"
-                    aria-label="Select Network"
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 pr-12 text-white focus:outline-none focus:border-primary appearance-none cursor-pointer"
-                  >
-                    <option value="MTN" className="bg-card">MTN Mobile Money</option>
-                    <option value="VOD" className="bg-card">Telecel (Vodafone) Cash</option>
-                    <option value="AIR" className="bg-card">AirtelTigo Money</option>
-                  </select>
-                  <ChevronDown className="w-5 h-5 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <div className="flex justify-between mt-2">
+                  <p className="text-[10px] text-gray-500">Available: <span className="text-emerald-500 font-bold">{wallet?.withdrawable_balance} {wallet?.currency || 'GHS'}</span></p>
+                  <p className="text-[10px] text-gray-500">Min: <span className="font-bold text-gray-400">{minW} {wallet?.currency || 'GHS'}</span></p>
                 </div>
               </div>
 
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Account Name</label>
-                <input
-                  type="text"
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary"
-                  placeholder="e.g. Kwame Mensah"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-500 tracking-widest mb-2 block">Account Number</label>
-                <input
-                  type="text"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-primary"
-                  placeholder="e.g. 024XXXXXXX"
-                />
-              </div>
+              {/* Fee Breakdown */}
+              {withdrawAmount >= minW && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-2"
+                >
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Withdrawal</span>
+                    <span className="text-white font-medium">{withdrawAmount.toFixed(2)} {wallet?.currency || 'GHS'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Processing Fee</span>
+                    <span className="text-orange-400 font-medium">-{user?.withdrawal_fee || 2.00} {wallet?.currency || 'GHS'}</span>
+                  </div>
+                  <div className="border-t border-white/10 pt-2 flex justify-between text-sm">
+                    <span className="text-gray-300 font-bold">You Receive</span>
+                    <span className="text-emerald-400 font-bold">{(withdrawAmount - (user?.withdrawal_fee || 2.00)).toFixed(2)} {wallet?.currency || 'GHS'}</span>
+                  </div>
+                </motion.div>
+              )}
 
               <button
                 onClick={handleWithdraw}
-                disabled={withdrawAmount < minW || withdrawAmount > (wallet?.withdrawable_balance || 0)}
-                className="w-full bg-primary text-background py-4 rounded-2xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100 mt-4"
+                disabled={
+                  submittingWithdrawal ||
+                  withdrawAmount < minW ||
+                  withdrawAmount > (wallet?.withdrawable_balance || 0) ||
+                  !accountNumber.trim() ||
+                  (payoutType === 'momo' && accountNumber.length < 10) ||
+                  (payoutType === 'bank' && accountNumber.length < 5) ||
+                  !accountName.trim() ||
+                  !bankCode
+                }
+                className="w-full bg-primary text-background py-4 rounded-2xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100 mt-2 flex items-center justify-center gap-2"
               >
-                Submit Request
+                {submittingWithdrawal ? (
+                  <>
+                    <RefreshCcw className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  `Withdraw to ${payoutType === 'momo' ? 'Mobile Money' : 'Bank Account'}`
+                )}
               </button>
+
+              <div className="flex items-center justify-center gap-2 text-[10px] text-gray-500 uppercase tracking-widest">
+                <ShieldCheck className="w-3 h-3" />
+                Processed via Paystack Transfer
+              </div>
             </div>
           </motion.div>
         </div>

@@ -60,14 +60,16 @@ class PaystackService:
             return {"status": False, "message": str(e)}
 
     @classmethod
-    def create_transfer_recipient(cls, name: str, account_number: str, bank_code: str):
-        """Creates a transfer recipient and returns the recipient_code."""
+    def create_transfer_recipient(cls, name: str, account_number: str, bank_code: str, recipient_type: str = "mobile_money"):
+        """Creates a transfer recipient and returns the recipient_code.
+        recipient_type: 'mobile_money' for MoMo, 'ghipss' for Ghana bank accounts.
+        """
         secret_key = cls._get_key()
         if not secret_key or settings.TESTING:
             return {"status": True, "data": {"recipient_code": "RCP_simulated123"}}
 
         payload = {
-            "type": "mobile_money",
+            "type": recipient_type,
             "name": name,
             "account_number": account_number,
             "bank_code": bank_code,

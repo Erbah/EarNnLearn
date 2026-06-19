@@ -70,8 +70,8 @@ export const Topbar = React.memo(function Topbar() {
   }, [router]);
 
   return (
-    <header className="h-16 lg:h-20 w-full flex items-center justify-between px-4 lg:px-8 bg-background/80 backdrop-blur-md sticky top-0 z-40 border-b border-white/5">
-      <div className="flex items-center gap-3 flex-1 min-w-0">
+    <header className="h-14 lg:h-20 w-full flex items-center justify-between px-3 lg:px-8 bg-background/80 backdrop-blur-md sticky top-0 z-40 border-b border-white/5">
+      <div className="flex items-center gap-2 lg:gap-3 flex-1 min-w-0">
         {/* Hamburger — mobile only */}
         <button
           onClick={toggleSidebar}
@@ -82,17 +82,17 @@ export const Topbar = React.memo(function Topbar() {
         </button>
 
         {/* Search bar */}
-        <div className="relative flex-1 max-w-xs lg:max-w-md group">
+        <div className="relative flex-1 max-w-[160px] sm:max-w-xs lg:max-w-md group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
             placeholder="Search..."
-            className="w-full bg-card/50 border border-white/10 rounded-full py-2 pl-10 pr-3 text-sm text-white focus:outline-none focus:border-primary/50 transition-all font-medium"
+            className="w-full bg-card/50 border border-white/10 rounded-full py-1.5 lg:py-2 pl-9 lg:pl-10 pr-3 text-sm text-white focus:outline-none focus:border-primary/50 transition-all font-medium"
           />
         </div>
       </div>
 
-      <div className="flex items-center space-x-6">
+      <div className="flex items-center space-x-2 sm:space-x-4 lg:space-x-6">
         {/* Gamification Stats */}
         <div className="hidden lg:flex items-center gap-4 px-4 py-2 bg-white/5 rounded-2xl border border-white/10 shadow-inner group/hud">
           {hud ? (
@@ -131,10 +131,10 @@ export const Topbar = React.memo(function Topbar() {
 
         <Link
           href="/"
-          className="p-2 rounded-full hover:bg-white/5 transition-colors group"
+          className="hidden sm:flex p-2 rounded-full hover:bg-white/5 transition-colors group"
           title="Back to Landing Page"
         >
-          <Home className="w-6 h-6 text-gray-400 group-hover:text-white transition-colors" />
+          <Home className="w-5 h-5 lg:w-6 lg:h-6 text-gray-400 group-hover:text-white transition-colors" />
         </Link>
 
         <div className="relative">
@@ -144,7 +144,7 @@ export const Topbar = React.memo(function Topbar() {
             aria-label="Notifications"
             title="Notifications"
           >
-            <Bell className={`w-6 h-6 transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
+            <Bell className={`w-5 h-5 lg:w-6 lg:h-6 transition-colors ${showNotifications ? 'text-white' : 'text-gray-400 group-hover:text-white'}`} />
             {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)] border-2 border-background"></span>
             )}
@@ -162,7 +162,7 @@ export const Topbar = React.memo(function Topbar() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute top-full right-0 mt-3 w-80 sm:w-96 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden"
+                  className="fixed sm:absolute top-14 sm:top-full right-2 sm:right-0 sm:mt-3 w-[calc(100vw-1rem)] sm:w-96 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl flex flex-col z-50 overflow-hidden"
                 >
                   <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-white/5">
                     <h3 className="text-white font-semibold">Notifications</h3>
@@ -223,16 +223,16 @@ export const Topbar = React.memo(function Topbar() {
             )}
           </AnimatePresence>
         </div>
-        <div className="h-8 w-[1px] bg-white/10"></div>
+        <div className="hidden sm:block h-8 w-[1px] bg-white/10"></div>
         <button
           onClick={handleProfileClick}
           className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer"
           aria-label="User Profile"
           title="User Profile"
         >
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center p-0.5">
+          <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center p-0.5">
             <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
-              <User className="w-5 h-5 text-primary" />
+              <User className="w-4 h-4 lg:w-5 lg:h-5 text-primary" />
             </div>
           </div>
           <div className="text-left hidden md:block">
