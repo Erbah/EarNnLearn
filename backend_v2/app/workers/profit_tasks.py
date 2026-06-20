@@ -62,7 +62,7 @@ def process_profit_distribution(self, transaction_id: str):
             if code.family_share is not None: ratios['family_r'] = Decimal(str(code.family_share))
 
         # ─── Core Algorithm: O(depth) string extraction ───
-        payouts = distribute_profit(seller_rid, price, **ratios)
+        payouts = distribute_profit(db, seller_rid, price, target_code=code)
 
         # Credit seller
         credit_wallet(
