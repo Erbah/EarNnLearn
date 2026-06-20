@@ -18,6 +18,7 @@ const EarningsChart = dynamic(
 import { Wallet, Users, KeyRound, DollarSign, Share2 } from "lucide-react";
 import axios from "axios";
 import { api } from "@/lib/api";
+import { APP_URL } from "@/lib/config";
 
 
 const API = "/api/v1";
@@ -115,7 +116,9 @@ export default function DashboardPage() {
               whileTap={{ scale: 0.95 }}
               onClick={() => {
                 if (!user?.product_codes?.[0]) return;
-                const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/register?code=${user?.product_codes[0]}&type=product_code`;
+                // Use the canonical app URL so shared links point to the live site, not localhost
+                const origin = APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+                const link = `${origin}/register?code=${user?.product_codes[0]}&type=product_code`;
                 const shareData = {
                   title: 'Join LearNnEarn',
                   text: `Join me on LearNnEarn! Use my activation code: ${user?.product_codes[0]}`,

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { api } from "@/lib/api";
+import { APP_URL } from "@/lib/config";
 
 const API = "/api/v1";
 
@@ -178,7 +179,9 @@ export default function ActivateCodePage() {
 
   function handleShare(codeValue: string) {
     const text = `Join me on LearNnEarn! Use my activation code: ${codeValue}`;
-    const url = `${window.location.origin}/register?code=${codeValue}&type=rid`;
+    // Use the canonical app URL so shared links point to the live site, not localhost
+    const origin = APP_URL || window.location.origin;
+    const url = `${origin}/register?code=${codeValue}&type=product_code`;
     
     if (navigator.share) {
       navigator.share({ title: 'Join LearNnEarn', text: text, url: url }).catch(() => {});
