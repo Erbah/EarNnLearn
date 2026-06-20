@@ -214,7 +214,7 @@ export default function ActivateCodePage() {
                 <ShieldCheck className="w-16 h-16 text-primary" />
               </div>
               <h3 className="text-xl font-bold text-white mb-1">Your Active Code</h3>
-              <p className="text-gray-400 text-sm mb-6">Share this code to earn 70% commission.</p>
+              <p className="text-gray-400 text-sm mb-6">Share this code to earn {user?.seller_percentage ? user.seller_percentage * 100 : 70}% commission.</p>
               
               <div className="text-center py-4 bg-black/40 rounded-lg border border-white/5 mb-6 font-mono text-xl tracking-wider text-white">
                 {activeCode.product_code}
@@ -366,7 +366,7 @@ export default function ActivateCodePage() {
                 "Choose a Sponsor or the Marketplace.",
                 "Complete the payment as specified.",
                 "Receive your ONE unique product code.",
-                "Start selling and earn 70% commission."
+                `Start selling and earn ${user?.seller_percentage ? user.seller_percentage * 100 : 70}% commission.`
               ].map((text, i) => (
                 <div key={i} className="flex gap-3 text-xs text-gray-500">
                   <div className="w-5 h-5 rounded-full bg-white/5 flex items-center justify-center shrink-0 border border-white/10 text-[10px] font-bold text-primary">

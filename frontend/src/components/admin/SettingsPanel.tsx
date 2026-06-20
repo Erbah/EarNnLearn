@@ -102,10 +102,38 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
   }, [loadSettings]);
 
   const save = useCallback(async (key: string) => {
+    // Save the directly edited setting
     await api.put(`${API}/settings/${key}`, { value: editVal });
-    setSettings(prev => prev.map(s => s.key === key ? { ...s, value: editVal } : s));
+    let updatedSettings = settings.map(s => s.key === key ? { ...s, value: editVal } : s);
+
+    // Auto-balance logic for profit shares
+    if (['seller_percentage', 'master_percentage', 'family_percentage'].includes(key)) {
+      const seller = parseFloat(updatedSettings.find(s => s.key === 'seller_percentage')?.value || '0');
+      const master = parseFloat(updatedSettings.find(s => s.key === 'master_percentage')?.value || '0');
+      const family = parseFloat(updatedSettings.find(s => s.key === 'family_percentage')?.value || '0');
+      
+      let keyToAutoAdjust = '';
+      let remaining = 0;
+      
+      if (key === 'seller_percentage' || key === 'master_percentage') {
+          keyToAutoAdjust = 'family_percentage';
+          remaining = Math.max(0, 1.0 - seller - master);
+      } else if (key === 'family_percentage') {
+          // If family is edited, we auto-adjust seller share
+          keyToAutoAdjust = 'seller_percentage';
+          remaining = Math.max(0, 1.0 - family - master);
+      }
+      
+      if (keyToAutoAdjust) {
+          const formattedRemaining = remaining.toFixed(2);
+          await api.put(`${API}/settings/${keyToAutoAdjust}`, { value: formattedRemaining });
+          updatedSettings = updatedSettings.map(s => s.key === keyToAutoAdjust ? { ...s, value: formattedRemaining } : s);
+      }
+    }
+
+    setSettings(updatedSettings);
     setEditing(null);
-  }, [editVal]);
+  }, [editVal, settings]);
 
   const handleEdit = useCallback((key: string, value: string) => {
     setEditing(key);
@@ -138,8 +166,46 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     }
   }, [currentPw, newPw]);
 
+  // Calculate visual distribution percentages
+  const sellerShare = parseFloat(settings.find(s => s.key === 'seller_percentage')?.value || '0');
+  const masterShare = parseFloat(settings.find(s => s.key === 'master_percentage')?.value || '0');
+  const familyShare = parseFloat(settings.find(s => s.key === 'family_percentage')?.value || '0');
+  const totalShare = sellerShare + masterShare + familyShare;
+  
+  const getWidth = (val: number) => totalShare > 0 ? `${(val / totalShare) * 100}%` : '0%';
+
   return (
     <div style={SETTINGS_BOX_STYLE}>
+      <div className="mb-8 p-6 bg-black/20 rounded-2xl border border-white/5 relative overflow-hidden">
+        <h4 className="text-white font-bold mb-1 flex items-center gap-2">
+          📊 Profit Distribution Matrix
+        </h4>
+        <p className="text-xs text-gray-400 mb-5">
+          Editing one percentage automatically calculates and balances the others to ensure they perfectly evaluate to 100%.
+        </p>
+        
+        {/* Colorful Distribution Bar */}
+        <div className="flex h-6 rounded-full overflow-hidden mb-4 shadow-inner bg-white/5">
+          <div style={{ width: getWidth(sellerShare) }} className="bg-emerald-500 transition-all duration-500 flex items-center justify-center text-[10px] font-bold text-black overflow-hidden whitespace-nowrap">
+            {sellerShare > 0.05 && `Seller (${(sellerShare*100).toFixed(0)}%)`}
+          </div>
+          <div style={{ width: getWidth(familyShare) }} className="bg-blue-500 transition-all duration-500 flex items-center justify-center text-[10px] font-bold text-white overflow-hidden whitespace-nowrap">
+            {familyShare > 0.05 && `Family (${(familyShare*100).toFixed(0)}%)`}
+          </div>
+          <div style={{ width: getWidth(masterShare) }} className="bg-amber-500 transition-all duration-500 flex items-center justify-center text-[10px] font-bold text-black overflow-hidden whitespace-nowrap">
+            {masterShare > 0.05 && `Platform (${(masterShare*100).toFixed(0)}%)`}
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex gap-6 text-xs font-medium">
+          <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span><span className="text-gray-300">Seller ({sellerShare})</span></div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></span><span className="text-gray-300">Family ({familyShare})</span></div>
+          <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></span><span className="text-gray-300">Platform ({masterShare})</span></div>
+          <div className="ml-auto text-primary font-bold">Total: {(totalShare * 100).toFixed(0)}%</div>
+        </div>
+      </div>
+
       <h3 style={TITLE_STYLE}>⚙️ System Settings</h3>
       {settings.map(s => (
         <SettingRow

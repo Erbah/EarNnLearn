@@ -125,8 +125,6 @@ def get_marketplace_pool(limit: int = 5, db: Session = Depends(get_db)):
     Returns a list of unactivated public product codes that users can buy
     if they don't have a direct sponsor.
     """
-    min_price = get_system_setting(db, "min_product_code_price", 20.0)
-
     codes = db.query(Code).filter(
         Code.used == False,
         Code.tier_type == "public",
@@ -136,7 +134,7 @@ def get_marketplace_pool(limit: int = 5, db: Session = Depends(get_db)):
     return [
         {
             "code": c.product_code,
-            "price": max(float(c.price), min_price),
+            "price": float(c.price),
             "owner": c.owner_rid,
             "tier": c.tier_type
         } for c in codes
@@ -155,8 +153,6 @@ def get_rid_pool(limit: int = 10, db: Session = Depends(get_db)):
     """
     Returns a list of unactivated RIDs (Direct Keys).
     """
-    activation_price = get_system_setting(db, "activation_price", 20.0)
-
     codes = db.query(Code).filter(
         Code.used == False,
         Code.generated_rid != None
@@ -165,7 +161,7 @@ def get_rid_pool(limit: int = 10, db: Session = Depends(get_db)):
     return [
         {
             "code": c.generated_rid,
-            "price": activation_price,
+            "price": float(c.price),
             "owner": c.owner_rid,
             "tier": c.tier_type
         } for c in codes
@@ -177,8 +173,6 @@ def get_product_code_pool(limit: int = 10, db: Session = Depends(get_db)):
     """
     Returns a list of unactivated Product Codes (Referral links).
     """
-    min_price = get_system_setting(db, "min_product_code_price", 20.0)
-
     codes = db.query(Code).filter(
         Code.used == False,
         Code.product_code != None
@@ -187,7 +181,7 @@ def get_product_code_pool(limit: int = 10, db: Session = Depends(get_db)):
     return [
         {
             "code": c.product_code,
-            "price": max(float(c.price), min_price),
+            "price": float(c.price),
             "owner": c.owner_rid,
             "tier": c.tier_type
         } for c in codes
@@ -206,11 +200,7 @@ def check_code(code: str, db: Session = Depends(get_db)):
 
     if target:
         is_rid = target.generated_rid == code
-        if is_rid:
-            price = get_system_setting(db, "activation_price", 20.0)
-        else:
-            min_price = get_system_setting(db, "min_product_code_price", 20.0)
-            price = max(float(target.price), min_price)
+        price = float(target.price)
 
         return {
             "valid": not target.used,

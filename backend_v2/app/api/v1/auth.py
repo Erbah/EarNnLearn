@@ -109,15 +109,11 @@ def register_user(request: Request, response: Response, user_in: UserCreate, bac
     db.add(new_metric)
 
     # 5. Create Pending Transaction for Payment Tracking
-    from app.models.admin import SystemSetting
-    setting = db.query(SystemSetting).filter(SystemSetting.key == "activation_price").first()
-    system_min_amount = float(setting.value) if setting else 20.0
-
     new_tx = Transaction(
         code_id=code.id,
         buyer_rid=f"PENDING_ACT_{new_user.id}",
         seller_rid=code.owner_rid,
-        amount=max(float(user_in.purchase_amount or code.price), system_min_amount),
+        amount=max(float(user_in.purchase_amount or code.price), float(code.price)),
         currency=user_in.preferred_currency or code.currency,
         payment_method=user_in.payment_method,
         payment_reference=f"REG-{uuid.uuid4().hex[:8].upper()}",

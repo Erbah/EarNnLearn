@@ -80,6 +80,12 @@ def distribute_profit(db: Session, parent_rid: str, price: Decimal, target_code=
         s_fam = db.query(SystemSetting).filter(SystemSetting.key == "family_percentage").first()
         if s_fam: family_r = Decimal(str(s_fam.value))
 
+    total_r = platform_r + seller_r + family_r
+    if total_r != Decimal('1.00') and total_r > Decimal('0.00'):
+        platform_r = platform_r / total_r
+        seller_r = seller_r / total_r
+        family_r = family_r / total_r
+
     platform_profit = (price * platform_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
     seller_profit   = (price * seller_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
     family_profit   = (price * family_r).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
