@@ -206,6 +206,21 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
     if not user:
         user = db.query(User).filter(User.phone == identifier).first()
     
+    # Debug logging to help identify why mobile logins fail
+    print(f"[LOGIN_DEBUG] Raw Identifier: '{login_data.identifier}', Stripped Identifier: '{identifier}', is_phone: {is_phone}, normalized_phone: '{normalized_phone}'")
+    if user:
+        pwd_verified = verify_password(login_data.password, user.password_hash)
+        stripped_pwd_verified = False
+        if not pwd_verified and login_data.password != login_data.password.strip():
+            stripped_pwd_verified = verify_password(login_data.password.strip(), user.password_hash)
+            if stripped_pwd_verified:
+                pwd_verified = True
+        print(f"[LOGIN_DEBUG] Found user: Email='{user.email}', Phone='{user.phone}', ID='{user.id}', Status='{user.status}'")
+        print(f"[LOGIN_DEBUG] Raw Password Length: {len(login_data.password)}, Stripped Password Length: {len(login_data.password.strip())}, Verification: {pwd_verified} (Fallback stripped: {stripped_pwd_verified})")
+    else:
+        print("[LOGIN_DEBUG] No user found matching the identifier.")
+        pwd_verified = False
+
     if user:
         if user.locked_until and user.locked_until > datetime.utcnow():
             remaining_seconds = int((user.locked_until - datetime.utcnow()).total_seconds())
@@ -214,7 +229,7 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
                 detail=f"Account is temporarily locked. Try again in {remaining_seconds} seconds.",
             )
             
-    if not user or not verify_password(login_data.password, user.password_hash):
+    if not user or not pwd_verified:
         if user:
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= 5:
