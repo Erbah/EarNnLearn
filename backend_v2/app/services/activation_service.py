@@ -50,8 +50,10 @@ def run_activation_engine(db: Session, user: User, target_code: Code, transactio
     if not db.query(Wallet).filter(Wallet.user_rid == new_rid).first():
         db.add(Wallet(user_rid=new_rid))
 
-    # 4. Mark the code as used (consumed for activation)
-    target_code.used = True
+    # 4. Mark the code as used (consumed for activation) - only if it is an activation RID (single-use)
+    # Product codes (resalable codes) have no usage limit and can be sold infinitely.
+    if target_code.generated_rid is not None:
+        target_code.used = True
     
     if transaction:
         transaction.status = "success"

@@ -29,8 +29,11 @@ def run_updates():
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_video_progress_video_id ON video_progress (video_id);"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_video_progress_user_video ON video_progress (user_rid, video_id);"))
             
+            # Restore all resalable product codes to active (used = FALSE) since they have no usage limit
+            conn.execute(text("UPDATE codes SET used = FALSE WHERE product_code IS NOT NULL;"))
+            
             conn.commit()
-            print("Successfully added columns and indexes (if they were missing).")
+            print("Successfully added columns, indexes, and restored product codes.")
         except Exception as e:
             print(f"Error adding columns or indexes: {e}")
 
