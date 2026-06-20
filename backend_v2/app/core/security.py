@@ -108,3 +108,36 @@ def get_current_user(
             )
 
     return user
+
+
+def get_current_user_optional(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> User | None:
+    token = None
+    try:
+        from fastapi.security.utils import get_authorization_scheme_param
+        authorization = request.headers.get("Authorization")
+        scheme, param = get_authorization_scheme_param(authorization)
+        if scheme.lower() == "bearer":
+            token = param
+    except Exception:
+        pass
+
+    if not token:
+        token = request.cookies.get("access_token")
+
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        sub: str = payload.get("sub")
+        if sub is None:
+            return None
+        user = db.query(User).filter(
+            (User.rid == sub) | (User.email == sub) | (User.phone == sub)
+        ).first()
+        return user
+    except Exception:
+        return None

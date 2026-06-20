@@ -13,7 +13,7 @@ from decimal import Decimal
 import uuid, random, string
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_current_user_optional
 from app.models.user import User
 from app.models.course import Course, Module, Video
 from app.models.marketplace import (
@@ -234,7 +234,11 @@ def convert_currency(amount: float, from_curr: str = "GHS", to_curr: str = "GHS"
 
 
 @router.get("/{course_id}")
-def get_course_detail(course_id: str, db: Session = Depends(get_db)):
+def get_course_detail(
+    course_id: str, 
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional)
+):
     """Get full course detail with modules, videos, and reviews."""
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
@@ -243,13 +247,28 @@ def get_course_detail(course_id: str, db: Session = Depends(get_db)):
     modules = db.query(Module).filter(Module.course_id == course_id).order_by(Module.position).all()
     reviews = db.query(CourseReview).filter(CourseReview.course_id == course_id).order_by(desc(CourseReview.created_at)).limit(10).all()
 
+    # Check if the user has full access (is enrolled, is course creator, or is admin)
+    has_full_access = False
+    if current_user:
+        if current_user.rid == course.creator_rid:
+            has_full_access = True
+        elif current_user.role in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
+            has_full_access = True
+        else:
+            enrollment = db.query(CourseEnrollment).filter(
+                CourseEnrollment.user_rid == current_user.rid,
+                CourseEnrollment.course_id == course_id
+            ).first()
+            if enrollment:
+                has_full_access = True
+
     module_data = []
     for m in modules:
         videos = db.query(Video).filter(Video.module_id == m.id).order_by(Video.position).all()
         quizzes = db.query(Quiz).filter(Quiz.module_id == m.id).all()
         module_data.append({
             "id": m.id, "title": m.title, "position": m.position,
-            "videos": [{"id": v.id, "title": v.title, "youtube_id": v.youtube_id if v.is_preview else None, "duration": v.duration, "is_preview": v.is_preview} for v in videos],
+            "videos": [{"id": v.id, "title": v.title, "youtube_id": v.youtube_id if (v.is_preview or has_full_access) else None, "duration": v.duration, "is_preview": v.is_preview} for v in videos],
             "quizzes": [{"id": q.id, "title": q.title, "question_count": len(q.questions)} for q in quizzes]
         })
 
