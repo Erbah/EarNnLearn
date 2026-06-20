@@ -26,6 +26,7 @@ from app.models.notification import Notification
 from app.services.currency_engine import currency_engine
 from app.services.ingestion_service import ingestion_service
 from app.models.code import Code
+from app.models.admin import SystemSetting
 
 router = APIRouter()
 
@@ -186,22 +187,33 @@ def get_product_code_pool(limit: int = 10, db: Session = Depends(get_db)):
 @router.get("/check")
 def check_code(code: str, db: Session = Depends(get_db)):
     """
-    Verifies a code and returns its metadata.
+    Verifies a code and returns its metadata, including the effective price
+    which reflects the admin-configured activation_price floor from SystemSettings.
     """
-    # Check RID
     target = db.query(Code).filter(
         (Code.generated_rid == code) | (Code.product_code == code)
     ).first()
 
     if target:
         is_rid = target.generated_rid == code
-        price = float(target.price)
+        code_price = float(target.price)
+
+        # Always enforce the activation_price from SystemSettings as the minimum.
+        # This ensures admin settings reflect immediately on the registration pricing UI.
+        activation_price = SystemSetting.get_val(db, "activation_price", 20.0)
+        try:
+            activation_price = float(activation_price)
+        except (TypeError, ValueError):
+            activation_price = 20.0
+
+        effective_price = max(code_price, activation_price)
 
         return {
             "valid": not target.used,
             "type": "rid" if is_rid else "product_code",
-            "price": price,
-            "currency": target.currency
+            "price": effective_price,
+            "currency": target.currency,
+            "activation_price": activation_price,
         }
     
     return {"valid": False, "error": "Code not found"}
