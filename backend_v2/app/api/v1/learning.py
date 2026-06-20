@@ -596,11 +596,17 @@ def my_learning(current_user: User = Depends(get_current_user), db: Session = De
         ).scalar()
         total_videos = count_course_videos(db, p.course_id) if course else 0
 
+        learning_status = p.status
+        if total_videos > 0 and videos_watched >= total_videos:
+            learning_status = "completed"
+        elif p.status == "completed":
+            learning_status = "active"
+
         result.append({
             "course_id": p.course_id,
             "title": course.title if course else "Unknown",
             "payment_method": p.payment_method,
-            "status": p.status,
+            "status": learning_status,
             "progress": round(videos_watched / max(total_videos, 1) * 100, 1),
             "amount_paid": float(p.amount_paid),
             "remaining": float(p.remaining)
