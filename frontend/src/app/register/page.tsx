@@ -247,11 +247,17 @@ function RegisterForm() {
           const meta = res.data;
           if (meta.valid) {
             setCodeMetadata(meta);
+          } else {
+            setCodeMetadata(null);
+            setValidationError(meta.error || "Code is invalid or already used");
+            lastVerifiedCodeRef.current = ""; // Reset so manual editing can re-validate
           }
         })
         .catch((err) => {
           if (axios.isCancel(err)) return;
           console.error(err);
+          setValidationError("Failed to verify code");
+          lastVerifiedCodeRef.current = "";
         });
       return () => {
         controller.abort();
