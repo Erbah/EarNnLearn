@@ -198,7 +198,7 @@ def check_code(code: str, db: Session = Depends(get_db)):
         is_rid = target.generated_rid == code
         code_price = float(target.price)
 
-        # Always enforce the activation_price from SystemSettings as the minimum.
+        # Always enforce the activation_price from SystemSettings as the minimum/exact value for RIDs.
         # This ensures admin settings reflect immediately on the registration pricing UI.
         activation_price = SystemSetting.get_val(db, "activation_price", 20.0)
         try:
@@ -206,7 +206,12 @@ def check_code(code: str, db: Session = Depends(get_db)):
         except (TypeError, ValueError):
             activation_price = 20.0
 
-        effective_price = max(code_price, activation_price)
+        if is_rid:
+            # RIDs represent system entry keys, their price is strictly determined by the admin setting.
+            effective_price = activation_price
+        else:
+            # Resalable product codes are set by users, but must meet the minimum activation_price.
+            effective_price = max(code_price, activation_price)
 
         return {
             "valid": not target.used,

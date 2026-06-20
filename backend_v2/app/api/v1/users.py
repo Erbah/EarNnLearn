@@ -12,9 +12,25 @@ from sqlalchemy import func
 router = APIRouter()
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
+def get_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Returns the current authenticated user profile."""
-    return current_user
+    resp = UserResponse.from_orm(current_user)
+    resp_dict = resp.model_dump()
+    
+    from app.models.code import Code
+    codes = db.query(Code).filter(Code.owner_rid == current_user.rid).all()
+    resp_dict["product_codes"] = [c.product_code for c in codes if c.product_code]
+    
+    from app.models.admin import SystemSetting
+    settings_dict = {s.key: s.value for s in db.query(SystemSetting).all()}
+    
+    if "seller_percentage" in settings_dict: resp_dict["seller_percentage"] = float(settings_dict["seller_percentage"])
+    if "activation_price" in settings_dict: resp_dict["activation_price"] = float(settings_dict["activation_price"])
+    if "min_withdrawal" in settings_dict: resp_dict["min_withdrawal"] = float(settings_dict["min_withdrawal"])
+    if "withdrawal_fee" in settings_dict: resp_dict["withdrawal_fee"] = float(settings_dict["withdrawal_fee"])
+    if "default_currency" in settings_dict: resp_dict["default_currency"] = settings_dict["default_currency"]
+    
+    return resp_dict
 
 
 

@@ -20,6 +20,11 @@ def run_updates():
             conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS institution VARCHAR;"))
             conn.execute(text("ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_preview BOOLEAN DEFAULT FALSE;"))
             
+            # Ensure notifications table has all necessary columns
+            conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS user_rid VARCHAR;"))
+            conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR DEFAULT 'SYSTEM';"))
+            conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;"))
+            
             # Add missing indexes safely
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_video_progress_video_id ON video_progress (video_id);"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS idx_video_progress_user_video ON video_progress (user_rid, video_id);"))
@@ -41,6 +46,7 @@ def run_updates():
             import app.models.code
             import app.models.progress
             import app.models.ai
+            import app.models.notification
             
             Base.metadata.create_all(bind=engine)
             print("Successfully ensured all tables exist.")

@@ -346,6 +346,11 @@ def delete_individual_code(code_id: str, current_user: Annotated[User, Depends(r
         raise HTTPException(status_code=404, detail="Code not found")
     
     was_used = code.used
+    
+    # Nullify references to this code in transactions to avoid foreign key/integrity failures
+    from app.models.transaction import Transaction
+    db.query(Transaction).filter(Transaction.code_id == u_id).update({Transaction.code_id: None})
+    
     db.delete(code)
     db.add(AdminLog(
         admin_rid=current_user.rid,
