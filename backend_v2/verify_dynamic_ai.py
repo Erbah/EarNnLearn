@@ -42,7 +42,7 @@ def test_dynamic_resolution():
         print("\n--- Testing Model/Key Resolution ---")
         # We won't actually call a real AI here to avoid using credits, 
         # but we can verify the _get_active_model logic
-        active_provider, active_model, active_api_key = AITutorEngine._get_active_model(db)
+        active_provider, active_model, active_api_key, active_base_url = AITutorEngine._get_active_model(db)
         print(f"Active Provider: {active_provider}")
         print(f"Active Model: {active_model}")
         print(f"Active API Key: {active_api_key}")
@@ -53,7 +53,7 @@ def test_dynamic_resolution():
 
         print("\n--- Testing Custom API Key ---")
         setup_settings(db, "openai", "gpt-4o", "sk-custom-key")
-        active_provider, active_model, active_api_key = AITutorEngine._get_active_model(db)
+        active_provider, active_model, active_api_key, active_base_url = AITutorEngine._get_active_model(db)
         print(f"Active API Key: {active_api_key}")
         assert active_api_key == "sk-custom-key"
         

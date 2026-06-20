@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.rate_limit import ai_rate_limiter
 from app.models.user import User
 from app.models.course import Video
 from app.models.engagement import Quiz, QuizQuestion, QuizOption
@@ -16,7 +17,7 @@ class AIAskRequest(BaseModel):
     video_id: str
     question: str
 
-@router.post("/ask")
+@router.post("/ask", dependencies=[Depends(ai_rate_limiter)])
 def ask_ai_tutor(body: AIAskRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Ask the AI Tutor a question about a specific video.
@@ -46,7 +47,7 @@ def ask_ai_tutor(body: AIAskRequest, current_user: User = Depends(get_current_us
         "answer": answer
     }
 
-@router.post("/generate-quiz/{video_id}")
+@router.post("/generate-quiz/{video_id}", dependencies=[Depends(ai_rate_limiter)])
 def auto_generate_quiz(video_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     1. Fetches YouTube transcript for a video.

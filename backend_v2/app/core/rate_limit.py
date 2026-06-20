@@ -82,3 +82,4 @@ register_rate_limiter = RateLimiter(limit=3, window_seconds=60, key_prefix="rate
 otp_rate_limiter = RateLimiter(limit=3, window_seconds=60, key_prefix="rate_limit:otp")
 upload_rate_limiter = RateLimiter(limit=5, window_seconds=60, key_prefix="rate_limit:upload")
 payment_verify_limiter = RateLimiter(limit=5, window_seconds=60, key_prefix="rate_limit:payment_verify")
+ai_rate_limiter = RateLimiter(limit=10, window_seconds=60, key_prefix="rate_limit:ai")

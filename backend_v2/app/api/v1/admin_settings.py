@@ -98,7 +98,10 @@ def get_ai_profit_suggestion(current_user: Annotated[User, Depends(require_super
 def list_tables(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     """List all application tables in the database."""
     from sqlalchemy import text
-    result = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
+    if db.bind.dialect.name == "postgresql":
+        result = db.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%'"))
+    else:
+        result = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"))
     tables = [row[0] for row in result.fetchall()]
     return tables
 
@@ -111,8 +114,14 @@ def get_table_data(table_name: str, current_user: Annotated[User, Depends(requir
         raise HTTPException(status_code=400, detail="Invalid table name")
         
     try:
-        pragma_res = db.execute(text(f"PRAGMA table_info({table_name})"))
-        columns = [row[1] for row in pragma_res.fetchall()]
+        if db.bind.dialect.name == "postgresql":
+            col_res = db.execute(text(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = :table_name ORDER BY ordinal_position"
+            ), {"table_name": table_name})
+            columns = [row[0] for row in col_res.fetchall()]
+        else:
+            pragma_res = db.execute(text(f"PRAGMA table_info({table_name})"))
+            columns = [row[1] for row in pragma_res.fetchall()]
         
         result = db.execute(text(f"SELECT * FROM {table_name} LIMIT 500"))
         rows = result.fetchall()

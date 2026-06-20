@@ -145,7 +145,7 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
         return {"status": "Already enrolled", "payment_status": existing.status}
 
     price = Decimal(str(course.price))
-    wallet = db.query(Wallet).filter(Wallet.user_rid == current_user.rid).first()
+    wallet = db.query(Wallet).filter(Wallet.user_rid == current_user.rid).with_for_update().first()
     if not wallet:
         raise HTTPException(status_code=400, detail="No wallet found")
 
@@ -189,7 +189,7 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
             amount=-price, description=f"Course: {course.title}"
         ))
 
-        creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).first()
+        creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).with_for_update().first()
         if creator_wallet:
             creator_share = (price * CREATOR_CUT).quantize(Decimal("0.01"))
             creator_wallet.balance += creator_share
@@ -420,7 +420,7 @@ def watch_video(course_id: str, body: WatchVideoRequest, current_user: User = De
     # 6. PPC DEDUCTION (earn-to-learn only & still has remaining)
     if payment.payment_method == "earn_to_learn" and payment.remaining > 0 and not progress.deduction_applied:
         ppc = Decimal(str(payment.ppc))
-        wallet = db.query(Wallet).filter(Wallet.user_rid == current_user.rid).first()
+        wallet = db.query(Wallet).filter(Wallet.user_rid == current_user.rid).with_for_update().first()
 
         if wallet and wallet.balance >= ppc:
             wallet.balance -= ppc
@@ -437,7 +437,7 @@ def watch_video(course_id: str, body: WatchVideoRequest, current_user: User = De
 
             course = db.query(Course).filter(Course.id == course_id).first()
             if course:
-                creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).first()
+                creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).with_for_update().first()
                 if creator_wallet:
                     creator_share = (deduction * CREATOR_CUT).quantize(Decimal("0.01"))
                     creator_wallet.balance += creator_share
@@ -581,20 +581,46 @@ def get_video_url(video_id: str, current_user: User = Depends(get_current_user),
 def my_learning(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get all courses the user is enrolled in with payment status."""
     payments = db.query(CoursePayment).filter(CoursePayment.user_rid == current_user.rid).all()
-    result = []
+    course_ids = [p.course_id for p in payments]
+    if not course_ids:
+        return []
+
+    # Bulk fetch courses
+    courses = db.query(Course).filter(Course.id.in_(course_ids)).all()
+    course_map = {c.id: c for c in courses}
+
+    # Bulk fetch watched video counts
+    watched_counts = db.query(
+        VideoProgress.course_id, 
+        func.count(VideoProgress.id)
+    ).filter(
+        VideoProgress.user_rid == current_user.rid,
+        VideoProgress.watched == True,
+        VideoProgress.course_id.in_(course_ids)
+    ).group_by(VideoProgress.course_id).all()
+    watched_map = {c_id: count for c_id, count in watched_counts}
+
+    # Bulk fetch total video counts
+    from app.models.course import Module, Video
+    video_counts = db.query(
+        Module.course_id, 
+        func.count(Video.id)
+    ).join(Video, Video.module_id == Module.id).filter(
+        Module.course_id.in_(course_ids)
+    ).group_by(Module.course_id).all()
+    video_counts_map = {c_id: count for c_id, count in video_counts}
+
     current_season = get_active_season(db)
+    any_status_changed = False
     for p in payments:
         # Auto-expire check
         if current_season - (p.start_season or 1) >= 2 and p.status != "expired":
             p.status = "expired"
+            any_status_changed = True
         
-        course = db.query(Course).filter(Course.id == p.course_id).first()
-        videos_watched = db.query(func.count(VideoProgress.id)).filter(
-            VideoProgress.user_rid == current_user.rid,
-            VideoProgress.course_id == p.course_id,
-            VideoProgress.watched == True
-        ).scalar()
-        total_videos = count_course_videos(db, p.course_id) if course else 0
+        course = course_map.get(p.course_id)
+        videos_watched = watched_map.get(p.course_id, 0)
+        total_videos = video_counts_map.get(p.course_id, 0) if course else 0
 
         learning_status = p.status
         if total_videos > 0 and videos_watched >= total_videos:
@@ -611,6 +637,10 @@ def my_learning(current_user: User = Depends(get_current_user), db: Session = De
             "amount_paid": float(p.amount_paid),
             "remaining": float(p.remaining)
         })
+        
+    if any_status_changed:
+        db.commit()
+
     return result
 
 # ═══════════════════════════════════════

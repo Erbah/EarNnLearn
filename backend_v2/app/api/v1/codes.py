@@ -79,10 +79,13 @@ def activate_product_code(req: ActivationRequest, current_user: User = Depends(g
     The Activation Engine:
     Initializes the user's RID, ancestry, and first product codes.
     """
-    target_code = db.query(Code).filter(Code.product_code == req.product_code).first()
+    target_code = db.query(Code).filter(Code.product_code == req.product_code).with_for_update().first()
     
     if not target_code:
         raise HTTPException(status_code=404, detail="Product code not found.")
+        
+    if target_code.used:
+        raise HTTPException(status_code=400, detail="This product code has already been used.")
         
     return run_activation_engine(db, current_user, target_code)
 

@@ -51,7 +51,7 @@ class VideoProgress(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     user_rid = Column(String, nullable=False, index=True)
     course_id = Column(String, nullable=False, index=True)
-    video_id = Column(String, nullable=False)
+    video_id = Column(String, nullable=False, index=True)
     
     watch_time = Column(Integer, default=0)  # Seconds the user actually watched
     watched = Column(Boolean, default=False)

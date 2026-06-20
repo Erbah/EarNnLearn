@@ -262,10 +262,22 @@ def get_course_detail(
             if enrollment:
                 has_full_access = True
 
+    module_ids = [m.id for m in modules]
+    all_videos = db.query(Video).filter(Video.module_id.in_(module_ids)).order_by(Video.position).all() if module_ids else []
+    all_quizzes = db.query(Quiz).filter(Quiz.module_id.in_(module_ids)).all() if module_ids else []
+    
+    videos_by_module = {}
+    for v in all_videos:
+        videos_by_module.setdefault(v.module_id, []).append(v)
+        
+    quizzes_by_module = {}
+    for q in all_quizzes:
+        quizzes_by_module.setdefault(q.module_id, []).append(q)
+
     module_data = []
     for m in modules:
-        videos = db.query(Video).filter(Video.module_id == m.id).order_by(Video.position).all()
-        quizzes = db.query(Quiz).filter(Quiz.module_id == m.id).all()
+        videos = videos_by_module.get(m.id, [])
+        quizzes = quizzes_by_module.get(m.id, [])
         module_data.append({
             "id": m.id, "title": m.title, "position": m.position,
             "videos": [{"id": v.id, "title": v.title, "youtube_id": v.youtube_id if (v.is_preview or has_full_access) else None, "duration": v.duration, "is_preview": v.is_preview} for v in videos],

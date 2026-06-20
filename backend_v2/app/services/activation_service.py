@@ -13,8 +13,12 @@ def run_activation_engine(db: Session, user: User, target_code: Code, transactio
     Shared logic to activate an account using a product code.
     Can be triggered by MoMo verification or Global Payment Gateway callbacks.
     """
+    user = db.query(User).filter(User.id == user.id).with_for_update().first()
     if user.rid:
         raise HTTPException(status_code=400, detail="Account is already activated.")
+
+    if target_code.used:
+        raise HTTPException(status_code=400, detail="This product code has already been used.")
 
     seller_rid = target_code.owner_rid
 

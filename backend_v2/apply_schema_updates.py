@@ -19,10 +19,15 @@ def run_updates():
             conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS creator_name VARCHAR;"))
             conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS institution VARCHAR;"))
             conn.execute(text("ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_preview BOOLEAN DEFAULT FALSE;"))
+            
+            # Add missing indexes safely
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_video_progress_video_id ON video_progress (video_id);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_video_progress_user_video ON video_progress (user_rid, video_id);"))
+            
             conn.commit()
-            print("Successfully added columns (if they were missing).")
+            print("Successfully added columns and indexes (if they were missing).")
         except Exception as e:
-            print(f"Error adding columns: {e}")
+            print(f"Error adding columns or indexes: {e}")
 
         try:
             # We also ensure all new tables are created. 

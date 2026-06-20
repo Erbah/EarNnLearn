@@ -39,7 +39,7 @@ class AITutorEngine:
         if cost <= Decimal('0.0000'):
             return True
 
-        wallet = db.query(Wallet).filter(Wallet.user_rid == user_rid).first()
+        wallet = db.query(Wallet).filter(Wallet.user_rid == user_rid).with_for_update().first()
         if not wallet or wallet.withdrawable_balance <= 0:
             return False # Payment Required - AI Access Denied
             
