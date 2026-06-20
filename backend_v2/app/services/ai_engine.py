@@ -205,14 +205,95 @@ class AITutorEngine:
             suggestions.append("The content appears to be test data or low quality.")
             recommendation = "Reject"
 
-        if health_score >= 80:
-            suggestions.append("Excellent structure and clear value proposition.")
-
         return {
             "recommendation": recommendation,
             "health_score": health_score,
             "suggestions": suggestions
         }
+
+    @classmethod
+    def get_financial_profit_suggestion(cls, db: Session, financial_context: dict) -> dict:
+        """
+        Analyzes the platform's financial history and suggests an optimal percentage split
+        for the Seller, Family, and Platform.
+        """
+        import litellm
+        import os
+        from app.core.config import Settings
+        import json
+        import re
+
+        provider, model, key, base_url = cls._get_active_model(db)
+        
+        settings = Settings()
+        env_key_map = {
+            "google": "GEMINI_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "anthropic": "ANTHROPIC_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY"
+        }
+        if provider in env_key_map:
+            os.environ[env_key_map[provider]] = key or getattr(settings, f"{provider.upper()}_API_KEY", "") or ""
+
+        prompt = (
+            f"You are an Expert Financial Analyst and Platform Economist for LearNnEarn.\n"
+            f"Your task is to analyze the following financial context from the platform's history and recommend the optimal profit-sharing percentages between the Seller, the Family (Network), and the Platform.\n\n"
+            f"FINANCIAL CONTEXT:\n"
+            f"- Total Transactions Count: {financial_context.get('total_transactions', 0)}\n"
+            f"- Total Revenue (GHS): {financial_context.get('total_revenue', 0)}\n"
+            f"- Total Withdrawals Requested: {financial_context.get('total_withdrawals', 0)}\n"
+            f"- Total Wallet Balances (Liabilities): {financial_context.get('total_wallet_balance', 0)}\n"
+            f"- Active Users: {financial_context.get('active_users', 0)}\n\n"
+            f"OBJECTIVE:\n"
+            f"1. Ensure the platform remains profitable and sustainable (Platform share).\n"
+            f"2. Heavily incentivize content creators to sell (Seller share).\n"
+            f"3. Maintain a healthy network/referral bonus pool (Family share).\n\n"
+            f"CONSTRAINTS:\n"
+            f"- The three percentages MUST exactly sum to 1.00 (100%).\n"
+            f"- Return ONLY a valid JSON object. Do not include markdown wrappers if possible.\n"
+            f"Format:\n"
+            f"{{\n"
+            f"  \"seller_percentage\": 0.65,\n"
+            f"  \"family_percentage\": 0.20,\n"
+            f"  \"master_percentage\": 0.15,\n"
+            f"  \"reasoning\": \"A concise explanation of why this split is optimal based on the provided data.\"\n"
+            f"}}\n"
+        )
+
+        try:
+            completion_args = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "timeout": 45
+            }
+            if base_url:
+                completion_args["api_base"] = base_url
+
+            response = litellm.completion(**completion_args)
+            raw_text = response.choices[0].message.content
+            
+            json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
+            if json_match:
+                raw_text = json_match.group(1).strip()
+            
+            suggestion = json.loads(raw_text)
+            
+            # Mathematical normalization to guarantee exactly 1.00
+            total = suggestion.get("seller_percentage", 0) + suggestion.get("family_percentage", 0) + suggestion.get("master_percentage", 0)
+            if total != 1.00 and total > 0:
+                suggestion["seller_percentage"] = round(suggestion["seller_percentage"] / total, 2)
+                suggestion["family_percentage"] = round(suggestion["family_percentage"] / total, 2)
+                suggestion["master_percentage"] = round(1.00 - suggestion["seller_percentage"] - suggestion["family_percentage"], 2)
+
+            return suggestion
+        except Exception as e:
+            print(f"Financial Suggestion Error: {str(e)}")
+            return {
+                "seller_percentage": 0.70,
+                "family_percentage": 0.20,
+                "master_percentage": 0.10,
+                "reasoning": f"Failed to generate AI suggestion ({str(e)}). Returning safe defaults."
+            }
 
     @staticmethod
     def get_system_instruction(role: str, topic: str, context: dict = None) -> str:

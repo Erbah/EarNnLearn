@@ -62,6 +62,34 @@ def update_setting(key: str, body: SettingUpdate, current_user: Annotated[User, 
     db.refresh(setting)
     return setting
 
+@router.get("/settings/ai-suggest")
+def get_ai_profit_suggestion(current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
+    """Fetches AI suggestions for optimal profit distribution based on platform financial health."""
+    from app.models.transaction import Transaction
+    from app.models.wallet import Wallet, WithdrawalRequest
+    from sqlalchemy.sql import func
+    
+    # 1. Aggregate Financial Data
+    total_transactions = db.query(func.count(Transaction.id)).filter(Transaction.status == "success").scalar() or 0
+    total_revenue = db.query(func.sum(Transaction.amount)).filter(Transaction.status == "success").scalar() or 0
+    total_withdrawals = db.query(func.sum(WithdrawalRequest.amount)).filter(WithdrawalRequest.status == "APPROVED").scalar() or 0
+    total_wallet_balance = db.query(func.sum(Wallet.balance)).scalar() or 0
+    active_users = db.query(func.count(User.id)).scalar() or 0
+    
+    financial_context = {
+        "total_transactions": int(total_transactions),
+        "total_revenue": float(total_revenue),
+        "total_withdrawals": float(total_withdrawals),
+        "total_wallet_balance": float(total_wallet_balance),
+        "active_users": int(active_users)
+    }
+    
+    # 2. Call AI Engine
+    from app.services.ai_engine import AITutorEngine
+    suggestion = AITutorEngine.get_financial_profit_suggestion(db, financial_context)
+    
+    return suggestion
+
 
 # ═══════════════════════════════════════
 #  SYSTEM DATABASE EXPLORER

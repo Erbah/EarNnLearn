@@ -88,6 +88,8 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<{ seller: number, family: number, master: number, reasoning: string } | null>(null);
 
   const loadSettings = useCallback((signal?: AbortSignal) => {
     api.get(`${API}/settings`, { signal }).then(res => setSettings(res.data)).catch((err) => {
@@ -166,6 +168,39 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     }
   }, [currentPw, newPw]);
 
+  const handleAskAI = useCallback(async () => {
+    setIsSuggesting(true);
+    setAiSuggestion(null);
+    try {
+      const res = await api.get(`${API}/settings/ai-suggest`);
+      setAiSuggestion({
+        seller: res.data.seller_percentage,
+        family: res.data.family_percentage,
+        master: res.data.master_percentage,
+        reasoning: res.data.reasoning
+      });
+    } catch (e: any) {
+      console.error("AI Suggestion failed", e);
+    } finally {
+      setIsSuggesting(false);
+    }
+  }, []);
+
+  const handleApplyAISuggestion = useCallback(async () => {
+    if (!aiSuggestion) return;
+    
+    // Update all three
+    await api.put(`${API}/settings/seller_percentage`, { value: aiSuggestion.seller.toFixed(2) });
+    await api.put(`${API}/settings/family_percentage`, { value: aiSuggestion.family.toFixed(2) });
+    await api.put(`${API}/settings/master_percentage`, { value: aiSuggestion.master.toFixed(2) });
+    
+    // Reload settings
+    const controller = new AbortController();
+    loadSettings(controller.signal);
+    
+    setAiSuggestion(null);
+  }, [aiSuggestion, loadSettings]);
+
   // Calculate visual distribution percentages
   const sellerShare = parseFloat(settings.find(s => s.key === 'seller_percentage')?.value || '0');
   const masterShare = parseFloat(settings.find(s => s.key === 'master_percentage')?.value || '0');
@@ -177,9 +212,21 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
   return (
     <div style={SETTINGS_BOX_STYLE}>
       <div className="mb-8 p-6 bg-black/20 rounded-2xl border border-white/5 relative overflow-hidden">
-        <h4 className="text-white font-bold mb-1 flex items-center gap-2">
-          📊 Profit Distribution Matrix
-        </h4>
+        <div className="flex justify-between items-center mb-1">
+          <h4 className="text-white font-bold flex items-center gap-2">
+            📊 Profit Distribution Matrix
+          </h4>
+          <button 
+            onClick={handleAskAI} 
+            disabled={isSuggesting}
+            className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] hover:scale-[1.02] transition-all disabled:opacity-50"
+          >
+            {isSuggesting ? (
+              <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+            ) : "🪄"}
+            {isSuggesting ? "Analyzing..." : "Ask AI Advisor"}
+          </button>
+        </div>
         <p className="text-xs text-gray-400 mb-5">
           Editing one percentage automatically calculates and balances the others to ensure they perfectly evaluate to 100%.
         </p>
@@ -204,6 +251,38 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
           <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></span><span className="text-gray-300">Platform ({masterShare})</span></div>
           <div className="ml-auto text-primary font-bold">Total: {(totalShare * 100).toFixed(0)}%</div>
         </div>
+
+        {aiSuggestion && (
+          <div className="mt-6 p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl relative">
+            <h5 className="text-purple-400 font-bold text-xs mb-2 flex items-center gap-2">
+              🪄 AI Advisor Recommendation
+            </h5>
+            <p className="text-gray-300 text-xs leading-relaxed mb-4">
+              {aiSuggestion.reasoning}
+            </p>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-4 text-xs font-bold">
+                <span className="text-emerald-400">Seller: {aiSuggestion.seller}</span>
+                <span className="text-blue-400">Family: {aiSuggestion.family}</span>
+                <span className="text-amber-400">Platform: {aiSuggestion.master}</span>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setAiSuggestion(null)} 
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:bg-white/5 transition-colors"
+                >
+                  Dismiss
+                </button>
+                <button 
+                  onClick={handleApplyAISuggestion} 
+                  className="bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-400 transition-colors shadow-[0_0_10px_rgba(168,85,247,0.3)]"
+                >
+                  Accept & Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <h3 style={TITLE_STYLE}>⚙️ System Settings</h3>
