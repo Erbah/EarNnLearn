@@ -581,6 +581,7 @@ def get_video_url(video_id: str, current_user: User = Depends(get_current_user),
 def my_learning(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get all courses the user is enrolled in with payment status."""
     payments = db.query(CoursePayment).filter(CoursePayment.user_rid == current_user.rid).all()
+    result = []
     course_ids = [p.course_id for p in payments]
     if not course_ids:
         return []
