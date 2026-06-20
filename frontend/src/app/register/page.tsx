@@ -577,6 +577,9 @@ function RegisterForm() {
                         name="username"
                         autoComplete="username"
                         type="text"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck="false"
                         aria-label="Email or Phone Number"
                         value={formData.identifier}
                         onChange={(e) => { setFormData({ ...formData, identifier: e.target.value }); setSubmitError(null); }}

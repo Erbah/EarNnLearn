@@ -189,13 +189,15 @@ def register_user(request: Request, response: Response, user_in: UserCreate, bac
 @router.post("/login", response_model=Token, dependencies=[Depends(login_rate_limiter)])
 def login_for_access_token(response: Response, login_data: LoginRequest, db: Session = Depends(get_db)):
     from app.utils.phone import normalize_phone
-    identifier = login_data.identifier
+    # Strip whitespace to prevent accidental keyboard trailing spaces on mobile
+    identifier = login_data.identifier.strip()
     
     # Try normalizing as a phone number
-    is_phone = identifier.replace('+', '').isdigit()
+    is_phone = identifier.replace('+', '').replace(' ', '').replace('-', '').isdigit()
     normalized_phone = normalize_phone(identifier) if is_phone else identifier
     
-    user = db.query(User).filter(User.email == identifier).first()
+    # Normalize email casing for case-insensitive logins
+    user = db.query(User).filter(User.email == identifier.lower()).first()
     
     if not user and is_phone and normalized_phone:
         user = db.query(User).filter(User.phone == normalized_phone).first()

@@ -137,6 +137,9 @@ export default function LoginPage() {
                 name="username"
                 autoComplete="username"
                 type="text"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="you@example.com or 054 123 4567"
