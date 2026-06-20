@@ -102,7 +102,7 @@ export function LandingHeader() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setMobileMenuOpen(false)}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] md:hidden"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[998] md:hidden"
           />
           {/* Drawer */}
           <motion.div
@@ -110,7 +110,7 @@ export function LandingHeader() {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 bottom-0 w-80 bg-background/95 backdrop-blur-xl border-l border-white/10 z-[70] p-6 flex flex-col justify-between md:hidden shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+            className="fixed right-0 top-0 bottom-0 w-80 bg-[#0a0a0a] border-l border-white/10 z-[999] p-6 flex flex-col justify-between md:hidden shadow-2xl"
           >
             <div className="space-y-8">
               <div className="flex items-center justify-between">
