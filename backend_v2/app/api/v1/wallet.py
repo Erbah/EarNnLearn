@@ -61,11 +61,16 @@ def get_wallet_transactions(current_user: User = Depends(get_current_user), db: 
     if not current_user.rid:
         return []
     
-    transactions = db.query(WalletTransaction).filter(
-        WalletTransaction.user_rid == current_user.rid
-    ).order_by(WalletTransaction.created_at.desc()).limit(limit).all()
-    
-    return transactions
+    try:
+        transactions = db.query(WalletTransaction).filter(
+            WalletTransaction.user_rid == current_user.rid
+        ).order_by(WalletTransaction.created_at.desc()).limit(limit).all()
+        return transactions
+    except Exception as e:
+        import traceback
+        print(f"[ERROR_TRANSACTIONS] Failed to fetch transactions for {current_user.rid}: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to fetch transactions: {e}")
 
 @router.post("/withdraw", response_model=WithdrawalRequestOut)
 def request_withdrawal(body: WithdrawalRequestCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -162,9 +167,16 @@ def request_withdrawal(body: WithdrawalRequestCreate, current_user: User = Depen
 def get_my_withdrawals(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not current_user.rid:
         return []
-    return db.query(WithdrawalRequest).filter(
-        WithdrawalRequest.user_rid == current_user.rid
-    ).order_by(WithdrawalRequest.created_at.desc()).all()
+    try:
+        res = db.query(WithdrawalRequest).filter(
+            WithdrawalRequest.user_rid == current_user.rid
+        ).order_by(WithdrawalRequest.created_at.desc()).all()
+        return res
+    except Exception as e:
+        import traceback
+        print(f"[ERROR_WITHDRAWALS] Failed to fetch withdrawals for {current_user.rid}: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to fetch withdrawals: {e}")
 
 class WLPVerifyRequest(BaseModel):
     wlp_code: str
