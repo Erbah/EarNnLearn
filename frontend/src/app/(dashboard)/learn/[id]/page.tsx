@@ -17,6 +17,12 @@ const API = `${API_BASE_URL}/api/v1`;
 interface VideoItem { id: string; title: string; youtube_id: string; duration: number; }
 interface ModuleItem { id: string; title: string; position: number; videos: VideoItem[]; quizzes: any[]; }
 
+const extractYouTubeID = (urlOrId: string) => {
+  if (!urlOrId) return "";
+  const match = urlOrId.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
+  return (match && match[1]) ? match[1] : urlOrId;
+};
+
 export default function LearnPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -433,7 +439,7 @@ export default function LearnPage() {
                 {/* The iframe is always present so audio plays, but visually hidden if audioOnly is true */}
                 <div className={`absolute inset-0 w-full h-full ${audioOnly ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                   <YouTube
-                    videoId={activeVideo.youtube_id}
+                    videoId={extractYouTubeID(activeVideo.youtube_id)}
                     opts={{
                       width: "100%", height: "100%",
                       playerVars: {
