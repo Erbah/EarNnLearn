@@ -113,13 +113,24 @@ def distribute_profit(db: Session, parent_rid: str, price: Decimal, target_code=
 
 
 def credit_wallet(db: Session, user_rid: str, amount: Decimal, tx_type: str, description: str):
-    """Atomically credit a user's wallet and record the transaction."""
+    """Atomically credit a user's wallet and record the transaction.
+    Auto-creates the wallet if it doesn't exist, so payouts are never silently lost.
+    """
+    if not user_rid or amount <= Decimal('0.00'):
+        print(f"[CREDIT_WALLET] Skipped: user_rid={user_rid!r}, amount={amount}")
+        return
+
     wallet = db.query(Wallet).filter(Wallet.user_rid == user_rid).first()
     if not wallet:
-        return
+        # Auto-provision wallet rather than silently dropping the payout
+        print(f"[CREDIT_WALLET] Wallet not found for {user_rid!r} — auto-creating and crediting {amount}")
+        wallet = Wallet(user_rid=user_rid, balance=Decimal('0.00'), withdrawable_balance=Decimal('0.00'))
+        db.add(wallet)
+        db.flush()  # Get wallet into the session before updating
 
     wallet.balance += amount
     wallet.withdrawable_balance += amount
+    print(f"[CREDIT_WALLET] Credited {amount} to {user_rid!r} ({tx_type}) | new balance={wallet.balance}")
 
     db.add(WalletTransaction(
         user_rid=user_rid,
