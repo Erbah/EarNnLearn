@@ -50,76 +50,68 @@ def ask_ai_tutor(body: AIAskRequest, current_user: User = Depends(get_current_us
 @router.post("/generate-quiz/{video_id}", dependencies=[Depends(ai_rate_limiter)])
 def auto_generate_quiz(video_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
-    1. Fetches YouTube transcript for a video.
-    2. Uses AI to generate a 5-question multiple choice quiz.
-    3. Saves it directly to the database.
+    1. Checks if video exists.
+    2. Bills the user synchronously to verify credits.
+    3. Triggers Celery task in the background (falls back to synchronous execution if Celery/Redis is offline).
     """
-    if current_user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN", "CREATOR"]:
-        # Standard users should be billed to use this feature, or restricted. 
-        # For this version, we'll allow anyone to trigger it but bill them.
-        success = AITutorEngine.bill_usage(db, current_user.rid, "GENERATE_QUIZ", tokens=1000)
-        if not success:
-            raise HTTPException(status_code=402, detail="Insufficient credits to generate an AI quiz.")
-
     # 1. Look up video
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video or not video.youtube_id:
         raise HTTPException(status_code=404, detail="Video not found or has no YouTube ID")
 
-    # 2. Fetch transcript
-    transcript = ingestion_service.fetch_youtube_transcript(video.youtube_id)
-    if not transcript or len(transcript.strip()) < 50:
-        raise HTTPException(status_code=400, detail="Could not extract a valid transcript for this video. Captions may be disabled.")
+    # 2. Bill user
+    if current_user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN", "CREATOR"]:
+        success = AITutorEngine.bill_usage(db, current_user.rid, "GENERATE_QUIZ", tokens=1000)
+        if not success:
+            raise HTTPException(status_code=402, detail="Insufficient credits to generate an AI quiz.")
 
-    # 3. Generate Questions
-    questions_data = AITutorEngine.generate_video_quiz(db, video.title, transcript)
-    if not questions_data or not isinstance(questions_data, list):
-        raise HTTPException(status_code=500, detail="AI failed to generate a valid quiz format. Please try again.")
+    # 3. Trigger background task
+    try:
+        # Verify Redis connectivity first to avoid long broker-connection timeouts on Celery dispatch
+        from app.core.redis import redis_client
+        redis_client.ping()
 
-    # 4. Save to DB
-    import uuid
-    from app.models.course import Module
-    module = db.query(Module).filter(Module.id == video.module_id).first()
-    course_id = module.course_id if module else "unknown"
+        from app.workers.ai_tasks import generate_quiz_task
+        task = generate_quiz_task.delay(video_id, current_user.rid)
+        return {
+            "status": "pending",
+            "task_id": task.id,
+            "message": "Quiz generation task queued."
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Celery/Redis check failed; executing synchronously: {e}")
+        from app.workers.ai_tasks import generate_quiz_task
+        res = generate_quiz_task(video_id, current_user.rid)
+        return {
+            "status": "success",
+            "quiz_id": res.get("quiz_id"),
+            "questions_generated": res.get("questions_generated"),
+            "message": "Quiz generated synchronously (Celery fallback)."
+        }
 
-    quiz = Quiz(
-        course_id=course_id,
-        module_id=video.module_id,
-        title=f"AI Generated Quiz: {video.title}",
-        description="This quiz was automatically generated from the video transcript by AI.",
-        passing_score=70
-    )
-    db.add(quiz)
-    db.flush()
-
-    for q_idx, q_data in enumerate(questions_data, start=1):
-        q_text = q_data.get("question_text")
-        q_type = q_data.get("question_type", "multiple_choice")
-        if not q_text: continue
+@router.get("/generate-quiz/status/{task_id}")
+def get_quiz_generation_status(task_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Check the status of a Celery background task for quiz generation.
+    Returns status and results when completed.
+    """
+    from celery.result import AsyncResult
+    from app.core.celery_app import celery_app
+    
+    res = AsyncResult(task_id, app=celery_app)
+    state = res.state
+    
+    response = {"status": state, "task_id": task_id}
+    
+    if state == "SUCCESS":
+        response.update({
+            "result": res.result,
+            "quiz_id": res.result.get("quiz_id") if isinstance(res.result, dict) else None
+        })
+    elif state == "FAILURE":
+        response.update({
+            "error": str(res.result)
+        })
         
-        db_question = QuizQuestion(
-            quiz_id=quiz.id,
-            question_text=q_text,
-            question_type=q_type,
-            points=10,
-            position=q_idx
-        )
-        db.add(db_question)
-        db.flush()
-        
-        for opt_data in q_data.get("options", []):
-            db_opt = QuizOption(
-                question_id=db_question.id,
-                option_text=opt_data.get("option_text", "Unknown Option"),
-                is_correct=bool(opt_data.get("is_correct", False))
-            )
-            db.add(db_opt)
-
-    db.commit()
-
-    return {
-        "status": "success",
-        "message": "Quiz generated successfully",
-        "quiz_id": quiz.id,
-        "questions_generated": len(questions_data)
-    }
+    return response

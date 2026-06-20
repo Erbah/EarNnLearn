@@ -7,7 +7,7 @@ celery_app = Celery(
     "cedi_workers",
     broker=redis_url,
     backend=redis_url,
-    include=["app.workers.profit_tasks"]
+    include=["app.workers.profit_tasks", "app.workers.ai_tasks"]
 )
 
 celery_app.conf.update(
