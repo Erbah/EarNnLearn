@@ -16,7 +16,7 @@ interface CodeRowProps {
   isSelected: boolean;
   onSelectChange: (id: string, checked: boolean) => void;
   onShare: (code: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, isUsed: boolean) => void;
 }
 
 const CodeRow = React.memo(function CodeRow({ code, isSelected, onSelectChange, onShare, onDelete }: CodeRowProps) {
@@ -29,24 +29,28 @@ const CodeRow = React.memo(function CodeRow({ code, isSelected, onSelectChange, 
   }, [code.rid_code, onShare]);
 
   const handleDeleteClick = useCallback(() => {
-    onDelete(code.id);
-  }, [code.id, onDelete]);
+    onDelete(code.id, code.is_used);
+  }, [code.id, code.is_used, onDelete]);
 
   return (
     <tr className={isSelected ? 'bg-primary/5' : ''}>
       <td className="px-6 py-4">
-        {!code.is_used && (
-          <input 
-            type="checkbox" 
-            checked={isSelected}
-            onChange={handleSelectChange}
-            className="rounded border-white/20 bg-transparent text-primary focus:ring-primary"
-          />
-        )}
+        <input 
+          type="checkbox" 
+          checked={isSelected}
+          onChange={handleSelectChange}
+          className="rounded border-white/20 bg-transparent text-primary focus:ring-primary"
+        />
       </td>
       <td className="px-6 py-4 font-mono text-gray-300 font-bold">{code.rid_code?.slice(0, 10)}...</td>
       <td className="px-6 py-4 text-[10px] uppercase text-primary/70">{code.tier_type}</td>
-      <td className="px-6 py-4 text-center">{code.is_used ? 'Used' : 'Avail'}</td>
+      <td className="px-6 py-4 text-center">
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+          code.is_used ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'
+        }`}>
+          {code.is_used ? 'Used' : 'Avail'}
+        </span>
+      </td>
       <td className="px-6 py-4 text-center">{code.price} GHS</td>
       <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
         <button 
@@ -55,14 +59,17 @@ const CodeRow = React.memo(function CodeRow({ code, isSelected, onSelectChange, 
         >
           Share
         </button>
-        {!code.is_used && (
-          <button 
-            onClick={handleDeleteClick}
-            className="p-1 px-2 bg-red-500/10 text-red-500 rounded-lg"
-          >
-            <X size={12} />
-          </button>
-        )}
+        <button 
+          onClick={handleDeleteClick}
+          title={code.is_used ? 'Force-delete used code (irreversible)' : 'Delete code'}
+          className={`p-1 px-2 rounded-lg transition-colors ${
+            code.is_used
+              ? 'bg-red-900/30 text-red-400 hover:bg-red-700/40 border border-red-500/30'
+              : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+          }`}
+        >
+          <X size={12} />
+        </button>
       </td>
     </tr>
   );
@@ -149,7 +156,7 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
 
   const handleSelectAllChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(codes.filter(c => !c.is_used).map(c => c.id));
+      setSelectedIds(codes.map(c => c.id));
     } else {
       setSelectedIds([]);
     }
@@ -166,20 +173,24 @@ export const CodeInspector = React.memo(function CodeInspector({ onClose }: Code
     }
   }, []);
 
-  const handleDeleteSingle = useCallback(async (id: string) => {
-    if (!confirm("Delete this code?")) return;
+  const handleDeleteSingle = useCallback(async (id: string, isUsed: boolean) => {
+    const msg = isUsed
+      ? "⚠️ WARNING: This code is USED — a registered user's account depends on it. Deleting it may break their activation record. Are you absolutely sure?"
+      : "Delete this unused code?";
+    if (!confirm(msg)) return;
     try {
       await api.delete(`${API}/codes/${id}`);
       loadData();
-    } catch (e) {}
+    } catch (e: any) {
+      alert("Delete failed: " + (e.response?.data?.detail || e.message));
+    }
   }, [loadData]);
 
   const handleCloseShare = useCallback(() => {
     setSharingCode(null);
   }, []);
 
-  const unusedCodesCount = useMemo(() => codes.filter(c => !c.is_used).length, [codes]);
-  const isAllSelected = useMemo(() => selectedIds.length > 0 && selectedIds.length === unusedCodesCount, [selectedIds, unusedCodesCount]);
+  const isAllSelected = useMemo(() => selectedIds.length > 0 && selectedIds.length === codes.length, [selectedIds, codes]);
 
   if (!mounted) return null;
 

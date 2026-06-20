@@ -344,14 +344,15 @@ def delete_individual_code(code_id: str, current_user: Annotated[User, Depends(r
     code = db.query(Code).filter(Code.id == u_id).first()
     if not code:
         raise HTTPException(status_code=404, detail="Code not found")
-        
-    if code.used:
-        raise HTTPException(status_code=400, detail="Cannot delete a code that has already been used")
-        
+    
+    was_used = code.used
     db.delete(code)
-    db.add(AdminLog(admin_rid=current_user.rid, action=f"Deleted individual code: {code_id}"))
+    db.add(AdminLog(
+        admin_rid=current_user.rid,
+        action=f"Force-deleted {'used' if was_used else 'unused'} code: {code_id}",
+    ))
     db.commit()
-    return {"status": "success"}
+    return {"status": "success", "was_used": was_used}
 
 @router.delete("/codes/sessions/{session_id}")
 def delete_generation_session(session_id: str, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
