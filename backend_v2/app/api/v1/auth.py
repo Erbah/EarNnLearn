@@ -196,8 +196,9 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
     is_phone = identifier.replace('+', '').replace(' ', '').replace('-', '').isdigit()
     normalized_phone = normalize_phone(identifier) if is_phone else identifier
     
-    # Normalize email casing for case-insensitive logins
-    user = db.query(User).filter(User.email == identifier.lower()).first()
+    # Normalize email casing for case-insensitive logins (both DB field and input)
+    from sqlalchemy import func
+    user = db.query(User).filter(func.lower(User.email) == identifier.lower()).first()
     
     if not user and is_phone and normalized_phone:
         user = db.query(User).filter(User.phone == normalized_phone).first()
