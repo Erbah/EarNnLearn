@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 # Add backend_v2 to path
-sys.path.append(os.path.join(os.getcwd(), "backend_v2"))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import SessionLocal, engine
 from app.models.ai import AILesson, LessonProgress

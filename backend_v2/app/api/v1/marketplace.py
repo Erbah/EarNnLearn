@@ -26,13 +26,8 @@ from app.models.notification import Notification
 from app.services.currency_engine import currency_engine
 from app.services.ingestion_service import ingestion_service
 from app.models.code import Code
-from app.models.admin import SystemSetting
 
 router = APIRouter()
-
-def get_system_setting(db: Session, key: str, default: float) -> float:
-    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
-    return float(setting.value) if setting else default
 
 
 # ═══════════════════════════════════════

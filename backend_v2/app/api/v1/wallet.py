@@ -79,15 +79,15 @@ def request_withdrawal(body: WithdrawalRequestCreate, current_user: User = Depen
         
     # Check minimum withdrawal (default 50 GHS)
     from app.models.admin import SystemSetting
-    min_withdrawal_setting = db.query(SystemSetting).filter(SystemSetting.key == "min_withdrawal").first()
-    min_val = Decimal(min_withdrawal_setting.value) if min_withdrawal_setting else Decimal("50.00")
+    min_val_str = SystemSetting.get_val(db, "min_withdrawal")
+    min_val = Decimal(min_val_str) if min_val_str else Decimal("50.00")
     
     if body.amount < min_val:
         raise HTTPException(status_code=400, detail=f"Minimum withdrawal is {min_val} GHS")
 
     # Check withdrawal fee (default 2.00 GHS)
-    fee_setting = db.query(SystemSetting).filter(SystemSetting.key == "withdrawal_fee").first()
-    fee = Decimal(fee_setting.value) if fee_setting else Decimal("2.00")
+    fee_val_str = SystemSetting.get_val(db, "withdrawal_fee")
+    fee = Decimal(fee_val_str) if fee_val_str else Decimal("2.00")
     
     total_deduction = body.amount + fee
     
@@ -122,11 +122,11 @@ def request_withdrawal(body: WithdrawalRequestCreate, current_user: User = Depen
     )
     
     # Optional: Route through automated payout system if enabled
-    auto_payout_setting = db.query(SystemSetting).filter(SystemSetting.key == "automated_withdrawals").first()
-    if auto_payout_setting and auto_payout_setting.value.lower() == "true":
+    auto_payout_val = SystemSetting.get_val(db, "automated_withdrawals")
+    if auto_payout_val and auto_payout_val.lower() == "true":
         # Check max auto withdrawal setting
-        max_auto_withdrawal_setting = db.query(SystemSetting).filter(SystemSetting.key == "max_auto_withdrawal").first()
-        max_auto_val = Decimal(max_auto_withdrawal_setting.value) if max_auto_withdrawal_setting else Decimal("500.00")
+        max_auto_val_str = SystemSetting.get_val(db, "max_auto_withdrawal")
+        max_auto_val = Decimal(max_auto_val_str) if max_auto_val_str else Decimal("500.00")
         
         if body.amount > max_auto_val:
             import random

@@ -20,6 +20,12 @@ class SystemSetting(Base):
     description = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    @staticmethod
+    def get_val(db, key: str, default = None):
+        """Safely fetch a system setting value by key, returning default if not found."""
+        setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+        return setting.value if setting else default
+
 
 class Tier(Base):
     __tablename__ = "tiers"
