@@ -68,6 +68,9 @@ def get_analytics(current_user: Annotated[User, Depends(require_super_admin)], d
         if row[0]:  # skip null parent_rid
             top_promoters.append({"rid": row[0], "network_size": row[1]})
 
+    community_wallet = db.query(Wallet).filter(Wallet.user_rid == "COMMUNITY_POT").first()
+    community_pot_balance = float(community_wallet.balance) if community_wallet else 0.0
+
     return AnalyticsOut(
         total_users=total_users,
         activated_users=activated_users,
@@ -75,7 +78,8 @@ def get_analytics(current_user: Annotated[User, Depends(require_super_admin)], d
         codes_used=codes_used,
         codes_available=codes_available,
         total_payouts=float(total_payouts),
-        top_promoters=top_promoters
+        top_promoters=top_promoters,
+        community_pot_balance=community_pot_balance
     )
 
 @router.get("/finance/notification-expenses")

@@ -72,6 +72,7 @@ class AnalyticsOut(BaseModel):
     codes_available: int
     total_payouts: float
     top_promoters: list[dict]
+    community_pot_balance: float
 
 class AdminLogOut(BaseModel):
     action: str

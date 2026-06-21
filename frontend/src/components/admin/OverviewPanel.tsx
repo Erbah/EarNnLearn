@@ -20,6 +20,7 @@ interface AnalyticsData {
   codes_used: number;
   codes_available: number;
   total_payouts: number | string;
+  community_pot_balance: number | string;
   top_promoters?: TopPromoter[];
 }
 
@@ -57,13 +58,14 @@ export const OverviewPanel = React.memo(function OverviewPanel() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-5 mb-8">
         <Stat label="Total Users" value={data.total_users ?? 0} />
         <Stat label="Activated Users" value={data.activated_users ?? 0} color="#FFD700" />
         <Stat label="Revenue (GHS)" value={(Number(data?.total_revenue) || 0).toFixed(2)} color="#10B981" />
         <Stat label="Codes Used" value={data.codes_used ?? 0} />
         <Stat label="Codes Available" value={data.codes_available ?? 0} color="#FFD700" />
         <Stat label="Total Payouts (GHS)" value={(Number(data?.total_payouts) || 0).toFixed(2)} color="#F59E0B" />
+        <Stat label="Community Pot (GHS)" value={(Number(data?.community_pot_balance) || 0).toFixed(2)} color="#8B5CF6" />
       </div>
       {(data.top_promoters && data.top_promoters.length > 0) && (
         <div className="bg-slate-900/40 backdrop-blur-md rounded-2xl p-6 border border-white/10 max-w-2xl">
