@@ -44,11 +44,11 @@ router = APIRouter()
 def audit_payouts(db: Session = Depends(get_db)):
     try:
         from app.models.code import Code
+        from app.models.admin import SystemSetting
+        
+        # 1. Fetch Amanda users
         amandas = db.query(User).filter(User.name.ilike("%Amanda%")).all()
-        if not amandas:
-            return {"error": "No Amanda found"}
-            
-        results = []
+        amandas_results = []
         for amanda in amandas:
             wallet = db.query(Wallet).filter(Wallet.user_rid == amanda.rid).first() if amanda.rid else None
             
@@ -76,7 +76,7 @@ def audit_payouts(db: Session = Depends(get_db)):
                         "transactions": rt_data
                     })
             
-            results.append({
+            amandas_results.append({
                 "amanda": {
                     "id": str(amanda.id),
                     "name": amanda.name,
@@ -91,9 +91,103 @@ def audit_payouts(db: Session = Depends(get_db)):
                 "wallet_transactions": w_txs_data,
                 "referrals": referrals_data
             })
-                
-        return {"users": results}
+            
+        # 2. Fetch platform (master) wallet
+        master_wallet = db.query(Wallet).filter(Wallet.user_rid == "ACNIRP").first()
+        master_txs = db.query(WalletTransaction).filter(WalletTransaction.user_rid == "ACNIRP").all()
+        master_txs_data = [{"type": wt.type, "amount": float(wt.amount), "description": wt.description, "created_at": str(wt.created_at)} for wt in master_txs]
+        master_data = {
+            "balance": float(master_wallet.balance) if master_wallet else 0.0,
+            "transactions": master_txs_data
+        }
+        
+        # 3. Fetch system settings
+        settings_rows = db.query(SystemSetting).all()
+        settings_data = {s.key: s.value for s in settings_rows}
+        
+        # 4. Fetch all transactions in 'success' or 'processed' status
+        success_txs = db.query(Transaction).filter(Transaction.status == "success").all()
+        success_txs_data = [{"id": s.id, "buyer_rid": s.buyer_rid, "seller_rid": s.seller_rid, "amount": float(s.amount), "status": s.status, "created_at": str(s.created_at)} for s in success_txs]
+        
+        processed_txs = db.query(Transaction).filter(Transaction.status == "processed").all()
+        processed_txs_data = [{"id": s.id, "buyer_rid": s.buyer_rid, "seller_rid": s.seller_rid, "amount": float(s.amount), "status": s.status, "created_at": str(s.created_at)} for s in processed_txs]
+        
+        return {
+            "users": amandas_results,
+            "master_wallet": master_data,
+            "system_settings": settings_data,
+            "success_transactions": success_txs_data,
+            "processed_transactions": processed_txs_data
+        }
     except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+@router.post("/repair-payouts")
+def repair_payouts(db: Session = Depends(get_db)):
+    try:
+        from app.models.code import Code
+        from app.services.profit_engine import distribute_profit, credit_wallet
+        from decimal import Decimal
+        
+        # Find all transactions in 'success' status
+        success_txs = db.query(Transaction).filter(Transaction.status == "success").all()
+        repaired = []
+        
+        for tx in success_txs:
+            # Check if this is an activation transaction
+            if not tx.buyer_rid or tx.buyer_rid.startswith("PENDING_ACT_"):
+                continue
+                
+            # Safety Check: check if any wallet transactions already exist for this buyer
+            existing_tx = db.query(WalletTransaction).filter(
+                WalletTransaction.description.ilike(f"%{tx.buyer_rid}%")
+            ).first()
+            if existing_tx:
+                print(f"[REPAIR] Tx {tx.id} already has wallet credits in DB. Marking as processed without duplicating.")
+                tx.status = "processed"
+                db.commit()
+                continue
+                
+            # Run profit distribution for this transaction
+            target_code = db.query(Code).filter(Code.id == tx.code_id).first()
+            seller_rid = tx.seller_rid or (target_code.owner_rid if target_code else None)
+            if not seller_rid:
+                continue
+                
+            print(f"[REPAIR] Running profit distribution for tx {tx.id}: seller={seller_rid}, amount={tx.amount}")
+            payouts = distribute_profit(db, seller_rid, Decimal(str(tx.amount)), target_code=target_code)
+            
+            # Credit seller
+            credit_wallet(db, payouts["seller"]["rid"], payouts["seller"]["amount"],
+                          "CREDIT_PROFIT_SELLER", f"Sale profit from buyer {tx.buyer_rid} (REPAIRED)")
+            # Credit platform
+            credit_wallet(db, payouts["platform"]["rid"], payouts["platform"]["amount"],
+                          "CREDIT_PROFIT_PLATFORM", f"Platform fee from {tx.buyer_rid} (REPAIRED)")
+            # Credit family
+            for payout in payouts["family"]:
+                credit_wallet(db, payout["rid"], payout["amount"],
+                              "CREDIT_PROFIT_FAMILY", f"Network family share from {tx.buyer_rid} (REPAIRED)")
+                              
+            tx.status = "processed"
+            db.commit()
+            
+            repaired.append({
+                "tx_id": str(tx.id),
+                "buyer_rid": tx.buyer_rid,
+                "seller_rid": seller_rid,
+                "amount": float(tx.amount),
+                "payouts": {
+                    "seller": {"rid": payouts["seller"]["rid"], "amount": float(payouts["seller"]["amount"])},
+                    "platform": {"rid": payouts["platform"]["rid"], "amount": float(payouts["platform"]["amount"])},
+                    "family": [{"rid": p["rid"], "amount": float(p["amount"])} for p in payouts["family"]],
+                    "community_pot": float(payouts["community_pot"]["amount"])
+                }
+            })
+            
+        return {"status": "success", "repaired_count": len(repaired), "repaired": repaired}
+    except Exception as e:
+        db.rollback()
         import traceback
         return {"error": str(e), "traceback": traceback.format_exc()}
 
