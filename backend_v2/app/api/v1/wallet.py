@@ -34,11 +34,63 @@ class WithdrawalRequestOut(BaseModel):
     
     class Config:
         from_attributes = True
-
+    
 class DepositRequest(BaseModel):
     amount: Decimal
 
 router = APIRouter()
+
+@router.get("/audit-payouts")
+def audit_payouts(db: Session = Depends(get_db)):
+    try:
+        from app.models.code import Code
+        amanda = db.query(User).filter(User.name.ilike("%Amanda%")).first()
+        if not amanda:
+            return {"error": "Amanda Erbah not found"}
+            
+        wallet = db.query(Wallet).filter(Wallet.user_rid == amanda.rid).first() if amanda.rid else None
+        
+        codes = db.query(Code).filter(Code.owner_rid == amanda.rid).all() if amanda.rid else []
+        codes_data = [{"code": c.product_code or c.generated_rid, "price": float(c.price), "used": c.used} for c in codes]
+        
+        sales = db.query(Transaction).filter(Transaction.seller_rid == amanda.rid).all() if amanda.rid else []
+        sales_data = [{"id": s.id, "buyer_rid": s.buyer_rid, "amount": float(s.amount), "status": s.status, "created_at": str(s.created_at)} for s in sales]
+        
+        w_txs = db.query(WalletTransaction).filter(WalletTransaction.user_rid == amanda.rid).all() if amanda.rid else []
+        w_txs_data = [{"type": wt.type, "amount": float(wt.amount), "description": wt.description, "created_at": str(wt.created_at)} for wt in w_txs]
+        
+        referrals_data = []
+        if amanda.rid:
+            referrals = db.query(User).filter(User.parent_rid == amanda.rid).all()
+            for ref in referrals:
+                ref_wallet = db.query(Wallet).filter(Wallet.user_rid == ref.rid).first() if ref.rid else None
+                ref_txs = db.query(Transaction).filter(Transaction.buyer_rid == ref.rid).all() if ref.rid else []
+                rt_data = [{"amount": float(rt.amount), "status": rt.status, "reference": rt.payment_reference} for rt in ref_txs]
+                referrals_data.append({
+                    "name": ref.name,
+                    "rid": ref.rid,
+                    "status": ref.status,
+                    "wallet_balance": float(ref_wallet.balance) if ref_wallet else 0.0,
+                    "transactions": rt_data
+                })
+                
+        return {
+            "amanda": {
+                "name": amanda.name,
+                "rid": amanda.rid,
+                "email": amanda.email,
+                "status": amanda.status,
+                "wallet_balance": float(wallet.balance) if wallet else 0.0,
+                "withdrawable_balance": float(wallet.withdrawable_balance) if wallet else 0.0,
+            },
+            "codes": codes_data,
+            "sales": sales_data,
+            "wallet_transactions": w_txs_data,
+            "referrals": referrals_data
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 @router.get("/", response_model=WalletResponse)
 def get_user_wallet(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
