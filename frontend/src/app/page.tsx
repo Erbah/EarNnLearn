@@ -54,33 +54,33 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-24 bg-card/30 border-t border-white/5 relative z-10 scroll-mt-20">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-white mb-4">A simple cycle of success</h3>
-            <p className="text-gray-400">Master the tech stack while mastering your financial freedom.</p>
+            <h3 className="text-3xl font-bold text-white mb-4">A Simple Path to Learn & Earn</h3>
+            <p className="text-gray-400 max-w-xl mx-auto">Unlock high-income digital skills while building a recurring, multi-tier stream of passive and active commissions.</p>
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-primary/30 transition-colors">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                <KeyRound className="w-8 h-8 text-primary" />
+            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-primary/40 hover:shadow-[0_0_30px_rgba(0,224,255,0.05)] transition-all duration-300 group">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <KeyRound className="w-8 h-8 text-primary animate-pulse" />
               </div>
-              <h4 className="text-xl font-bold text-white mb-3">1. Activate</h4>
-              <p className="text-gray-400 text-sm leading-relaxed">Purchase an activation code from a sponsor to unlock your portal and training modules.</p>
+              <h4 className="text-xl font-bold text-white mb-3">1. Activate Portal</h4>
+              <p className="text-gray-400 text-sm leading-relaxed">Enter an activation code from a friend or purchase one from the public marketplace. This unlocks your access to the entire portal.</p>
             </div>
             
-            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-blue-400/30 transition-colors">
-              <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-6">
+            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-blue-400/40 hover:shadow-[0_0_30px_rgba(96,165,250,0.05)] transition-all duration-300 group">
+              <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
                 <Lightbulb className="w-8 h-8 text-blue-400" />
               </div>
-              <h4 className="text-xl font-bold text-white mb-3">2. Learn</h4>
-              <p className="text-gray-400 text-sm leading-relaxed">Gain access to premium technical courses and digital products instantly.</p>
+              <h4 className="text-xl font-bold text-white mb-3">2. Master Tech Skills</h4>
+              <p className="text-gray-400 text-sm leading-relaxed">Gain instant access to premium courses on AI, programming, and digital marketing. Learn at your own pace with a personalized AI tutor.</p>
             </div>
             
-            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-secondary/30 transition-colors">
-              <div className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-6">
+            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-secondary/40 hover:shadow-[0_0_30px_rgba(236,72,153,0.05)] transition-all duration-300 group">
+              <div className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
                 <Users className="w-8 h-8 text-secondary" />
               </div>
-              <h4 className="text-xl font-bold text-white mb-3">3. Earn</h4>
-              <p className="text-gray-400 text-sm leading-relaxed">Resell codes and build your network. Earn active & passive commissions up to infinity levels.</p>
+              <h4 className="text-xl font-bold text-white mb-3">3. Share & Earn</h4>
+              <p className="text-gray-400 text-sm leading-relaxed">Receive your own resale codes. Earn 70% direct commissions on sales, plus passive cash splits from your growing network tree.</p>
             </div>
           </div>
         </div>
