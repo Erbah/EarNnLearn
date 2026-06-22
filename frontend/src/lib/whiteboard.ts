@@ -100,6 +100,40 @@ class WhiteboardManager {
     return element.id;
   }
 
+  drawPath(
+    points: [number, number][],
+    color: string = "#06b6d4",
+    _width: number = 2,
+    _duration: number = 500
+  ) {
+    for (let i = 0; i < points.length - 1; i++) {
+      this.addElement(
+        { type: "line", from: points[i], to: points[i + 1], color },
+        0
+      );
+    }
+  }
+
+  addText(opts: {
+    content: string;
+    x: number;
+    y: number;
+    color?: string;
+    fontSize?: string;
+  }) {
+    this.addElement(
+      {
+        type: "text",
+        x: opts.x,
+        y: opts.y,
+        value: opts.content,
+        color: opts.color,
+        fontSize: opts.fontSize,
+      },
+      0
+    );
+  }
+
   clear() {
     this.state.elements = [];
     this.notify();
