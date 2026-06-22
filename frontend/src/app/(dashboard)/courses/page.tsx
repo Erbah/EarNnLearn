@@ -114,9 +114,26 @@ export default function CoursesPage() {
   }, [loadCourses]);
 
   const filtered = useMemo(() => {
-    return debouncedSearch && Array.isArray(courses)
-      ? courses.filter(c => c.title.toLowerCase().includes(debouncedSearch.toLowerCase()))
-      : (Array.isArray(courses) ? courses : []);
+    if (!debouncedSearch) return Array.isArray(courses) ? courses : [];
+    
+    const term = debouncedSearch.toLowerCase().trim();
+    
+    return (Array.isArray(courses) ? courses : []).filter(c => {
+      // 1. Match title
+      if (c.title.toLowerCase().includes(term)) return true;
+      
+      // 2. Match description
+      if (c.description && c.description.toLowerCase().includes(term)) return true;
+      
+      // 3. Match category
+      if (c.category.toLowerCase().includes(term)) return true;
+      
+      // 4. Match subtopics of the category
+      const topics = CATEGORY_TOPICS[c.category] || [];
+      if (topics.some(t => t.toLowerCase().includes(term))) return true;
+      
+      return false;
+    });
   }, [courses, debouncedSearch]);
 
   const levels = ["Beginner", "Intermediate", "Advanced"];
