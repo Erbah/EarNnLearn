@@ -1,11 +1,31 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, PlayCircle, KeyRound, Lightbulb, Users, ShieldCheck, Zap, Cpu, Award, BookOpen, TrendingUp, DollarSign, Wallet, Building2 } from "lucide-react";
 import { LandingHeader } from "@/components/LandingHeader";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function LandingPage() {
+  const [config, setConfig] = useState({
+    seller_percentage: 0.70,
+    family_percentage: 0.25,
+    master_percentage: 0.05,
+    activation_price: 20.0
+  });
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/v1/marketplace/config`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.seller_percentage === 'number') {
+          setConfig(data);
+        }
+      })
+      .catch(err => console.error("Error loading config:", err));
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-hidden flex flex-col">
       <LandingHeader />
@@ -201,10 +221,10 @@ export default function LandingPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h5 className="font-semibold text-white text-sm">70% Direct Seller Share</h5>
+                        <h5 className="font-semibold text-white text-sm">{Math.round(config.seller_percentage * 100)}% Direct Seller Share</h5>
                         <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">Active</span>
                       </div>
-                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Keep the majority of every direct sale. Resell activation codes directly to new students and receive a 70% payout instantly in your wallet.</p>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Keep the majority of every direct sale. Resell activation codes directly to new students and receive a {Math.round(config.seller_percentage * 100)}% payout instantly in your wallet.</p>
                     </div>
                   </div>
                   
@@ -214,10 +234,10 @@ export default function LandingPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h5 className="font-semibold text-white text-sm">25% Network Splits</h5>
+                        <h5 className="font-semibold text-white text-sm">{Math.round(config.family_percentage * 100)}% Network Splits</h5>
                         <span className="text-[10px] font-bold bg-pink-500/10 text-secondary border border-pink-500/20 px-1.5 py-0.5 rounded">Passive</span>
                       </div>
-                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Build downstream income. When referrals you sponsored make sales, a 25% passive share is distributed up the network tree to sponsors.</p>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Build downstream income. When referrals you sponsored make sales, a {Math.round(config.family_percentage * 100)}% passive share is distributed up the network tree to sponsors.</p>
                     </div>
                   </div>
                   
@@ -227,10 +247,10 @@ export default function LandingPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h5 className="font-semibold text-white text-sm">5% Master node & Settlements</h5>
+                        <h5 className="font-semibold text-white text-sm">{Math.round(config.master_percentage * 100)}% Master node & Settlements</h5>
                         <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded">System</span>
                       </div>
-                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">A minimal 5% platform fee is kept to power interactive AI APIs. All commissions land instantly in your dashboard and can be withdrawn anytime.</p>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">A minimal {Math.round(config.master_percentage * 100)}% platform fee is kept to power interactive AI APIs. All commissions land instantly in your dashboard and can be withdrawn anytime.</p>
                     </div>
                   </div>
                 </div>

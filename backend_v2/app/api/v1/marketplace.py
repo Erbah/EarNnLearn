@@ -233,6 +233,42 @@ def get_rates():
     }
 
 
+@router.get("/config")
+def get_public_config(db: Session = Depends(get_db)):
+    """Returns public configurations like splits and activation price."""
+    seller = SystemSetting.get_val(db, "seller_percentage", 0.70)
+    family = SystemSetting.get_val(db, "family_percentage", 0.25)
+    master = SystemSetting.get_val(db, "master_percentage", 0.05)
+    price = SystemSetting.get_val(db, "activation_price", 20.0)
+    
+    try:
+        seller = float(seller)
+    except:
+        seller = 0.70
+        
+    try:
+        family = float(family)
+    except:
+        family = 0.25
+        
+    try:
+        master = float(master)
+    except:
+        master = 0.05
+        
+    try:
+        price = float(price)
+    except:
+        price = 20.0
+
+    return {
+        "seller_percentage": seller,
+        "family_percentage": family,
+        "master_percentage": master,
+        "activation_price": price
+    }
+
+
 @router.get("/convert")
 def convert_currency(amount: float, from_curr: str = "GHS", to_curr: str = "GHS"):
     """Converts amount from one currency to another."""
