@@ -141,173 +141,169 @@ export default function CoursesPage() {
       </div>
 
       {/* Unified Search Header */}
-      <div className="flex w-full gap-4 relative z-50">
+      <div className="grid grid-cols-2 md:flex w-full gap-4 relative z-50">
         
-        {/* Categories Dropdown & Search Wrapper */}
-        <div className="flex flex-1 items-center bg-white/5 border border-white/10 rounded-xl transition-all focus-within:border-primary/50 focus-within:bg-white/10 relative">
-          
-          {/* Categories Button */}
-          <div 
-            className="relative h-full explore-dropdown-container"
-            onMouseEnter={() => !isMobile && setIsDropdownOpen(true)}
-            onMouseLeave={() => !isMobile && setIsDropdownOpen(false)}
+        {/* Categories Dropdown */}
+        <div 
+          className="relative col-span-1 md:h-full explore-dropdown-container order-2 md:order-1"
+          onMouseEnter={() => !isMobile && setIsDropdownOpen(true)}
+          onMouseLeave={() => !isMobile && setIsDropdownOpen(false)}
+        >
+          <button 
+            onClick={() => setIsDropdownOpen(prev => !prev)}
+            className={`flex items-center justify-between w-full md:min-w-[180px] h-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-sm font-medium transition-all ${isDropdownOpen || activeCategory ? 'border-primary/50 bg-white/10 text-primary' : 'text-gray-300 hover:bg-white/10'}`}
           >
-            <button 
-              onClick={() => setIsDropdownOpen(prev => !prev)}
-              className={`flex items-center h-full gap-2 px-5 text-sm font-medium transition-colors border-r border-white/10 ${isDropdownOpen || activeCategory ? 'text-primary' : 'text-gray-300 hover:text-white'}`}
-            >
-              {activeCategory ? activeCategory : "Explore"}
-              <ChevronDown className={`w-4 h-4 ml-1 opacity-70 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-            </button>
+            <span className="truncate">{activeCategory ? activeCategory : "Explore"}</span>
+            <ChevronDown className={`w-4 h-4 ml-2 opacity-70 transition-transform flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
 
-            {/* Dropdown Menu */}
-            <AnimatePresence>
-              {isDropdownOpen && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute top-full left-0 mt-2 w-72 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-2 flex z-50"
-                >
-                  {/* Main Subjects Pane */}
-                  <div className="w-full">
-                    <button
-                      onClick={() => {
-                        setActiveCategory(null);
-                        setSearch("");
-                        setIsDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-5 py-3 text-sm transition-colors text-left ${!activeCategory ? 'text-primary bg-primary/10' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
-                    >
-                      <span className="font-medium">All Courses</span>
-                    </button>
-                    {Array.isArray(categories) && categories.map(cat => {
-                      const topics = CATEGORY_TOPICS[cat.name] || [];
-                      const isActive = activeCategory === cat.name;
-                      const isExpanded = hoveredCategory === cat.name;
-                      return (
-                        <div 
-                          key={cat.id}
-                          className="relative group"
-                          onMouseEnter={() => !isMobile && setHoveredCategory(cat.name)}
-                          onMouseLeave={() => !isMobile && setHoveredCategory(null)}
+          {/* Dropdown Menu */}
+          <AnimatePresence>
+            {isDropdownOpen && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full left-0 mt-2 w-72 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl py-2 flex z-50"
+              >
+                {/* Main Subjects Pane */}
+                <div className="w-full">
+                  <button
+                    onClick={() => {
+                      setActiveCategory(null);
+                      setSearch("");
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-5 py-3 text-sm transition-colors text-left ${!activeCategory ? 'text-primary bg-primary/10' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                  >
+                    <span className="font-medium">All Courses</span>
+                  </button>
+                  {Array.isArray(categories) && categories.map(cat => {
+                    const topics = CATEGORY_TOPICS[cat.name] || [];
+                    const isActive = activeCategory === cat.name;
+                    const isExpanded = hoveredCategory === cat.name;
+                    return (
+                      <div 
+                        key={cat.id}
+                        className="relative group"
+                        onMouseEnter={() => !isMobile && setHoveredCategory(cat.name)}
+                        onMouseLeave={() => !isMobile && setHoveredCategory(null)}
+                      >
+                        <button
+                          onClick={() => {
+                            if (isMobile && topics.length > 0) {
+                              setHoveredCategory(prev => prev === cat.name ? null : cat.name);
+                            } else {
+                              setActiveCategory(cat.name);
+                              setSearch("");
+                              setIsDropdownOpen(false);
+                            }
+                          }}
+                          className={`w-full flex items-center justify-between px-5 py-3 text-sm transition-colors text-left ${isActive ? 'text-primary bg-primary/10' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                         >
-                          <button
-                            onClick={() => {
-                              if (isMobile && topics.length > 0) {
-                                setHoveredCategory(prev => prev === cat.name ? null : cat.name);
-                              } else {
-                                setActiveCategory(cat.name);
-                                setSearch("");
-                                setIsDropdownOpen(false);
-                              }
-                            }}
-                            className={`w-full flex items-center justify-between px-5 py-3 text-sm transition-colors text-left ${isActive ? 'text-primary bg-primary/10' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
-                          >
-                            <span className="flex items-center gap-3">
-                              <span className="text-lg">{cat.icon}</span> 
-                              <span className="font-medium">{cat.name}</span>
-                            </span>
-                            {topics.length > 0 && (
-                              <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90 text-primary' : 'text-gray-500 group-hover:text-white'}`} />
-                            )}
-                          </button>
-
-                          {/* Desktop flyout pane */}
-                          {!isMobile && isExpanded && topics.length > 0 && (
-                            <div className="absolute top-0 left-full ml-1 w-64 bg-[#222] border border-white/10 rounded-xl shadow-2xl py-2 z-50">
-                              <div className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/10 mb-1">
-                                {cat.name} Topics
-                              </div>
-                              {topics.map(topic => (
-                                <button
-                                  key={topic}
-                                  onClick={() => {
-                                    setActiveCategory(cat.name);
-                                    setSearch(topic);
-                                    setIsDropdownOpen(false);
-                                  }}
-                                  className="w-full px-5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left font-medium"
-                                >
-                                  {topic}
-                                </button>
-                              ))}
-                            </div>
+                          <span className="flex items-center gap-3">
+                            <span className="text-lg">{cat.icon}</span> 
+                            <span className="font-medium">{cat.name}</span>
+                          </span>
+                          {topics.length > 0 && (
+                            <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90 text-primary' : 'text-gray-500 group-hover:text-white'}`} />
                           )}
+                        </button>
 
-                          {/* Mobile inline accordion pane */}
-                          {isMobile && isExpanded && topics.length > 0 && (
-                            <div className="bg-[#222]/40 border-t border-b border-white/5 py-1 pl-4 flex flex-col">
+                        {/* Desktop flyout pane */}
+                        {!isMobile && isExpanded && topics.length > 0 && (
+                          <div className="absolute top-0 left-full ml-1 w-64 bg-[#222] border border-white/10 rounded-xl shadow-2xl py-2 z-50">
+                            <div className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/10 mb-1">
+                              {cat.name} Topics
+                            </div>
+                            {topics.map(topic => (
                               <button
+                                key={topic}
                                 onClick={() => {
+                                  setActiveCategory(cat.name);
+                                  setSearch(topic);
+                                  setIsDropdownOpen(false);
+                                }}
+                                className="w-full px-5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left font-medium"
+                              >
+                                {topic}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Mobile inline accordion pane */}
+                        {isMobile && isExpanded && topics.length > 0 && (
+                          <div className="bg-[#222]/40 border-t border-b border-white/5 py-1 pl-4 flex flex-col">
+                            <button
+                              onClick={() => {
                                   setActiveCategory(cat.name);
                                   setSearch("");
                                   setIsDropdownOpen(false);
+                              }}
+                              className="w-full px-5 py-2 text-xs transition-colors text-left font-semibold text-primary"
+                            >
+                              View All {cat.name}
+                            </button>
+                            {topics.map(topic => (
+                              <button
+                                key={topic}
+                                onClick={() => {
+                                  setActiveCategory(cat.name);
+                                  setSearch(topic);
+                                  setIsDropdownOpen(false);
                                 }}
-                                className="w-full px-5 py-2 text-xs transition-colors text-left font-semibold text-primary"
+                                className="w-full px-5 py-2 text-xs text-gray-400 hover:text-white transition-colors text-left font-medium"
                               >
-                                View All {cat.name}
+                                {topic}
                               </button>
-                              {topics.map(topic => (
-                                <button
-                                  key={topic}
-                                  onClick={() => {
-                                    setActiveCategory(cat.name);
-                                    setSearch(topic);
-                                    setIsDropdownOpen(false);
-                                  }}
-                                  className="w-full px-5 py-2 text-xs text-gray-400 hover:text-white transition-colors text-left font-medium"
-                                >
-                                  {topic}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Search Input */}
-          <div className="flex-1 relative flex items-center">
-            <Search className="absolute left-4 w-5 h-5 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search for anything..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-transparent text-white placeholder-gray-500 focus:outline-none"
-            />
-            {search && (
-              <button 
-                onClick={() => setSearch("")}
-                className="absolute right-4 text-xs font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest"
-              >
-                Clear
-              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
+        </div>
+
+        {/* Search Input */}
+        <div className="col-span-2 md:flex-1 relative flex items-center bg-white/5 border border-white/10 rounded-xl transition-all focus-within:border-primary/50 focus-within:bg-white/10 order-1 md:order-2">
+          <Search className="absolute left-4 w-5 h-5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search for anything..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-12 pr-16 py-4 bg-transparent text-white placeholder-gray-500 focus:outline-none"
+          />
+          {search && (
+            <button 
+              onClick={() => setSearch("")}
+              className="absolute right-4 text-xs font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest"
+            >
+              Clear
+            </button>
+          )}
         </div>
 
         {/* Sort Dropdown */}
         <div 
-          className="relative h-full sort-dropdown-container"
+          className="relative col-span-1 md:h-full sort-dropdown-container order-3 md:order-3"
           onMouseEnter={() => !isMobile && setIsSortOpen(true)}
           onMouseLeave={() => !isMobile && setIsSortOpen(false)}
         >
           <button 
             onClick={() => setIsSortOpen(prev => !prev)}
-            className={`flex items-center justify-between h-full px-5 py-4 min-w-[160px] bg-white/5 border border-white/10 rounded-xl text-sm font-medium transition-all ${isSortOpen ? 'border-primary/50 bg-white/10' : 'hover:bg-white/10'}`}
+            className={`flex items-center justify-between w-full md:min-w-[160px] h-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-sm font-medium transition-all ${isSortOpen ? 'border-primary/50 bg-white/10' : 'hover:bg-white/10'}`}
           >
-            <span className="text-gray-300">
+            <span className="text-gray-300 truncate">
               {sort === 'popular' ? 'Most Popular' : sort === 'rating' ? 'Top Rated' : 'Newest'}
             </span>
-            <ChevronRight className={`w-4 h-4 text-gray-500 transition-transform ${isSortOpen ? 'rotate-90 text-primary' : 'rotate-90'}`} />
+            <ChevronRight className={`w-4 h-4 text-gray-500 transition-transform flex-shrink-0 ${isSortOpen ? 'rotate-90 text-primary' : 'rotate-90'}`} />
           </button>
 
           <AnimatePresence>
