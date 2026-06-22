@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, PlayCircle, KeyRound, Lightbulb, Users, ShieldCheck, Zap, Cpu, Award } from "lucide-react";
+import { ArrowRight, PlayCircle, KeyRound, Lightbulb, Users, ShieldCheck, Zap, Cpu, Award, BookOpen, TrendingUp, DollarSign, Wallet } from "lucide-react";
 import { LandingHeader } from "@/components/LandingHeader";
 
 export default function LandingPage() {
@@ -53,35 +53,137 @@ export default function LandingPage() {
       {/* How it works simple section */}
       <section id="how-it-works" className="py-24 bg-card/30 border-t border-white/5 relative z-10 scroll-mt-20">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-white mb-4">A Simple Path to Learn & Earn</h3>
-            <p className="text-gray-400 max-w-xl mx-auto">Unlock high-income digital skills while building a recurring, multi-tier stream of passive and active commissions.</p>
+          <div className="text-center mb-20">
+            <span className="text-sm font-semibold tracking-wider text-primary uppercase">Ecosystem Dynamics</span>
+            <h3 className="text-3xl md:text-4xl font-bold text-white mt-2 mb-4">How the Platform Works</h3>
+            <p className="text-gray-400 max-w-xl mx-auto">Learn high-income tech skills while participating in a transparent, decentralized referral economy.</p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-primary/40 hover:shadow-[0_0_30px_rgba(0,224,255,0.05)] transition-all duration-300 group">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                <KeyRound className="w-8 h-8 text-primary animate-pulse" />
+          <div className="grid md:grid-cols-2 gap-12 items-stretch">
+            
+            {/* 1. The Learning Portal */}
+            <div className="p-8 md:p-10 rounded-3xl bg-card border border-white/5 glass flex flex-col justify-between hover:border-primary/20 transition-all duration-300">
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <BookOpen className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-primary uppercase tracking-widest">Pillar One</span>
+                    <h4 className="text-2xl font-bold text-white">The Learning Journey</h4>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+                  Gain access to a world-class training center that turns absolute beginners into job-ready technical talent. Our education portal features structured curriculums, bite-sized video learning, and interactive projects.
+                </p>
+                
+                <div className="space-y-6">
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Cpu className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-white text-base">Interactive AI Tutor</h5>
+                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Every course is equipped with an AI tutor. Get instant explanations for complex code, custom quiz questions, and direct support on any lesson.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Lightbulb className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-white text-base">Premium Tech Subjects</h5>
+                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Master programming, Artificial Intelligence engineering, digital marketing, business development, and personal finance via modular chapters.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Award className="w-4 h-4 text-secondary" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-white text-base">Verified Certifications</h5>
+                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Pass final lesson quizzes to unlock cryptographic completion certificates that verify your skills and credentials directly to clients.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <h4 className="text-xl font-bold text-white mb-3">1. Activate Portal</h4>
-              <p className="text-gray-400 text-sm leading-relaxed">Enter an activation code from a friend or purchase one from the public marketplace. This unlocks your access to the entire portal.</p>
+              
+              <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
+                <span className="text-xs text-gray-500 font-medium">Self-Paced • AI Guided</span>
+                <Link href="/register" className="text-sm font-semibold text-primary hover:text-cyan-300 transition-colors flex items-center gap-1">
+                  Browse Courses <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
             
-            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-blue-400/40 hover:shadow-[0_0_30px_rgba(96,165,250,0.05)] transition-all duration-300 group">
-              <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Lightbulb className="w-8 h-8 text-blue-400" />
+            {/* 2. The Referral Economy */}
+            <div className="p-8 md:p-10 rounded-3xl bg-card border border-white/5 glass flex flex-col justify-between hover:border-secondary/20 transition-all duration-300">
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-secondary" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-secondary uppercase tracking-widest">Pillar Two</span>
+                    <h4 className="text-2xl font-bold text-white">The Referral Economy</h4>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+                  Earn active and passive commission splits as you help grow the platform. When a new user activates their portal using your code, the activation fee is immediately split mathematically across three levels.
+                </p>
+                
+                <div className="space-y-6">
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h5 className="font-semibold text-white text-base">70% Direct Seller Share</h5>
+                        <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">Active</span>
+                      </div>
+                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Keep the majority of every direct sale. Resell activation codes directly to new students and receive a 70% payout instantly in your wallet.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Users className="w-4 h-4 text-secondary" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h5 className="font-semibold text-white text-base">25% Network Family Tree</h5>
+                        <span className="text-[10px] font-bold bg-pink-500/10 text-secondary border border-pink-500/20 px-1.5 py-0.5 rounded">Passive</span>
+                      </div>
+                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Build downstream income. When referrals you sponsored make sales, a 25% passive share is distributed up the network tree to sponsors.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
+                      <Wallet className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h5 className="font-semibold text-white text-base">5% Master node & Instant Payout</h5>
+                        <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded">System</span>
+                      </div>
+                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">A minimal 5% platform fee is kept to power interactive AI APIs. All commissions land instantly in your dashboard and can be withdrawn anytime.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <h4 className="text-xl font-bold text-white mb-3">2. Master Tech Skills</h4>
-              <p className="text-gray-400 text-sm leading-relaxed">Gain instant access to premium courses on AI, programming, and digital marketing. Learn at your own pace with a personalized AI tutor.</p>
+              
+              <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
+                <span className="text-xs text-gray-500 font-medium">Transparent • Instant Settlements</span>
+                <Link href="/register" className="text-sm font-semibold text-secondary hover:text-pink-300 transition-colors flex items-center gap-1">
+                  Activate Now <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
             
-            <div className="p-8 rounded-2xl bg-card border border-white/5 glass text-center hover:border-secondary/40 hover:shadow-[0_0_30px_rgba(236,72,153,0.05)] transition-all duration-300 group">
-              <div className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                <Users className="w-8 h-8 text-secondary" />
-              </div>
-              <h4 className="text-xl font-bold text-white mb-3">3. Share & Earn</h4>
-              <p className="text-gray-400 text-sm leading-relaxed">Receive your own resale codes. Earn 70% direct commissions on sales, plus passive cash splits from your growing network tree.</p>
-            </div>
           </div>
         </div>
       </section>
