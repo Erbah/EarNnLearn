@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, PlayCircle, KeyRound, Lightbulb, Users, ShieldCheck, Zap, Cpu, Award, BookOpen, TrendingUp, DollarSign, Wallet } from "lucide-react";
+import { ArrowRight, PlayCircle, KeyRound, Lightbulb, Users, ShieldCheck, Zap, Cpu, Award, BookOpen, TrendingUp, DollarSign, Wallet, Building2 } from "lucide-react";
 import { LandingHeader } from "@/components/LandingHeader";
 
 export default function LandingPage() {
@@ -52,17 +52,17 @@ export default function LandingPage() {
 
       {/* How it works simple section */}
       <section id="how-it-works" className="py-24 bg-card/30 border-t border-white/5 relative z-10 scroll-mt-20">
-        <div className="max-w-6xl mx-auto px-6">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-20">
             <span className="text-sm font-semibold tracking-wider text-primary uppercase">Ecosystem Dynamics</span>
             <h3 className="text-3xl md:text-4xl font-bold text-white mt-2 mb-4">How the Platform Works</h3>
-            <p className="text-gray-400 max-w-xl mx-auto">Learn high-income tech skills while participating in a transparent, decentralized referral economy.</p>
+            <p className="text-gray-400 max-w-2xl mx-auto">Master digital skills, publish your expertise, and build network wealth in a multi-tier commission economy.</p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-12 items-stretch">
+          <div className="grid lg:grid-cols-3 gap-8 items-stretch">
             
             {/* 1. The Learning Portal */}
-            <div className="p-8 md:p-10 rounded-3xl bg-card border border-white/5 glass flex flex-col justify-between hover:border-primary/20 transition-all duration-300">
+            <div className="p-8 rounded-3xl bg-card border border-white/5 glass flex flex-col justify-between hover:border-primary/20 transition-all duration-300">
               <div>
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -70,116 +70,176 @@ export default function LandingPage() {
                   </div>
                   <div>
                     <span className="text-xs font-bold text-primary uppercase tracking-widest">Pillar One</span>
-                    <h4 className="text-2xl font-bold text-white">The Learning Journey</h4>
+                    <h4 className="text-xl font-bold text-white">The Learning Journey</h4>
                   </div>
                 </div>
-                <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-                  Gain access to a world-class training center that turns absolute beginners into job-ready technical talent. Our education portal features structured curriculums, bite-sized video learning, and interactive projects.
+                <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                  Gain access to a world-class training center that turns beginners into tech professionals. Our education portal features structured curriculums, bite-sized video learning, and interactive projects.
                 </p>
                 
-                <div className="space-y-6">
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
-                      <Cpu className="w-4 h-4 text-primary" />
+                <div className="space-y-5">
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Cpu className="w-3.5 h-3.5 text-primary" />
                     </div>
                     <div>
-                      <h5 className="font-semibold text-white text-base">Interactive AI Tutor</h5>
-                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Every course is equipped with an AI tutor. Get instant explanations for complex code, custom quiz questions, and direct support on any lesson.</p>
+                      <h5 className="font-semibold text-white text-sm">Interactive AI Tutor</h5>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Every course includes an AI tutor. Get explanations for code, custom quiz questions, and direct support on any lesson.</p>
                     </div>
                   </div>
                   
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
-                      <Lightbulb className="w-4 h-4 text-blue-400" />
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Lightbulb className="w-3.5 h-3.5 text-blue-400" />
                     </div>
                     <div>
-                      <h5 className="font-semibold text-white text-base">Premium Tech Subjects</h5>
-                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Master programming, Artificial Intelligence engineering, digital marketing, business development, and personal finance via modular chapters.</p>
+                      <h5 className="font-semibold text-white text-sm">Premium Tech Subjects</h5>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Master programming, Artificial Intelligence engineering, digital marketing, business development, and personal finance via modular chapters.</p>
                     </div>
                   </div>
                   
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
-                      <Award className="w-4 h-4 text-secondary" />
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Award className="w-3.5 h-3.5 text-secondary" />
                     </div>
                     <div>
-                      <h5 className="font-semibold text-white text-base">Verified Certifications</h5>
-                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Pass final lesson quizzes to unlock cryptographic completion certificates that verify your skills and credentials directly to clients.</p>
+                      <h5 className="font-semibold text-white text-sm">Verified Certifications</h5>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Pass final lesson quizzes to unlock cryptographic completion certificates that verify your skills directly to clients.</p>
                     </div>
                   </div>
                 </div>
               </div>
               
               <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
-                <span className="text-xs text-gray-500 font-medium">Self-Paced • AI Guided</span>
-                <Link href="/register" className="text-sm font-semibold text-primary hover:text-cyan-300 transition-colors flex items-center gap-1">
-                  Browse Courses <ArrowRight className="w-4 h-4" />
+                <span className="text-[10px] text-gray-500 font-medium">Self-Paced • AI Guided</span>
+                <Link href="/register" className="text-xs font-semibold text-primary hover:text-cyan-300 transition-colors flex items-center gap-1">
+                  Browse Courses <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* 2. Creator & Institution Space */}
+            <div className="p-8 rounded-3xl bg-card border border-white/5 glass flex flex-col justify-between hover:border-blue-400/20 transition-all duration-300">
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">Pillar Two</span>
+                    <h4 className="text-xl font-bold text-white">Creator Space</h4>
+                  </div>
+                </div>
+                <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                  Publish high-value educational content and establish your brand on a globally scaling platform. Tools designed for universities, content creators, and independent instructors.
+                </p>
+                
+                <div className="space-y-5">
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Zap className="w-3.5 h-3.5 text-blue-400" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-white text-sm">Course Ingestion Tools</h5>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Create structured course syllabi, add learning modules, and import videos via YouTube playlists with a single click.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h5 className="font-semibold text-white text-sm">Earning-Powered Payments</h5>
+                        <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">Flexible</span>
+                      </div>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Students can pay for your courses using their platform wallet earnings or pay upfront using card/mobile money simulators.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Users className="w-3.5 h-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-white text-sm">Creator Analytics</h5>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Track student counts, ratings, reviews, revenue split metrics, and referral network reach directly from your creator studio.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
+                <span className="text-[10px] text-gray-500 font-medium">Publish • Earn • Scale</span>
+                <Link href="/register" className="text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
+                  Become a Creator <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </div>
             
-            {/* 2. The Referral Economy */}
-            <div className="p-8 md:p-10 rounded-3xl bg-card border border-white/5 glass flex flex-col justify-between hover:border-secondary/20 transition-all duration-300">
+            {/* 3. The Referral Economy */}
+            <div className="p-8 rounded-3xl bg-card border border-white/5 glass flex flex-col justify-between hover:border-secondary/20 transition-all duration-300">
               <div>
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center">
                     <TrendingUp className="w-6 h-6 text-secondary" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-secondary uppercase tracking-widest">Pillar Two</span>
-                    <h4 className="text-2xl font-bold text-white">The Referral Economy</h4>
+                    <span className="text-xs font-bold text-secondary uppercase tracking-widest">Pillar Three</span>
+                    <h4 className="text-xl font-bold text-white">Referral Economy</h4>
                   </div>
                 </div>
-                <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-                  Earn active and passive commission splits as you help grow the platform. When a new user activates their portal using your code, the activation fee is immediately split mathematically across three levels.
+                <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                  Earn active and passive commission splits as you help grow the platform. When a new user activates their portal using your code, the activation fee is split instantly.
                 </p>
                 
-                <div className="space-y-6">
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
-                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                <div className="space-y-5">
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h5 className="font-semibold text-white text-base">70% Direct Seller Share</h5>
+                        <h5 className="font-semibold text-white text-sm">70% Direct Seller Share</h5>
                         <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded">Active</span>
                       </div>
-                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Keep the majority of every direct sale. Resell activation codes directly to new students and receive a 70% payout instantly in your wallet.</p>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Keep the majority of every direct sale. Resell activation codes directly to new students and receive a 70% payout instantly in your wallet.</p>
                     </div>
                   </div>
                   
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
-                      <Users className="w-4 h-4 text-secondary" />
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Users className="w-3.5 h-3.5 text-secondary" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h5 className="font-semibold text-white text-base">25% Network Family Tree</h5>
+                        <h5 className="font-semibold text-white text-sm">25% Network Splits</h5>
                         <span className="text-[10px] font-bold bg-pink-500/10 text-secondary border border-pink-500/20 px-1.5 py-0.5 rounded">Passive</span>
                       </div>
-                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">Build downstream income. When referrals you sponsored make sales, a 25% passive share is distributed up the network tree to sponsors.</p>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">Build downstream income. When referrals you sponsored make sales, a 25% passive share is distributed up the network tree to sponsors.</p>
                     </div>
                   </div>
                   
-                  <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-1">
-                      <Wallet className="w-4 h-4 text-blue-400" />
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Wallet className="w-3.5 h-3.5 text-blue-400" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h5 className="font-semibold text-white text-base">5% Master node & Instant Payout</h5>
+                        <h5 className="font-semibold text-white text-sm">5% Master node & Settlements</h5>
                         <span className="text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded">System</span>
                       </div>
-                      <p className="text-gray-400 text-sm mt-1 leading-relaxed">A minimal 5% platform fee is kept to power interactive AI APIs. All commissions land instantly in your dashboard and can be withdrawn anytime.</p>
+                      <p className="text-gray-400 text-xs mt-0.5 leading-relaxed">A minimal 5% platform fee is kept to power interactive AI APIs. All commissions land instantly in your dashboard and can be withdrawn anytime.</p>
                     </div>
                   </div>
                 </div>
               </div>
               
               <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
-                <span className="text-xs text-gray-500 font-medium">Transparent • Instant Settlements</span>
+                <span className="text-[10px] text-gray-500 font-medium">Transparent • Instant Settlements</span>
                 <Link href="/register" className="text-sm font-semibold text-secondary hover:text-pink-300 transition-colors flex items-center gap-1">
-                  Activate Now <ArrowRight className="w-4 h-4" />
+                  Activate Now <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </div>
