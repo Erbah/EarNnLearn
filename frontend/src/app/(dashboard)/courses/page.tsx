@@ -46,6 +46,27 @@ export default function CoursesPage() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (!isDropdownOpen && !isSortOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.explore-dropdown-container') && !target.closest('.sort-dropdown-container')) {
+        setIsDropdownOpen(false);
+        setIsSortOpen(false);
+      }
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, [isDropdownOpen, isSortOpen]);
 
   const loadCourses = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -127,11 +148,12 @@ export default function CoursesPage() {
           
           {/* Categories Button */}
           <div 
-            className="relative h-full"
-            onMouseEnter={() => setIsDropdownOpen(true)}
-            onMouseLeave={() => setIsDropdownOpen(false)}
+            className="relative h-full explore-dropdown-container"
+            onMouseEnter={() => !isMobile && setIsDropdownOpen(true)}
+            onMouseLeave={() => !isMobile && setIsDropdownOpen(false)}
           >
             <button 
+              onClick={() => setIsDropdownOpen(prev => !prev)}
               className={`flex items-center h-full gap-2 px-5 text-sm font-medium transition-colors border-r border-white/10 ${isDropdownOpen || activeCategory ? 'text-primary' : 'text-gray-300 hover:text-white'}`}
             >
               {activeCategory ? activeCategory : "Explore"}
@@ -163,16 +185,23 @@ export default function CoursesPage() {
                     {Array.isArray(categories) && categories.map(cat => {
                       const topics = CATEGORY_TOPICS[cat.name] || [];
                       const isActive = activeCategory === cat.name;
+                      const isExpanded = hoveredCategory === cat.name;
                       return (
                         <div 
                           key={cat.id}
                           className="relative group"
-                          onMouseEnter={() => setHoveredCategory(cat.name)}
+                          onMouseEnter={() => !isMobile && setHoveredCategory(cat.name)}
+                          onMouseLeave={() => !isMobile && setHoveredCategory(null)}
                         >
                           <button
                             onClick={() => {
-                              setActiveCategory(cat.name);
-                              setIsDropdownOpen(false);
+                              if (isMobile && topics.length > 0) {
+                                setHoveredCategory(prev => prev === cat.name ? null : cat.name);
+                              } else {
+                                setActiveCategory(cat.name);
+                                setSearch("");
+                                setIsDropdownOpen(false);
+                              }
                             }}
                             className={`w-full flex items-center justify-between px-5 py-3 text-sm transition-colors text-left ${isActive ? 'text-primary bg-primary/10' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
                           >
@@ -181,12 +210,12 @@ export default function CoursesPage() {
                               <span className="font-medium">{cat.name}</span>
                             </span>
                             {topics.length > 0 && (
-                              <ChevronRight className={`w-4 h-4 transition-transform ${hoveredCategory === cat.name ? 'translate-x-1' : ''} ${isActive ? 'text-primary' : 'text-gray-500 group-hover:text-white'}`} />
+                              <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90 text-primary' : 'text-gray-500 group-hover:text-white'}`} />
                             )}
                           </button>
 
-                          {/* Topics Flyout Pane */}
-                          {hoveredCategory === cat.name && topics.length > 0 && (
+                          {/* Desktop flyout pane */}
+                          {!isMobile && isExpanded && topics.length > 0 && (
                             <div className="absolute top-0 left-full ml-1 w-64 bg-[#222] border border-white/10 rounded-xl shadow-2xl py-2 z-50">
                               <div className="px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-white/10 mb-1">
                                 {cat.name} Topics
@@ -200,6 +229,35 @@ export default function CoursesPage() {
                                     setIsDropdownOpen(false);
                                   }}
                                   className="w-full px-5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left font-medium"
+                                >
+                                  {topic}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Mobile inline accordion pane */}
+                          {isMobile && isExpanded && topics.length > 0 && (
+                            <div className="bg-[#222]/40 border-t border-b border-white/5 py-1 pl-4 flex flex-col">
+                              <button
+                                onClick={() => {
+                                  setActiveCategory(cat.name);
+                                  setSearch("");
+                                  setIsDropdownOpen(false);
+                                }}
+                                className="w-full px-5 py-2 text-xs transition-colors text-left font-semibold text-primary"
+                              >
+                                View All {cat.name}
+                              </button>
+                              {topics.map(topic => (
+                                <button
+                                  key={topic}
+                                  onClick={() => {
+                                    setActiveCategory(cat.name);
+                                    setSearch(topic);
+                                    setIsDropdownOpen(false);
+                                  }}
+                                  className="w-full px-5 py-2 text-xs text-gray-400 hover:text-white transition-colors text-left font-medium"
                                 >
                                   {topic}
                                 </button>
@@ -238,11 +296,12 @@ export default function CoursesPage() {
 
         {/* Sort Dropdown */}
         <div 
-          className="relative h-full"
-          onMouseEnter={() => setIsSortOpen(true)}
-          onMouseLeave={() => setIsSortOpen(false)}
+          className="relative h-full sort-dropdown-container"
+          onMouseEnter={() => !isMobile && setIsSortOpen(true)}
+          onMouseLeave={() => !isMobile && setIsSortOpen(false)}
         >
           <button 
+            onClick={() => setIsSortOpen(prev => !prev)}
             className={`flex items-center justify-between h-full px-5 py-4 min-w-[160px] bg-white/5 border border-white/10 rounded-xl text-sm font-medium transition-all ${isSortOpen ? 'border-primary/50 bg-white/10' : 'hover:bg-white/10'}`}
           >
             <span className="text-gray-300">

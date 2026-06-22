@@ -404,8 +404,11 @@ def list_seasons(current_user: Annotated[User, Depends(require_super_admin)], db
 @router.post("/seasons")
 def create_season(body: SeasonCreate, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     
-    # Deactivate other seasons to ensure only one is active (optional but recommended)
-    db.query(Season).filter(Season.is_active == True).update({"is_active": False})
+    # Deactivate other seasons and set their end_date to mark the boundary
+    db.query(Season).filter(Season.is_active == True).update({
+        "is_active": False,
+        "end_date": body.start_date
+    })
     
     season = Season(
         season_number=body.season_number, 
@@ -437,6 +440,11 @@ def delete_season_rids(
     if not season:
         raise HTTPException(status_code=404, detail="Season not found")
 
+    # Fetch next season if end_date is missing (to protect newer seasons from unbounded deletes)
+    next_season = db.query(Season).filter(
+        Season.start_date > season.start_date
+    ).order_by(Season.start_date.asc()).first()
+
     # Filter codes created within this season's range
     query = db.query(Code).filter(
         Code.used == False,
@@ -445,6 +453,8 @@ def delete_season_rids(
     )
     if season.end_date:
         query = query.filter(Code.created_at <= season.end_date)
+    elif next_season:
+        query = query.filter(Code.created_at < next_season.start_date)
     
     count = query.delete(synchronize_session=False)
     
