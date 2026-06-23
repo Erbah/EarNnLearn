@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useCallback, useMemo, useRef } from "rea
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Lock, Mail, User, KeyRound, Globe, ShoppingCart, ChevronDown, CheckCircle, CreditCard, Smartphone, ShieldCheck, ChevronLeft, Loader2, RefreshCw, Info, Zap, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Lock, Mail, User, KeyRound, Globe, ShoppingCart, ChevronDown, CheckCircle, CreditCard, Smartphone, ShieldCheck, ChevronLeft, Loader2, RefreshCw, Info, Zap, Eye, EyeOff, BookOpen, Coins, Wallet, Video, Sparkles } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL, api } from "@/lib/api";
 
@@ -48,6 +48,7 @@ function RegisterForm() {
   const [isActivating, setIsActivating] = useState(false);
   const [activationStatus, setActivationStatus] = useState("Preparing your account...");
   const [referralApplied, setReferralApplied] = useState(false);
+  const [showReferralIntro, setShowReferralIntro] = useState(false);
 
   const [entryMethod, setEntryMethod] = useState<"rid" | "product_code">("rid");
   const [activationPool, setActivationPool] = useState<any[]>([]);
@@ -239,6 +240,7 @@ function RegisterForm() {
       setEntryMethod(typeParam);
       setFormData(prev => ({ ...prev, manualCode: codeParam, purchaseAmount: "" }));
       setReferralApplied(true);
+      setShowReferralIntro(true);
       lastVerifiedCodeRef.current = codeParam;
 
       const controller = new AbortController();
@@ -451,26 +453,112 @@ function RegisterForm() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-lg p-6 sm:p-8 rounded-3xl bg-card border border-white/10 shadow-2xl glass relative z-10"
       >
-        <div className="flex justify-between mb-8 px-4">
-          {!isActivating && [1, 2].map((s) => (
-            <div key={s} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${step >= s ? "bg-primary text-background" : "bg-white/10 text-gray-500 border border-white/10"
-                }`}>
-                {step > s ? <CheckCircle className="w-5 h-5" /> : s}
+        {!showReferralIntro && (
+          <div className="flex justify-between mb-8 px-4">
+            {!isActivating && [1, 2].map((s) => (
+              <div key={s} className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${step >= s ? "bg-primary text-background" : "bg-white/10 text-gray-500 border border-white/10"
+                  }`}>
+                  {step > s ? <CheckCircle className="w-5 h-5" /> : s}
+                </div>
+                {s < 2 && <div className={`w-12 sm:w-16 h-[2px] mx-2 ${step > s ? "bg-primary" : "bg-white/10"}`} />}
               </div>
-              {s < 2 && <div className={`w-12 sm:w-16 h-[2px] mx-2 ${step > s ? "bg-primary" : "bg-white/10"}`} />}
-            </div>
-          ))}
-          {isActivating && (
-            <div className="flex items-center justify-center w-full">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center animate-pulse">
-                <ShieldCheck className="w-6 h-6 text-background" />
+            ))}
+            {isActivating && (
+              <div className="flex items-center justify-center w-full">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center animate-pulse">
+                  <ShieldCheck className="w-6 h-6 text-background" />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
-        {isActivating ? (
+        {showReferralIntro ? (
+          <div className="space-y-6">
+            <div className="text-center pb-4 border-b border-white/10">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3 border border-primary/20">
+                <Sparkles className="w-6 h-6 text-primary animate-pulse" />
+              </div>
+              <h2 className="text-xl font-bold text-white">You've Been Invited!</h2>
+              <p className="text-xs text-gray-400 mt-1">
+                Sponsor Code <span className="font-mono text-primary font-bold">{formData.manualCode}</span> has invited you to join the ecosystem.
+              </p>
+            </div>
+
+            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+              <div className="flex gap-3.5 p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all duration-200">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <BookOpen className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Pillar One: Learn</h4>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                    Master programming, AI engineering, digital finance, and marketing through structured video lessons. Complete quizzes to unlock cryptographic completion certificates.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3.5 p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-purple-400/20 transition-all duration-200">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                  <Zap className="w-4 h-4 text-purple-400" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">AI Interactive Tutor</h4>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                    Every lesson includes an AI tutor that explains complex code, drafts custom practice quiz questions, and provides personalized study assistance.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3.5 p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-secondary/20 transition-all duration-200">
+                <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
+                  <Coins className="w-4 h-4 text-secondary" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Pillar Two: Earn & Payouts</h4>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                    Earn up to 70% direct commission when reselling portal access codes to new students. Build network wealth with up to 20% passive downstream network splits.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3.5 p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-emerald-400/20 transition-all duration-200">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                  <Wallet className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Learn with Your Earnings</h4>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                    Accumulate referral commissions in your platform wallet, and use your earnings balance to pay for courses and certificates—no external topups required.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3.5 p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-blue-400/20 transition-all duration-200">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                  <Video className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Pillar Three: Creator Hub</h4>
+                  <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                    Become a creator! Easily build course syllabi, import YouTube playlists, track student metrics, and receive instant payouts from students.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => setShowReferralIntro(false)}
+                className="w-full py-4 bg-primary text-background font-bold rounded-2xl hover:bg-primary/95 transition-all shadow-[0_0_20px_rgba(0,224,255,0.3)] hover:scale-[1.01] flex items-center justify-center gap-2 group"
+              >
+                Continue to Registration
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+          </div>
+        ) : isActivating ? (
           <div className="text-center py-12 space-y-6">
             <div className="relative inline-block">
               <Loader2 className="w-16 h-16 text-primary animate-spin" />
