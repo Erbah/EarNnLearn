@@ -39,6 +39,11 @@ interface WalletData {
   currency: string;
 }
 
+const formatPrice = (val: any) => {
+  const num = Number(val);
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [wallet, setWallet] = useState<WalletData | null>(null);
@@ -151,7 +156,7 @@ export default function ShopPage() {
           <div>
             <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Wallet Balance</span>
             <span className="text-xl font-black text-white">
-              {wallet ? `${wallet.currency} ${wallet.balance.toFixed(2)}` : "Loading..."}
+              {wallet ? `${wallet.currency} ${formatPrice(wallet.balance)}` : "Loading..."}
             </span>
           </div>
         </div>
@@ -248,7 +253,7 @@ export default function ShopPage() {
               <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-gray-500 uppercase tracking-widest block font-bold">Price</span>
-                  <span className="text-lg font-black text-white">GHS {product.price.toFixed(2)}</span>
+                  <span className="text-lg font-black text-white">GHS {formatPrice(product.price)}</span>
                 </div>
                 
                 <button
@@ -295,7 +300,7 @@ export default function ShopPage() {
                   <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-gray-400">Unit Price:</span>
-                      <span className="text-white font-bold">GHS {selectedProduct.price.toFixed(2)}</span>
+                      <span className="text-white font-bold">GHS {formatPrice(selectedProduct.price)}</span>
                     </div>
 
                     <div className="flex justify-between items-center text-xs">
@@ -321,7 +326,7 @@ export default function ShopPage() {
 
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-400 font-bold">Total Bill:</span>
-                      <span className="text-xl font-black text-primary">GHS {(selectedProduct.price * quantity).toFixed(2)}</span>
+                      <span className="text-xl font-black text-primary">GHS {formatPrice(Number(selectedProduct.price) * quantity)}</span>
                     </div>
                   </div>
 
@@ -366,7 +371,7 @@ export default function ShopPage() {
                   {/* Submit Button */}
                   <button
                     onClick={handlePurchase}
-                    disabled={buyLoading || (wallet ? wallet.balance < selectedProduct.price * quantity : true)}
+                    disabled={buyLoading || (wallet ? Number(wallet.balance) < Number(selectedProduct.price) * quantity : true)}
                     className="w-full py-4 bg-primary text-background font-black rounded-2xl text-sm uppercase tracking-widest hover:scale-[1.01] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {buyLoading ? (
@@ -388,7 +393,7 @@ export default function ShopPage() {
                   <div className="space-y-2">
                     <h3 className="text-xl font-bold text-white">Purchase Successful!</h3>
                     <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
-                      Your payment of GHS {(selectedProduct.price * quantity).toFixed(2)} has been charged and is held securely in escrow.
+                      Your payment of GHS {formatPrice(Number(selectedProduct.price) * quantity)} has been charged and is held securely in escrow.
                     </p>
                   </div>
 

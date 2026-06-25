@@ -49,6 +49,11 @@ interface Order {
   created_at: string;
 }
 
+const formatPrice = (val: any) => {
+  const num = Number(val);
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
 export default function SellerStudioPage() {
   const [activeTab, setActiveTab] = useState<"listings" | "sales">("listings");
   const [myProducts, setMyProducts] = useState<Product[]>([]);
@@ -286,7 +291,7 @@ export default function SellerStudioPage() {
                 <div className="mt-6 pt-4 border-t border-white/5 flex justify-between items-center">
                   <div>
                     <span className="text-[9px] text-gray-500 uppercase block font-bold tracking-widest">Price</span>
-                    <span className="text-lg font-black text-white">GHS {product.price.toFixed(2)}</span>
+                    <span className="text-lg font-black text-white">GHS {formatPrice(product.price)}</span>
                   </div>
                   <div>
                     <span className="text-[9px] text-gray-500 uppercase block font-bold tracking-widest text-right">Stock</span>
@@ -343,7 +348,7 @@ export default function SellerStudioPage() {
                 <div className="flex md:flex-col justify-between items-end gap-2 w-full md:w-auto shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-white/5">
                   <div className="text-left md:text-right">
                     <span className="text-[9px] text-gray-500 uppercase tracking-widest block font-bold">Sales Income</span>
-                    <span className="text-xl font-black text-white">GHS {order.total_price.toFixed(2)}</span>
+                    <span className="text-xl font-black text-white">GHS {formatPrice(order.total_price)}</span>
                     <span className="text-[9px] text-gray-400 block mt-0.5">Quantity: {order.quantity}</span>
                   </div>
 

@@ -52,6 +52,11 @@ interface ShopSetting {
   platform_commission: number;
 }
 
+const formatPrice = (val: any) => {
+  const num = Number(val);
+  return isNaN(num) ? "0.00" : num.toFixed(2);
+};
+
 export default function ShopPanel() {
   const [settings, setSettings] = useState<ShopSetting | null>(null);
   const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
@@ -284,7 +289,7 @@ export default function ShopPanel() {
                       </span>
                     </div>
                     <div className="text-xs text-gray-300">
-                      Buyer: <span className="font-mono">{order.buyer_rid}</span> | Total: <strong>GHS {order.total_price.toFixed(2)}</strong>
+                      Buyer: <span className="font-mono">{order.buyer_rid}</span> | Total: <strong>GHS {formatPrice(order.total_price)}</strong>
                     </div>
                   </div>
 
