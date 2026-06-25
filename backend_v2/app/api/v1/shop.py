@@ -1,7 +1,7 @@
 from typing import List, Optional
 from decimal import Decimal
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -383,7 +383,7 @@ def admin_get_all_orders(db: Session = Depends(get_db)):
 @router.post("/admin/orders/{order_id}/resolve", response_model=OrderOut, dependencies=[Depends(verify_admin_access)])
 def admin_resolve_dispute(
     order_id: str,
-    resolution: str = Field("release", pattern="^(release|refund)$"),
+    resolution: str = Query("release", pattern="^(release|refund)$"),
     db: Session = Depends(get_db)
 ):
     """
