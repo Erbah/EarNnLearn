@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from decimal import Decimal
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.permissions import require_super_admin
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction, WithdrawalRequest
 from app.models.admin import SystemSetting
@@ -40,7 +41,7 @@ class DepositRequest(BaseModel):
 
 router = APIRouter()
 
-@router.get("/audit-payouts")
+@router.get("/audit-payouts", dependencies=[Depends(require_super_admin)])
 def audit_payouts(db: Session = Depends(get_db)):
     try:
         from app.models.code import Code
@@ -123,7 +124,7 @@ def audit_payouts(db: Session = Depends(get_db)):
         import traceback
         return {"error": str(e), "traceback": traceback.format_exc()}
 
-@router.post("/repair-payouts")
+@router.post("/repair-payouts", dependencies=[Depends(require_super_admin)])
 def repair_payouts(db: Session = Depends(get_db)):
     try:
         from app.models.code import Code

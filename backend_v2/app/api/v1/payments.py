@@ -7,6 +7,7 @@ from app.models.wallet import Wallet, WalletTransaction
 from app.models.code import Code
 from app.services.activation_service import run_activation_engine
 from app.core.config import settings
+from app.core.permissions import require_super_admin
 import uuid
 import hashlib
 import hmac
@@ -14,15 +15,20 @@ import json
 
 router = APIRouter()
 
-@router.post("/verify/{reference}")
+@router.post("/verify/{reference}", dependencies=[Depends(require_super_admin)])
 def verify_payment_simulator(reference: str, db: Session = Depends(get_db)):
     """
-    Simulates a webhook/callback for a global payment reference.
+    DEV/ADMIN ONLY: Simulates a webhook/callback for a global payment reference.
     Triggers Phase C (Activation) if the pending transaction is found.
-    
-    This is used for testing international payment flows (Stripe/PayPal/Paystack)
-    without requiring live API keys.
+
+    This endpoint is BLOCKED in production (TESTING=False). It exists solely
+    to facilitate local development and QA without requiring live payment keys.
+    In production, it returns 404 to conceal its existence from attackers.
     """
+    # Hard-block in production — return 404 to avoid revealing this endpoint exists
+    if not settings.TESTING:
+        raise HTTPException(status_code=404, detail="Not Found")
+
     # 1. Find the pending transaction
     tx = db.query(Transaction).filter(
         Transaction.payment_reference == reference, 
