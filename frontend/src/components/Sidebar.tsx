@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
-import { API_BASE_URL } from "@/lib/api";
+import { API_BASE_URL, api, setClientToken } from "@/lib/api";
 
 const API = `${API_BASE_URL}/api/v1`;
 
@@ -78,8 +78,13 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
     });
   }, [user]);
 
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem("access_token");
+  const handleLogout = useCallback(async () => {
+    try {
+      await api.post("/api/v1/auth/logout");
+    } catch (e) {
+      console.error("Logout request failed", e);
+    }
+    setClientToken(null);
     document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     sessionStorage.removeItem("admin_unlocked");
     window.location.href = "/login";

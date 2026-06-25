@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { API_BASE_URL, api } from '@/lib/api';
+import { API_BASE_URL, api, setClientToken } from '@/lib/api';
 import { LandingHeader } from '@/components/LandingHeader';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
@@ -22,9 +22,7 @@ export default function AdminLogin() {
     try {
       const response = await api.post(`${API}/login`, { admin_password: password });
       if (response.data.token) {
-        localStorage.setItem('access_token', response.data.token);
-        // Set cookie for middleware auth
-        document.cookie = `access_token=${response.data.token}; path=/; max-age=86400; SameSite=Lax`;
+        setClientToken(response.data.token);
       }
     } catch (e: any) {
       setError(e.response?.data?.detail || 'Authorization failed');

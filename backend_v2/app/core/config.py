@@ -1,11 +1,13 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "CediTrees 2.0"
     API_V1_STR: str = "/api/v1"
     TESTING: bool = False
-    ENFORCE_HTTPS: bool = False
+    PRODUCTION: bool = False
+    ENFORCE_HTTPS: bool = True
     
     SECRET_KEY: str = "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
@@ -17,10 +19,25 @@ class Settings(BaseSettings):
     # CORS Configuration — include both localhost dev and Railway production frontend
     BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,https://earnnlearn.up.railway.app,https://www.earnnlearn.up.railway.app,https://earnnnlearn.up.railway.app,https://www.earnnnlearn.up.railway.app"
     
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.PRODUCTION:
+            if self.SECRET_KEY == "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD":
+                raise ValueError("SECRET_KEY must be set in production!")
+            if self.ROOT_USER_PASSWORD == "rootpass123":
+                raise ValueError("ROOT_USER_PASSWORD must be changed in production!")
+            if len(self.SECRET_KEY) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 characters.")
+        return self
+
     @property
     def CORS_ORIGINS_LIST(self) -> list[str]:
         origins = [s.strip() for s in self.BACKEND_CORS_ORIGINS.split(",") if s.strip()]
-        return origins if origins else ["*"]  # fail-open if misconfigured
+        if not origins:
+            import logging
+            logging.getLogger(__name__).error("BACKEND_CORS_ORIGINS is not configured. CORS will reject all origins.")
+            return []  # Fail-closed: deny all rather than allow all
+        return origins
 
     # Database
     DATABASE_BACKEND: str = "sqlite"

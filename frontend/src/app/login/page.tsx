@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Lock, Mail, Loader2, Eye, EyeOff, ChevronLeft } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { API_BASE_URL, api } from "@/lib/api";
+import { API_BASE_URL, api, setClientToken } from "@/lib/api";
 import { PLATFORM_NAME, API_PREFIX } from "@/lib/config";
 
 import { LandingHeader } from "@/components/LandingHeader";
@@ -35,9 +35,7 @@ export default function LoginPage() {
 
       if (res.status === 200) {
         const data = res.data;
-        localStorage.setItem("access_token", data.access_token);
-        // Set cookie for middleware
-        document.cookie = `access_token=${data.access_token}; path=/; max-age=86400; SameSite=Lax`;
+        setClientToken(data.access_token);
 
         // Fetch profile to determine redirect
         const profileRes = await api.get(`${API}/auth/me`);

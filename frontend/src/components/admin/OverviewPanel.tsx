@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Stat } from './Stat';
-import { API_BASE_URL, api } from '@/lib/api';
+import { API_BASE_URL, api, setClientToken } from '@/lib/api';
 import axios from 'axios';
 
 const API = `${API_BASE_URL}/api/v1/admin`;
@@ -38,7 +38,8 @@ export const OverviewPanel = React.memo(function OverviewPanel() {
         const status = err.response?.status;
         if (status === 401 || status === 403) {
           sessionStorage.removeItem('admin_unlocked');
-          localStorage.removeItem('access_token');
+          setClientToken(null);
+          document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           setError(`Session expired (${status}). Redirecting to login...`);
           setTimeout(() => { window.location.href = '/admin-login'; }, 2000);
         } else {

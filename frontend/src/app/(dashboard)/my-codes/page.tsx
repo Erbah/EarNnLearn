@@ -3,10 +3,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QrCode, Copy, CheckCircle, Share2, MessageCircle, Send, Plus, CreditCard } from "lucide-react";
-import { API_BASE_URL } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useUser } from "@/context/UserContext";
 
-const API = `${API_BASE_URL}/api/v1`;
 const APP_URL = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001';
 
 export default function MyCodesPage() {
@@ -17,21 +16,11 @@ export default function MyCodesPage() {
   const [buying, setBuying] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-  const headers = useMemo<HeadersInit>(() => {
-    const h: Record<string, string> = {};
-    if (token) {
-      h["Authorization"] = `Bearer ${token}`;
-      h["Content-Type"] = "application/json";
-    }
-    return h;
-  }, [token]);
-
   const loadCodes = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/codes/my-codes`, { headers, signal });
-      setCodes(await r.json());
+      const res = await api.get('/api/v1/codes/my-codes', { signal });
+      setCodes(res.data);
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       setCodes([]);
@@ -40,32 +29,32 @@ export default function MyCodesPage() {
         setLoading(false);
       }
     }
-  }, [headers]);
+  }, []);
 
   useEffect(() => {
-    if (token) {
-      const controller = new AbortController();
-      loadCodes(controller.signal);
-      fetch(`${API}/wallet/`, { headers, signal: controller.signal })
-        .then(r => r.json())
-        .then(data => setWalletBalance(Number(data.balance) || 0))
-        .catch(() => { });
-      return () => {
-        controller.abort();
-      };
-    }
-  }, [token, headers, loadCodes]);
+    const controller = new AbortController();
+    loadCodes(controller.signal);
+    api.get('/api/v1/wallet/', { signal: controller.signal })
+      .then(res => setWalletBalance(Number(res.data.balance) || 0))
+      .catch(() => { });
+    return () => {
+      controller.abort();
+    };
+  }, [loadCodes]);
 
   async function buyCode() {
     setBuying(true);
-    const r = await fetch(`${API}/codes/buy`, { method: "POST", headers });
-    if (r.ok) {
-      await loadCodes();
-      // update wallet balance
-      fetch(`${API}/wallet/`, { headers }).then(res => res.json()).then(data => setWalletBalance(Number(data.balance) || 0)).catch(() => { });
-    } else {
-      const err = await r.json();
-      alert(err.detail || "Failed to buy code");
+    try {
+      const res = await api.post('/api/v1/codes/buy');
+      if (res.status === 200 || res.status === 201) {
+        await loadCodes();
+        // update wallet balance
+        api.get('/api/v1/wallet/')
+          .then(res => setWalletBalance(Number(res.data.balance) || 0))
+          .catch(() => { });
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.detail || "Failed to buy code");
     }
     setBuying(false);
   }

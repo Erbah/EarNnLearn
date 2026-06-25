@@ -9,7 +9,7 @@ Full control center for the platform:
 - Season control
 - Analytics overview
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, text
 from pydantic import BaseModel
@@ -46,7 +46,7 @@ class CredentialUpdateRequest(BaseModel):
     new_password: str
 
 @router.post("/login")
-def login_admin(body: AdminLoginRequest, db: Session = Depends(get_db)):
+def login_admin(body: AdminLoginRequest, response: Response, db: Session = Depends(get_db)):
     """Log in strictly as a Super Admin bypass using the master password."""
     setting = db.query(SystemSetting).filter(SystemSetting.key == "ADMIN_PASSWORD").first()
     
@@ -74,6 +74,17 @@ def login_admin(body: AdminLoginRequest, db: Session = Depends(get_db)):
 
     new_token = create_access_token(
         data={"sub": admin_user.rid, "tier_type": "admin", "role": admin_user.role}
+    )
+    
+    # Set secure cookie
+    response.set_cookie(
+        key="access_token",
+        value=new_token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="strict",
+        secure=True
     )
     
     return {"status": "authenticated", "tier_type": "admin", "token": new_token}

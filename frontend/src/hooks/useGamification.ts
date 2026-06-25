@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { API_BASE_URL, api } from "@/lib/api";
+import { useUser } from "@/context/UserContext";
 
 const API = `${API_BASE_URL}/api/v1`;
 
@@ -14,6 +15,7 @@ export interface GamificationHUD {
 }
 
 export function useGamification() {
+  const { user } = useUser();
   const [hud, setHud] = useState<GamificationHUD | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,9 +54,8 @@ export function useGamification() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
     const controller = new AbortController();
-    if (token) {
+    if (user) {
       fetchHUD(controller.signal);
       syncHeartbeat(controller.signal);
     } else {
@@ -63,7 +64,7 @@ export function useGamification() {
     return () => {
       controller.abort();
     };
-  }, [fetchHUD, syncHeartbeat]);
+  }, [user, fetchHUD, syncHeartbeat]);
 
   return { hud, loading, refresh: fetchHUD };
 }

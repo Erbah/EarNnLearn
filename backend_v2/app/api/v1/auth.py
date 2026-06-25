@@ -1,5 +1,6 @@
 import uuid
 import asyncio
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -18,6 +19,7 @@ from app.services.activation_service import run_activation_engine
 from app.services.paystack_service import paystack_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 def simulate_payment_webhook(tx_id: str, code_id: str, user_id: str):
     """Background task to simulate a successful payment after 5 seconds."""
@@ -217,8 +219,8 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
     if not user:
         user = db.query(User).filter(User.phone == identifier).first()
     
-    # Debug logging to help identify why mobile logins fail
-    print(f"[LOGIN_DEBUG] Raw Identifier: '{login_data.identifier}', Stripped Identifier: '{identifier}', is_phone: {is_phone}, normalized_phone: '{normalized_phone}'")
+    # Debug logging that does not leak user PII
+    logger.debug("[LOGIN] Auth attempt start", extra={"is_phone": is_phone})
     if user:
         pwd_verified = verify_password(login_data.password, user.password_hash)
         stripped_pwd_verified = False
@@ -226,10 +228,9 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
             stripped_pwd_verified = verify_password(login_data.password.strip(), user.password_hash)
             if stripped_pwd_verified:
                 pwd_verified = True
-        print(f"[LOGIN_DEBUG] Found user: Email='{user.email}', Phone='{user.phone}', ID='{user.id}', Status='{user.status}'")
-        print(f"[LOGIN_DEBUG] Raw Password Length: {len(login_data.password)}, Stripped Password Length: {len(login_data.password.strip())}, Verification: {pwd_verified} (Fallback stripped: {stripped_pwd_verified})")
+        logger.debug("[LOGIN] User record found", extra={"status": user.status, "pwd_verified": pwd_verified})
     else:
-        print("[LOGIN_DEBUG] No user found matching the identifier.")
+        logger.debug("[LOGIN] User record not found")
         pwd_verified = False
 
     if user:
@@ -380,4 +381,33 @@ def retry_activation(current_user: User = Depends(get_current_user), db: Session
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Activation failed: {str(e)}")
+
+
+@router.get("/token", response_model=Token)
+def get_token(current_user: User = Depends(get_current_user)):
+    """
+    Cookie-to-Token retrieval. Allows authenticated clients (via secure cookie)
+    to bootstrap their in-memory token for state-changing requests.
+    """
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    sub_claim = current_user.rid if current_user.rid else (current_user.email or current_user.phone)
+    access_token = create_access_token(
+        data={"sub": sub_claim, "role": current_user.role}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/logout")
+def logout_user(response: Response):
+    """
+    Clears the access token cookie from the client browser.
+    """
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        httponly=True,
+        samesite="strict",
+        secure=True
+    )
+    return {"status": "success", "message": "Logged out successfully"}
 

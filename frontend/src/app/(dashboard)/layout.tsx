@@ -7,7 +7,7 @@ import { useUser } from "@/context/UserContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, LogOut, RefreshCw, AlertCircle } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, setClientToken } from "@/lib/api";
 
 export default function DashboardLayout({
   children,
@@ -32,8 +32,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     window.location.href = 'mailto:support@learnnearn.com';
   }, []);
 
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem("access_token");
+  const handleLogout = useCallback(async () => {
+    try {
+      await api.post("/api/v1/auth/logout");
+    } catch (e) {
+      console.error("Logout request failed", e);
+    }
+    setClientToken(null);
     document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     window.location.href = "/login";
   }, []);

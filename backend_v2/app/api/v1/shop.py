@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.permissions import require_super_admin, require_education_admin
 from app.models.user import User
 from app.models.shop import Product, Order, Escrow, ShopSetting
 from app.services.shop_service import ShopService
@@ -308,11 +309,7 @@ def get_seller_orders(
 
 # --- Admin Shop Moderation Endpoints ---
 
-def verify_admin_access(current_user: User = Depends(get_current_user)):
-    if current_user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
-        raise HTTPException(status_code=403, detail="Admin permissions required")
-
-@router.get("/admin/settings", response_model=SettingsOut, dependencies=[Depends(verify_admin_access)])
+@router.get("/admin/settings", response_model=SettingsOut, dependencies=[Depends(require_super_admin)])
 def get_shop_settings(db: Session = Depends(get_db)):
     """
     Fetches platform shop and AI review rules settings.
@@ -326,7 +323,7 @@ def get_shop_settings(db: Session = Depends(get_db)):
     return setting
 
 
-@router.put("/admin/settings", response_model=SettingsOut, dependencies=[Depends(verify_admin_access)])
+@router.put("/admin/settings", response_model=SettingsOut, dependencies=[Depends(require_super_admin)])
 def update_shop_settings(body: SettingsUpdate, db: Session = Depends(get_db)):
     """
     Updates the platform AI review rules guidelines and commission rate.
@@ -342,7 +339,7 @@ def update_shop_settings(body: SettingsUpdate, db: Session = Depends(get_db)):
     return setting
 
 
-@router.get("/admin/pending", response_model=List[ProductOut], dependencies=[Depends(verify_admin_access)])
+@router.get("/admin/pending", response_model=List[ProductOut], dependencies=[Depends(require_education_admin)])
 def get_pending_moderation_products(db: Session = Depends(get_db)):
     """
     Fetches a list of all products waiting for moderation or rejected by AI.
@@ -350,7 +347,7 @@ def get_pending_moderation_products(db: Session = Depends(get_db)):
     return db.query(Product).filter(Product.status.in_(["PENDING_AI_REVIEW", "REJECTED"])).all()
 
 
-@router.post("/admin/review/{product_id}", response_model=ProductOut, dependencies=[Depends(verify_admin_access)])
+@router.post("/admin/review/{product_id}", response_model=ProductOut, dependencies=[Depends(require_education_admin)])
 def admin_manual_review(
     product_id: str,
     body: AdminProductReview,
@@ -371,7 +368,7 @@ def admin_manual_review(
     return product
 
 
-@router.get("/admin/orders", response_model=List[OrderOut], dependencies=[Depends(verify_admin_access)])
+@router.get("/admin/orders", response_model=List[OrderOut], dependencies=[Depends(require_education_admin)])
 def admin_get_all_orders(db: Session = Depends(get_db)):
     """
     Allows admin to inspect all shop transactions and shipping states.
@@ -380,7 +377,7 @@ def admin_get_all_orders(db: Session = Depends(get_db)):
     return db.query(Order).all()
 
 
-@router.post("/admin/orders/{order_id}/resolve", response_model=OrderOut, dependencies=[Depends(verify_admin_access)])
+@router.post("/admin/orders/{order_id}/resolve", response_model=OrderOut, dependencies=[Depends(require_super_admin)])
 def admin_resolve_dispute(
     order_id: str,
     resolution: str = Query("release", pattern="^(release|refund)$"),

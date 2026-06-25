@@ -11,15 +11,23 @@ export const api = axios.create({
   },
 });
 
+let inMemoryToken: string | null = null;
+
+export const setClientToken = (token: string | null) => {
+  inMemoryToken = token;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('access_token'); // Clean up legacy localstorage
+  }
+};
+
+export const getClientToken = () => inMemoryToken;
+
 // Request Interceptor: Attach Token automatically
 api.interceptors.request.use(
   (config) => {
-    // We only access localStorage on the client side
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    const token = getClientToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -48,10 +56,10 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
+        setClientToken(null);
         document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         // Avoid redirect loop if already on login
-        if (!window.location.pathname.includes('/login')) {
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/admin-login')) {
           window.location.href = '/login';
         }
       }

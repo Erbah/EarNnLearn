@@ -21,6 +21,8 @@ const AIStrategyPanel = dynamic(() => import('./admin/AIStrategyPanel'), { loadi
 const ShopPanel = dynamic(() => import('./admin/ShopPanel'), { loading: () => <PanelSkeleton />, ssr: false });
 const LogsPanel = dynamic(() => import('./admin/LogsPanel'), { loading: () => <PanelSkeleton />, ssr: false });
 
+import { setClientToken } from '@/lib/api';
+
 export const AdminDashboard = React.memo(function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -40,7 +42,8 @@ export const AdminDashboard = React.memo(function AdminDashboard() {
   ], []);
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('access_token');
+    setClientToken(null);
+    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     sessionStorage.removeItem('admin_unlocked');
     window.location.href = '/admin-login';
   }, []);

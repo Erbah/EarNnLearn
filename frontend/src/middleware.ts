@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
 import { ROLES, ACCESS_LEVELS } from './lib/roles';
 
-// The secret must be the same as the backend's SECRET_KEY
-// In a real app, this would be an environment variable
-const secretString = process.env.JWT_SECRET || process.env.SECRET_KEY || "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD";
-const SECRET = new TextEncoder().encode(secretString);
-if (!process.env.JWT_SECRET && !process.env.SECRET_KEY) {
-  console.warn("Neither JWT_SECRET nor SECRET_KEY environment variables are set! Middleware is using the development fallback secret.");
+function decodeJwtPayload(token: string): any {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = atob(base64);
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
 }
 
 export async function middleware(request: NextRequest) {
@@ -32,8 +36,11 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    // 3. Verify JWT using jose (Edge-compatible)
-    const { payload } = await jwtVerify(token, SECRET);
+    // 3. Decode JWT (signature verification is enforced by backend API)
+    const payload = decodeJwtPayload(token);
+    if (!payload) {
+      throw new Error('Invalid JWT payload format');
+    }
     const userRole = payload.role as string;
     console.log(`MIDDLEWARE DEBUG: Path ${pathname}, Role ${userRole}, Payload: ${JSON.stringify(payload)}`);
 
@@ -47,11 +54,9 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-
-
     return NextResponse.next();
   } catch (error) {
-    console.error('Middleware JWT verification failed:', error);
+    console.error('Middleware JWT decoding failed:', error);
     // Clear invalid cookie and redirect
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('access_token');

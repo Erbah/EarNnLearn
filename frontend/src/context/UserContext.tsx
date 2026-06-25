@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { api } from "@/lib/api";
+import { api, setClientToken, getClientToken } from "@/lib/api";
 import axios from "axios";
 
 const API = "/api/v1";
@@ -48,10 +48,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
       setError(null);
       
-      // Check if token exists before making request
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
+      // Bootstrap token if not already in memory
+      if (!getClientToken()) {
+        try {
+          const tokenRes = await api.get(`${API}/auth/token`, { signal });
+          if (tokenRes.data?.access_token) {
+            setClientToken(tokenRes.data.access_token);
+          }
+        } catch (e) {
+          setClientToken(null);
           setUser(null);
           setLoading(false);
           return;

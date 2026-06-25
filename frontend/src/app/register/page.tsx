@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Lock, Mail, User, KeyRound, Globe, ShoppingCart, ChevronDown, CheckCircle, CreditCard, Smartphone, ShieldCheck, ChevronLeft, Loader2, RefreshCw, Info, Zap, Eye, EyeOff, BookOpen, Coins, Wallet, Video, Sparkles } from "lucide-react";
 import axios from "axios";
-import { API_BASE_URL, api } from "@/lib/api";
+import { API_BASE_URL, api, setClientToken } from "@/lib/api";
 
 const API = "/api/v1";
 
@@ -354,8 +354,7 @@ function RegisterForm() {
       if (res.status === 200 || res.status === 201) {
         const data = res.data;
         const token = data.token.access_token;
-        localStorage.setItem("access_token", token);
-        document.cookie = `access_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+        setClientToken(token);
 
         if (data.paystack_url && data.paystack_url !== "#simulated-paystack-checkout") {
           // Real Paystack payment — redirect user to checkout
@@ -396,8 +395,7 @@ function RegisterForm() {
             detectedActive = true;
             clearInterval(interval);
             setActivationStatus("Account activated! Redirecting...");
-            localStorage.setItem("access_token", token);
-            document.cookie = `access_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+            setClientToken(token);
             // Shorter delay - bootstrap will load faster with token cached
             setTimeout(() => router.push("/dashboard"), 800);
           }

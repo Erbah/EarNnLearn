@@ -80,7 +80,7 @@ async def paystack_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
     signature = request.headers.get("x-paystack-signature")
     
-    if settings.PAYSTACK_SECRET_KEY and not settings.TESTING:
+    if settings.PAYSTACK_SECRET_KEY:
         if not signature or not verify_paystack_signature(payload, signature):
             raise HTTPException(status_code=401, detail="Invalid Paystack signature")
 

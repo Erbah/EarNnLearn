@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { setClientToken, getClientToken, api } from './api';
 
 interface AuthContextType {
   token: string | null;
@@ -22,23 +23,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    const stored = localStorage.getItem('access_token');
+    const stored = getClientToken();
     if (stored) {
-      setTimeout(() => {
-        setToken(stored);
-      }, 0);
+      setToken(stored);
     }
   }, []);
 
   const login = (newToken: string) => {
-    localStorage.setItem('access_token', newToken);
+    setClientToken(newToken);
     setToken(newToken);
     router.push('/dashboard');
   };
 
-  const logout = () => {
-    localStorage.removeItem('access_token');
+  const logout = async () => {
+    try {
+      await api.post('/api/v1/auth/logout');
+    } catch (e) {
+      console.error("Logout request failed", e);
+    }
+    setClientToken(null);
     setToken(null);
+    document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     router.push('/login');
   };
 
