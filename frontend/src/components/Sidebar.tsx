@@ -15,6 +15,8 @@ import {
   LogOut,
   Shield,
   X,
+  ShoppingBag,
+  Store,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
@@ -51,6 +53,8 @@ const navItems = [
   { name: "Dashboard",     href: "/dashboard", icon: LayoutDashboard,  roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Activate Code", href: "/activate",  icon: KeyRound,         roles: ["USER"] },
   { name: "Wallet",        href: "/wallet",    icon: Wallet,           roles: ["USER"] },
+  { name: "Shopping Mall", href: "/shop",      icon: ShoppingBag,      roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
+  { name: "Seller Studio", href: "/seller-studio", icon: Store,        roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Majors",        href: "/tracks",    icon: Network,          roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Courses",       href: "/courses",   icon: GraduationCap,    roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "My Learning",   href: "/my-learning", icon: BookOpen,       roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },

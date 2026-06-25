@@ -18,6 +18,7 @@ const PayoutsPanel = dynamic(() => import('./admin/PayoutsPanel'), { loading: ()
 const CodesPanel = dynamic(() => import('./admin/CodesPanel'), { loading: () => <PanelSkeleton />, ssr: false });
 const DatabasePanel = dynamic(() => import('./admin/DatabasePanel'), { loading: () => <PanelSkeleton />, ssr: false });
 const AIStrategyPanel = dynamic(() => import('./admin/AIStrategyPanel'), { loading: () => <PanelSkeleton />, ssr: false });
+const ShopPanel = dynamic(() => import('./admin/ShopPanel'), { loading: () => <PanelSkeleton />, ssr: false });
 const LogsPanel = dynamic(() => import('./admin/LogsPanel'), { loading: () => <PanelSkeleton />, ssr: false });
 
 export const AdminDashboard = React.memo(function AdminDashboard() {
@@ -34,6 +35,7 @@ export const AdminDashboard = React.memo(function AdminDashboard() {
     { key: 'codes', label: '🔑 Codes' },
     { key: 'database', label: '🗄️ Database' },
     { key: 'ai', label: '🧠 AI Strategy' },
+    { key: 'shop', label: '🛍️ Shop Moderation' },
     { key: 'logs', label: '📜 Logs' },
   ], []);
 
@@ -90,6 +92,7 @@ export const AdminDashboard = React.memo(function AdminDashboard() {
           {activeTab === 'codes' && <CodesPanel />}
           {activeTab === 'database' && <DatabasePanel />}
           {activeTab === 'ai' && <AIStrategyPanel />}
+          {activeTab === 'shop' && <ShopPanel />}
           {activeTab === 'logs' && <LogsPanel />}
         </motion.div>
       </div>

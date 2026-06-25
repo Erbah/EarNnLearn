@@ -7,7 +7,7 @@ from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from sqlalchemy import text
 from app.core.config import settings, sanitize_secrets
 from app.core.database import Base, engine
-from app.api.v1 import auth, wallet, codes, referral, admin_auth, admin_settings, admin_ai, admin_codes, admin_analytics, marketplace, learning, ai, payments, education, users, engagement, tracks, instructors
+from app.api.v1 import auth, wallet, codes, referral, admin_auth, admin_settings, admin_ai, admin_codes, admin_analytics, marketplace, learning, ai, payments, education, users, engagement, tracks, instructors, shop
 
 # Import all models so Base.metadata knows about them
 from app.models.user import User
@@ -21,6 +21,7 @@ from app.models.admin import SystemSetting, Tier, AdminLog, Advertisement, Seaso
 from app.models.learning import CoursePayment, VideoProgress
 from app.models.marketplace import CourseCategory, CourseEnrollment, CourseReview, Certificate
 from app.models.engagement import Quiz, QuizQuestion, QuizOption, QuizAttempt, Discussion, DiscussionReply
+from app.models.shop import Product, Order, Escrow, ShopSetting
 
 def create_app() -> FastAPI:
     logger = logging.getLogger("uvicorn.error")
@@ -179,8 +180,12 @@ def create_app() -> FastAPI:
                 for i, (name, icon) in enumerate(categories):
                     db.add(CourseCategory(name=name, icon=icon, position=i))
                 
+                # Seed default shop settings
+                if not db.query(ShopSetting).first():
+                    db.add(ShopSetting())
+                
                 db.commit()
-                print("Seeded root + settings + tiers + 11 categories")
+                print("Seeded root + settings + tiers + 11 categories + shop settings")
             
             # Seed Learning Forest (The Skill Tree) - Run independently
             if not db.query(SkillNode).first():
@@ -251,6 +256,7 @@ def create_app() -> FastAPI:
     app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["User Profile & Onboarding"])
     app.include_router(tracks.router, prefix=f"{settings.API_V1_STR}/tracks", tags=["Learning Tracks"])
     app.include_router(instructors.router, prefix=f"{settings.API_V1_STR}/instructors", tags=["Instructors"])
+    app.include_router(shop.router, prefix=f"{settings.API_V1_STR}/shop", tags=["Shopping Mall"])
 
     @app.get("/health")
     def health_check():
