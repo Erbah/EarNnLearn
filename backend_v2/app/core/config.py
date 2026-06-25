@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     TESTING: bool = False
     PRODUCTION: bool = False
-    ENFORCE_HTTPS: bool = True
+    ENFORCE_HTTPS: bool = False
     
     SECRET_KEY: str = "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: str = "5432"
     POSTGRES_DB: str = "ceditrees"
     
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     # Payment Gateways — pydantic-settings reads these directly from environment
     STRIPE_SECRET_KEY: str = ""
