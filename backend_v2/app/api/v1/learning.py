@@ -34,9 +34,9 @@ from app.services.gamification_service import GamificationService
 router = APIRouter()
 
 # Platform share of PPC deductions
-PLATFORM_CUT = Decimal("0.20")
-CREATOR_CUT = Decimal("0.70")
-NETWORK_CUT = Decimal("0.10")
+PLATFORM_CUT = Decimal("0.05")
+CREATOR_CUT = Decimal("0.95")
+NETWORK_CUT = Decimal("0.00")
 
 
 # ═══════════════════════════════════════
@@ -197,6 +197,16 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
             db.add(WalletTransaction(
                 user_rid=course.creator_rid, type="CREDIT_COURSE_SALE",
                 amount=creator_share, description=f"Course sale: {course.title}"
+            ))
+
+        platform_wallet = db.query(Wallet).filter(Wallet.user_rid == "ACNIRP").with_for_update().first()
+        if platform_wallet:
+            platform_share = (price * PLATFORM_CUT).quantize(Decimal("0.01"))
+            platform_wallet.balance += platform_share
+            platform_wallet.withdrawable_balance += platform_share
+            db.add(WalletTransaction(
+                user_rid="ACNIRP", type="PLATFORM_COMMISSION",
+                amount=platform_share, description=f"Platform fee (5%) on upfront course purchase: '{course.title}'"
             ))
             
             # Notify the creator
@@ -454,7 +464,17 @@ def watch_video(course_id: str, body: WatchVideoRequest, current_user: User = De
                     if creator:
                         msg = f"You earned {creator_share} GHS from a student learning '{course.title}' (Earn-To-Learn)."
                         notification_service.send_alert(creator, "New Learning Earnings!", msg)
-                        notification_service.send_in_app_notification(db, creator.rid, "Learning Earnings 📈", msg, type="WALLET")
+                        notification_service.send_in_app_notification(db, creator.rid, "New Earnings! 📈", msg, type="WALLET")
+
+                platform_wallet = db.query(Wallet).filter(Wallet.user_rid == "ACNIRP").with_for_update().first()
+                if platform_wallet:
+                    platform_share = (deduction * PLATFORM_CUT).quantize(Decimal("0.01"))
+                    platform_wallet.balance += platform_share
+                    platform_wallet.withdrawable_balance += platform_share
+                    db.add(WalletTransaction(
+                        user_rid="ACNIRP", type="PLATFORM_COMMISSION",
+                        amount=platform_share, description=f"Platform fee (5%) on PPC video watch: '{course_id[:8]}'"
+                    ))
 
             if payment.remaining <= 0:
                 payment.status = "completed"
