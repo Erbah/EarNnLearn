@@ -89,7 +89,14 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
   const [newPw, setNewPw] = useState('');
   const [pwMsg, setPwMsg] = useState('');
   const [isSuggesting, setIsSuggesting] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState<{ seller: number, family: number, master: number, reasoning: string } | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<{
+    seller: number;
+    family: number;
+    master: number;
+    shopCommission?: number;
+    courseCommission?: number;
+    reasoning: string;
+  } | null>(null);
 
   const loadSettings = useCallback((signal?: AbortSignal) => {
     api.get(`${API}/settings`, { signal }).then(res => setSettings(res.data)).catch((err) => {
@@ -177,6 +184,8 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
         seller: res.data.seller_percentage,
         family: res.data.family_percentage,
         master: res.data.master_percentage,
+        shopCommission: res.data.shop_platform_commission,
+        courseCommission: res.data.course_platform_commission,
         reasoning: res.data.reasoning
       });
     } catch (e: any) {
@@ -189,10 +198,18 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
   const handleApplyAISuggestion = useCallback(async () => {
     if (!aiSuggestion) return;
     
-    // Update all three
+    // Update RID activation percentages
     await api.put(`${API}/settings/seller_percentage`, { value: aiSuggestion.seller.toFixed(2) });
     await api.put(`${API}/settings/family_percentage`, { value: aiSuggestion.family.toFixed(2) });
     await api.put(`${API}/settings/master_percentage`, { value: aiSuggestion.master.toFixed(2) });
+    
+    // Update shop and course platform commission settings
+    if (aiSuggestion.shopCommission !== undefined) {
+      await api.put(`${API}/settings/shop_platform_commission`, { value: aiSuggestion.shopCommission.toFixed(2) });
+    }
+    if (aiSuggestion.courseCommission !== undefined) {
+      await api.put(`${API}/settings/course_platform_commission`, { value: aiSuggestion.courseCommission.toFixed(2) });
+    }
     
     // Reload settings
     const controller = new AbortController();
@@ -260,13 +277,25 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
             <p className="text-gray-300 text-xs leading-relaxed mb-4">
               {aiSuggestion.reasoning}
             </p>
-            <div className="flex items-center justify-between">
-              <div className="flex gap-4 text-xs font-bold">
-                <span className="text-emerald-400">Seller: {aiSuggestion.seller}</span>
-                <span className="text-blue-400">Family: {aiSuggestion.family}</span>
-                <span className="text-amber-400">Platform: {aiSuggestion.master}</span>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex gap-4 text-xs font-bold">
+                  <span className="text-emerald-400 font-mono">Seller: {aiSuggestion.seller}</span>
+                  <span className="text-blue-400 font-mono">Family: {aiSuggestion.family}</span>
+                  <span className="text-amber-400 font-mono">Platform (RID): {aiSuggestion.master}</span>
+                </div>
+                {(aiSuggestion.shopCommission !== undefined || aiSuggestion.courseCommission !== undefined) && (
+                  <div className="flex gap-4 text-xs font-bold border-t border-white/5 pt-1">
+                    {aiSuggestion.shopCommission !== undefined && (
+                      <span className="text-pink-400 font-mono">Shop Commission: {(aiSuggestion.shopCommission * 100).toFixed(0)}%</span>
+                    )}
+                    {aiSuggestion.courseCommission !== undefined && (
+                      <span className="text-cyan-400 font-mono">Course Commission: {(aiSuggestion.courseCommission * 100).toFixed(0)}%</span>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 self-end md:self-center">
                 <button 
                   onClick={() => setAiSuggestion(null)} 
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:bg-white/5 transition-colors"

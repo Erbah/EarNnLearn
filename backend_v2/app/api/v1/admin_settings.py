@@ -76,12 +76,17 @@ def get_ai_profit_suggestion(current_user: Annotated[User, Depends(require_super
     total_wallet_balance = db.query(func.sum(Wallet.balance)).scalar() or 0
     active_users = db.query(func.count(User.id)).scalar() or 0
     
+    shop_comm = SystemSetting.get_val(db, "shop_platform_commission", "0.05")
+    course_comm = SystemSetting.get_val(db, "course_platform_commission", "0.05")
+    
     financial_context = {
         "total_transactions": int(total_transactions),
         "total_revenue": float(total_revenue),
         "total_withdrawals": float(total_withdrawals),
         "total_wallet_balance": float(total_wallet_balance),
-        "active_users": int(active_users)
+        "active_users": int(active_users),
+        "current_shop_platform_commission": float(shop_comm),
+        "current_course_platform_commission": float(course_comm)
     }
     
     # 2. Call AI Engine

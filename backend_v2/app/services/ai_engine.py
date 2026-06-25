@@ -237,25 +237,28 @@ class AITutorEngine:
 
         prompt = (
             f"You are an Expert Financial Analyst and Platform Economist for LearNnEarn.\n"
-            f"Your task is to analyze the following financial context from the platform's history and recommend the optimal profit-sharing percentages between the Seller, the Family (Network), and the Platform.\n\n"
+            f"Your task is to analyze the following financial context from the platform's history and recommend the optimal profit-sharing splits:\n"
+            f"1. RID Activation Split: Seller share, Family (Network) share, and Platform (Master) share.\n"
+            f"2. Platform Commission: Shop Platform Commission (for e-commerce purchases) and Course Platform Commission (for course sales and PPC watches).\n\n"
             f"FINANCIAL CONTEXT:\n"
             f"- Total Transactions Count: {financial_context.get('total_transactions', 0)}\n"
             f"- Total Revenue (GHS): {financial_context.get('total_revenue', 0)}\n"
             f"- Total Withdrawals Requested: {financial_context.get('total_withdrawals', 0)}\n"
             f"- Total Wallet Balances (Liabilities): {financial_context.get('total_wallet_balance', 0)}\n"
-            f"- Active Users: {financial_context.get('active_users', 0)}\n\n"
-            f"OBJECTIVE:\n"
-            f"1. Ensure the platform remains profitable and sustainable (Platform share).\n"
-            f"2. Heavily incentivize content creators to sell (Seller share).\n"
-            f"3. Maintain a healthy network/referral bonus pool (Family share).\n\n"
-            f"CONSTRAINTS:\n"
-            f"- The three percentages MUST exactly sum to 1.00 (100%).\n"
+            f"- Active Users: {financial_context.get('active_users', 0)}\n"
+            f"- Current Shop Platform Commission: {financial_context.get('current_shop_platform_commission', 0.05)}\n"
+            f"- Current Course Platform Commission: {financial_context.get('current_course_platform_commission', 0.05)}\n\n"
+            f"OBJECTIVE & CONSTRAINTS:\n"
+            f"- RID Activation split (seller_percentage, family_percentage, master_percentage) MUST exactly sum to 1.00 (100%). Typical ranges: Seller: 0.60-0.80, Family: 0.15-0.30, Master: 0.05-0.15.\n"
+            f"- Shop Platform Commission (shop_platform_commission) and Course Platform Commission (course_platform_commission) must be decimal rates (e.g. 0.05 for 5%, 0.08 for 8%). Typical ranges: 0.02 to 0.15.\n"
             f"- Return ONLY a valid JSON object. Do not include markdown wrappers if possible.\n"
             f"Format:\n"
             f"{{\n"
             f"  \"seller_percentage\": 0.65,\n"
             f"  \"family_percentage\": 0.20,\n"
             f"  \"master_percentage\": 0.15,\n"
+            f"  \"shop_platform_commission\": 0.05,\n"
+            f"  \"course_platform_commission\": 0.05,\n"
             f"  \"reasoning\": \"A concise explanation of why this split is optimal based on the provided data.\"\n"
             f"}}\n"
         )
@@ -278,12 +281,18 @@ class AITutorEngine:
             
             suggestion = json.loads(raw_text)
             
-            # Mathematical normalization to guarantee exactly 1.00
-            total = suggestion.get("seller_percentage", 0) + suggestion.get("family_percentage", 0) + suggestion.get("master_percentage", 0)
+            # Mathematical normalization to guarantee exactly 1.00 for RID activation
+            total = float(suggestion.get("seller_percentage", 0)) + float(suggestion.get("family_percentage", 0)) + float(suggestion.get("master_percentage", 0))
             if total != 1.00 and total > 0:
                 suggestion["seller_percentage"] = round(suggestion["seller_percentage"] / total, 2)
                 suggestion["family_percentage"] = round(suggestion["family_percentage"] / total, 2)
                 suggestion["master_percentage"] = round(1.00 - suggestion["seller_percentage"] - suggestion["family_percentage"], 2)
+
+            # Safeguards for commissions
+            if "shop_platform_commission" not in suggestion:
+                suggestion["shop_platform_commission"] = 0.05
+            if "course_platform_commission" not in suggestion:
+                suggestion["course_platform_commission"] = 0.05
 
             return suggestion
         except Exception as e:
@@ -292,6 +301,8 @@ class AITutorEngine:
                 "seller_percentage": 0.70,
                 "family_percentage": 0.20,
                 "master_percentage": 0.10,
+                "shop_platform_commission": 0.05,
+                "course_platform_commission": 0.05,
                 "reasoning": f"Failed to generate AI suggestion ({str(e)}). Returning safe defaults."
             }
 

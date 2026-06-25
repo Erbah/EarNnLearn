@@ -28,7 +28,7 @@ from app.models.marketplace import Certificate
 from app.models.engagement import Quiz, QuizAttempt
 from app.models.transaction import Transaction
 from app.services.paystack_service import paystack_service
-from app.models.admin import Season, Tier
+from app.models.admin import Season, Tier, SystemSetting
 from app.services.gamification_service import GamificationService
 
 router = APIRouter()
@@ -189,9 +189,18 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
             amount=-price, description=f"Course: {course.title}"
         ))
 
+        # Fetch dynamic platform commission
+        comm_str = SystemSetting.get_val(db, "course_platform_commission", "0.05")
+        try:
+            course_platform_commission = Decimal(comm_str)
+        except Exception:
+            course_platform_commission = Decimal("0.05")
+
+        platform_share = (price * course_platform_commission).quantize(Decimal("0.01"))
+        creator_share = price - platform_share
+
         creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).with_for_update().first()
         if creator_wallet:
-            creator_share = (price * CREATOR_CUT).quantize(Decimal("0.01"))
             creator_wallet.balance += creator_share
             creator_wallet.withdrawable_balance += creator_share
             db.add(WalletTransaction(
@@ -201,12 +210,11 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
 
         platform_wallet = db.query(Wallet).filter(Wallet.user_rid == "ACNIRP").with_for_update().first()
         if platform_wallet:
-            platform_share = (price * PLATFORM_CUT).quantize(Decimal("0.01"))
             platform_wallet.balance += platform_share
             platform_wallet.withdrawable_balance += platform_share
             db.add(WalletTransaction(
                 user_rid="ACNIRP", type="PLATFORM_COMMISSION",
-                amount=platform_share, description=f"Platform fee (5%) on upfront course purchase: '{course.title}'"
+                amount=platform_share, description=f"Platform fee ({course_platform_commission * 100:.1f}%) on upfront course purchase: '{course.title}'"
             ))
             
             # Notify the creator
@@ -447,9 +455,18 @@ def watch_video(course_id: str, body: WatchVideoRequest, current_user: User = De
 
             course = db.query(Course).filter(Course.id == course_id).first()
             if course:
+                # Fetch dynamic platform commission
+                comm_str = SystemSetting.get_val(db, "course_platform_commission", "0.05")
+                try:
+                    course_platform_commission = Decimal(comm_str)
+                except Exception:
+                    course_platform_commission = Decimal("0.05")
+
+                platform_share = (deduction * course_platform_commission).quantize(Decimal("0.01"))
+                creator_share = deduction - platform_share
+
                 creator_wallet = db.query(Wallet).filter(Wallet.user_rid == course.creator_rid).with_for_update().first()
                 if creator_wallet:
-                    creator_share = (deduction * CREATOR_CUT).quantize(Decimal("0.01"))
                     creator_wallet.balance += creator_share
                     creator_wallet.withdrawable_balance += creator_share
                     db.add(WalletTransaction(
@@ -468,12 +485,11 @@ def watch_video(course_id: str, body: WatchVideoRequest, current_user: User = De
 
                 platform_wallet = db.query(Wallet).filter(Wallet.user_rid == "ACNIRP").with_for_update().first()
                 if platform_wallet:
-                    platform_share = (deduction * PLATFORM_CUT).quantize(Decimal("0.01"))
                     platform_wallet.balance += platform_share
                     platform_wallet.withdrawable_balance += platform_share
                     db.add(WalletTransaction(
                         user_rid="ACNIRP", type="PLATFORM_COMMISSION",
-                        amount=platform_share, description=f"Platform fee (5%) on PPC video watch: '{course_id[:8]}'"
+                        amount=platform_share, description=f"Platform fee ({course_platform_commission * 100:.1f}%) on PPC video watch: '{course_id[:8]}'"
                     ))
 
             if payment.remaining <= 0:

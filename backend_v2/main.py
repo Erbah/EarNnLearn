@@ -184,8 +184,17 @@ def create_app() -> FastAPI:
                 if not db.query(ShopSetting).first():
                     db.add(ShopSetting())
                 
+                # Seed default commissions
+                for key, val, desc in [
+                    ("shop_platform_commission", "0.05", "Platform commission for e-commerce shop purchases (e.g. 0.05 = 5%)"),
+                    ("course_platform_commission", "0.05", "Platform commission for course purchases (e.g. 0.05 = 5%)")
+                ]:
+                    exists = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+                    if not exists:
+                        db.add(SystemSetting(key=key, value=val, description=desc))
+                
                 db.commit()
-                print("Seeded root + settings + tiers + 11 categories + shop settings")
+                print("Seeded root + settings + tiers + 11 categories + shop settings + commission settings")
             
             # Seed Learning Forest (The Skill Tree) - Run independently
             if not db.query(SkillNode).first():

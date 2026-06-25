@@ -174,8 +174,13 @@ class ShopService:
         if not product:
             raise ValueError("Product not found.")
 
-        setting = db.query(ShopSetting).filter(ShopSetting.id == "AI_REVIEW_CONFIG").first()
-        commission_rate = setting.platform_commission if setting else Decimal("0.05")
+        from app.models.admin import SystemSetting
+        sys_setting = db.query(SystemSetting).filter(SystemSetting.key == "shop_platform_commission").first()
+        if sys_setting:
+            commission_rate = Decimal(sys_setting.value)
+        else:
+            setting = db.query(ShopSetting).filter(ShopSetting.id == "AI_REVIEW_CONFIG").first()
+            commission_rate = setting.platform_commission if setting else Decimal("0.05")
         
         total_amount = escrow.amount
         platform_fee = (total_amount * commission_rate).quantize(Decimal("0.01"))
