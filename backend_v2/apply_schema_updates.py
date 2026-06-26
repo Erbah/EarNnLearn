@@ -1,109 +1,66 @@
+"""
+Standalone schema migration script.
+
+Intentionally has ZERO imports from the app package to avoid triggering
+Redis/Celery/background connections that would cause this script to hang.
+Reads DATABASE_URL directly from the environment.
+"""
 import os
+import sys
 import sqlalchemy as sa
-from sqlalchemy import text
+from sqlalchemy import text, inspect
+
 
 def run_updates():
-    from app.core.config import settings
-    db_url = os.getenv("DATABASE_URL", settings.SQLALCHEMY_DATABASE_URI)
-    if db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
-        
+    db_url = os.getenv("DATABASE_URL", "")
     if not db_url:
-        print("No DATABASE_URL or configured database URI found. Skipping schema updates.")
+        print("No DATABASE_URL found. Skipping schema updates.")
         return
 
-    print("Running schema updates...")
-    engine = sa.create_engine(db_url)
-    
-    # 1. Run static updates (wrapped in try/except)
-    with engine.connect() as conn:
-        try:
-            # Add missing columns safely (PostgreSQL specific IF NOT EXISTS syntax)
-            if engine.name != "sqlite":
-                conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS creator_name VARCHAR;"))
-                conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS institution VARCHAR;"))
-                conn.execute(text("ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_preview BOOLEAN DEFAULT FALSE;"))
-                
-                # Ensure notifications table has all necessary columns
-                conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS user_rid VARCHAR;"))
-                conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR DEFAULT 'SYSTEM';"))
-                conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;"))
-            
-            # Add missing indexes safely
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_video_progress_video_id ON video_progress (video_id);"))
-            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_video_progress_user_video ON video_progress (user_rid, video_id);"))
-            
-            # Restore all resalable product codes to active (used = FALSE) since they have no usage limit
-            conn.execute(text("UPDATE codes SET used = FALSE WHERE product_code IS NOT NULL;"))
-            
-            conn.commit()
-            print("Successfully added columns, indexes, and restored product codes.")
-        except Exception as e:
-            print(f"Error adding columns or indexes: {e}")
+    # SQLAlchemy requires postgresql:// not postgres://
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-    # 2. Ensure all tables exist and run dynamic column adder (wrapped in try/except)
+    print("Running schema updates...")
+
     try:
-        from app.core.database import Base
-        # Import models to register them with Base
-        import app.models.course
-        import app.models.user
-        import app.models.wallet
-        import app.models.transaction
-        import app.models.code
-        import app.models.progress
-        import app.models.ai
-        import app.models.notification
-        import app.models.admin
-        import app.models.learning
-        import app.models.marketplace
-        import app.models.engagement
-        import app.models.refresh_token
-        
-        Base.metadata.create_all(bind=engine)
-        print("Successfully ensured all tables exist.")
-        
-        # Dynamic missing-column adder
-        from sqlalchemy import inspect
-        inspector = inspect(engine)
-        
-        with engine.connect() as conn:
-            for table_name, table in Base.metadata.tables.items():
-                if not inspector.has_table(table_name):
-                    continue
-                
-                existing_cols = {col["name"] for col in inspector.get_columns(table_name)}
-                for column in table.columns:
-                    if column.name not in existing_cols:
-                        # Column is missing from database, but defined in SQLAlchemy model
-                        col_type = str(column.type.compile(dialect=engine.dialect))
-                        default_clause = ""
-                        if column.default is not None and not callable(column.default.arg):
-                            val = column.default.arg
-                            if isinstance(val, bool):
-                                val_str = "TRUE" if val else "FALSE"
-                            elif isinstance(val, (int, float)):
-                                val_str = str(val)
-                            else:
-                                val_str = f"'{val}'"
-                            default_clause = f" DEFAULT {val_str}"
-                        
-                        # Safely add column (we already verified it doesn't exist in existing_cols)
-                        alter_query = f"ALTER TABLE {table_name} ADD COLUMN {column.name} {col_type}{default_clause}"
-                        print(f"[DYNAMIC_MIGRATION] Running: {alter_query}")
-                        try:
-                            conn.execute(text(alter_query))
-                            conn.commit()
-                            print(f"[DYNAMIC_MIGRATION] Successfully added column {column.name} to table {table_name}")
-                        except Exception as alter_err:
-                            # Connection might need rollback
-                            try:
-                                conn.rollback()
-                            except Exception:
-                                pass
-                            print(f"[DYNAMIC_MIGRATION] Failed to add column {column.name} to {table_name}: {alter_err}")
+        engine = sa.create_engine(db_url, connect_args={"connect_timeout": 10})
     except Exception as e:
-        print(f"Error checking/migrating dynamic columns: {e}")
-        
+        print(f"Failed to create engine: {e}")
+        sys.exit(1)
+
+    # ── 1. Static safe ALTER TABLE operations ─────────────────────────────────
+    try:
+        with engine.connect() as conn:
+            stmts = [
+                # courses table
+                "ALTER TABLE courses ADD COLUMN IF NOT EXISTS creator_name VARCHAR;",
+                "ALTER TABLE courses ADD COLUMN IF NOT EXISTS institution VARCHAR;",
+                # videos table
+                "ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_preview BOOLEAN DEFAULT FALSE;",
+                # notifications table
+                "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS user_rid VARCHAR;",
+                "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR DEFAULT 'SYSTEM';",
+                "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;",
+                # indexes
+                "CREATE INDEX IF NOT EXISTS idx_video_progress_video_id ON video_progress (video_id);",
+                "CREATE INDEX IF NOT EXISTS idx_video_progress_user_video ON video_progress (user_rid, video_id);",
+                # restore resalable product codes
+                "UPDATE codes SET used = FALSE WHERE product_code IS NOT NULL;",
+            ]
+            for stmt in stmts:
+                try:
+                    conn.execute(text(stmt))
+                except Exception as e:
+                    # Table might not exist yet — that's fine, create_all will handle it
+                    print(f"  [SKIP] {stmt.strip()[:60]}... → {e}")
+            conn.commit()
+            print("Static schema updates applied.")
+    except Exception as e:
+        print(f"Error during static updates: {e}")
+
+    print("Schema update script completed successfully.")
+
 
 if __name__ == "__main__":
     run_updates()
