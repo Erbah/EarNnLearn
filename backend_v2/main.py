@@ -353,7 +353,14 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health_check():
-        """Enhanced health check with database connectivity verification."""
+        """Lightweight health check — always returns 200 immediately.
+        Railway uses this to decide if the container is alive.
+        DB/Redis checks are intentionally excluded to prevent lock-induced hangs."""
+        return {"status": "ok", "version": "2.0.0"}
+
+    @app.get("/health/detailed")
+    def health_check_detailed():
+        """Full health check with DB and Redis connectivity. Use for monitoring only."""
         db_status = "connected"
         redis_status = "unknown"
         try:
