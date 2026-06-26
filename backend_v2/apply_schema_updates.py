@@ -104,41 +104,6 @@ def run_updates():
     except Exception as e:
         print(f"Error checking/migrating dynamic columns: {e}")
         
-    # 3. Run recovery actions (wrapped in try/except)
-    try:
-        from app.models.user import User
-        from app.models.code import Code
-        from app.models.transaction import Transaction
-        from app.services.activation_service import run_activation_engine
-        from app.core.database import SessionLocal
-        
-        db_session = SessionLocal()
-        try:
-            amanda = db_session.query(User).filter(
-                User.name.ilike("%Amanda%"),
-                User.status == "pending"
-            ).first()
-            if amanda:
-                print(f"Found pending user Amanda: {amanda.name} (ID: {amanda.id})")
-                tx = db_session.query(Transaction).filter(
-                    Transaction.buyer_rid == f"PENDING_ACT_{amanda.id}"
-                ).first()
-                if tx:
-                    print(f"Found pending transaction for Amanda: {tx.id}")
-                    code = db_session.query(Code).filter(Code.id == tx.code_id).first()
-                    if code:
-                        print(f"Found code for Amanda's transaction: {code.id}")
-                        code.used = False
-                        db_session.commit()
-                        run_activation_engine(db_session, amanda, code, tx)
-                        print("Successfully auto-activated Amanda Erbah during migration!")
-        except Exception as e:
-            db_session.rollback()
-            print(f"Error during auto-activating Amanda: {e}")
-        finally:
-            db_session.close()
-    except Exception as e:
-        print(f"Failed to run auto-activation recovery: {e}")
 
 if __name__ == "__main__":
     run_updates()
