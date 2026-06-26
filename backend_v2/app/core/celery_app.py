@@ -1,7 +1,7 @@
 from celery import Celery
 import os
 
-redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_url = os.getenv("REDIS_URL", "redis://localhost")
 
 celery_app = Celery(
     "cedi_workers",

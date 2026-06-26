@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: str = "5432"
     POSTGRES_DB: str = "ceditrees"
     
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost")
 
     # Payment Gateways — pydantic-settings reads these directly from environment
     STRIPE_SECRET_KEY: str = ""

@@ -2,7 +2,7 @@ from celery import Celery
 import os
 
 # Allow overriding via environment variables, otherwise default to local redis
-redis_url = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+redis_url = os.getenv("CELERY_BROKER_URL", "redis://localhost")
 
 celery_app = Celery(
     "earnnlearn",

@@ -61,6 +61,22 @@ def setup_logging():
         l.handlers = [handler]
         l.propagate = False
 
+from starlette.types import Receive, Scope, Send
+
+class SafeTrustedHostMiddleware(TrustedHostMiddleware):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        # Bypass host header validation for the health check endpoint
+        if scope.get("path") == "/health":
+            await self.app(scope, receive, send)
+            return
+
+        # Otherwise, use the standard TrustedHostMiddleware behavior
+        await super().__call__(scope, receive, send)
+
 setup_logging()
 
 def create_app() -> FastAPI:
@@ -101,7 +117,7 @@ def create_app() -> FastAPI:
         )
 
     app.add_middleware(
-        TrustedHostMiddleware,
+        SafeTrustedHostMiddleware,
         allowed_hosts=settings.ALLOWED_HOSTS_LIST,
     )
 

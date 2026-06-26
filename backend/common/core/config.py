@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "password")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "ceditrees")
     
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://127.0.0.1")
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
