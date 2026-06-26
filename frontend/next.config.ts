@@ -24,7 +24,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
-  output: "standalone",
+  output: process.env.VERCEL ? undefined : "standalone",
   images: {
     remotePatterns: [
       {
