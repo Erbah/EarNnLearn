@@ -41,7 +41,7 @@ class Settings(BaseSettings):
         return origins
 
     # Trusted Host Header configuration
-    ALLOWED_HOSTS: str = "localhost,127.0.0.1,earnnlearn.up.railway.app,www.earnnlearn.up.railway.app,earnnnlearn.up.railway.app,www.earnnnlearn.up.railway.app"
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1,earnnlearn.up.railway.app,www.earnnlearn.up.railway.app,earnnnlearn.up.railway.app,www.earnnnlearn.up.railway.app,healthcheck.railway.app"
 
     @property
     def ALLOWED_HOSTS_LIST(self) -> list[str]:
