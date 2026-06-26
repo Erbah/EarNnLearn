@@ -319,7 +319,7 @@ class AITutorEngine:
         is_first_session = (context or {}).get("is_first_session", False)
         
         # Consistent Identity Traits (v9)
-        persona_base = f"""
+        persona_base = fr"""
 # IDENTITY PROTOCOL: AI Tutor
 
 YOU ARE A REAL TUTOR.
