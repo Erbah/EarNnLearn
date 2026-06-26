@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     ROOT_USER_PASSWORD: str = "rootpass123"
     
     # CORS Configuration — include both localhost dev and Railway production frontend
-    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,https://earnnlearn.up.railway.app,https://www.earnnlearn.up.railway.app,https://earnnnlearn.up.railway.app,https://www.earnnnlearn.up.railway.app"
+    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,https://earnnlearn.up.railway.app,https://www.earnnlearn.up.railway.app,https://earnnnlearn.up.railway.app,https://www.earnnnlearn.up.railway.app,https://earnnlearn.vercel.app,https://www.earnnlearn.vercel.app,https://earnnlearn-production.up.railway.app,https://www.earnnlearn-production.up.railway.app"
     
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
         return origins
 
     # Trusted Host Header configuration
-    ALLOWED_HOSTS: str = "localhost,127.0.0.1,earnnlearn.up.railway.app,www.earnnlearn.up.railway.app,earnnnlearn.up.railway.app,www.earnnnlearn.up.railway.app,healthcheck.railway.app"
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1,earnnlearn.up.railway.app,www.earnnlearn.up.railway.app,earnnnlearn.up.railway.app,www.earnnnlearn.up.railway.app,healthcheck.railway.app,earnnlearn.vercel.app,www.earnnlearn.vercel.app,earnnlearn-production.up.railway.app,www.earnnlearn-production.up.railway.app"
 
     @property
     def ALLOWED_HOSTS_LIST(self) -> list[str]:
