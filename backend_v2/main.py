@@ -319,7 +319,12 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        startup_logic()
+        import asyncio
+        # Run startup_logic in a thread so it doesn't block the event loop.
+        # This allows the /health endpoint to respond immediately while
+        # seeding and migrations run in the background.
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, startup_logic)
         yield
 
     app.router.lifespan_context = lifespan
