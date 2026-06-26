@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app.core.config import settings, sanitize_secrets
 from app.core.database import Base, engine
 from app.api.v1 import auth, wallet, codes, referral, admin_auth, admin_settings, admin_ai, admin_codes, admin_analytics, marketplace, learning, ai, payments, education, users, engagement, tracks, instructors, shop
+from app.services.code_engine import generate_admin_rid
 
 # Import all models so Base.metadata knows about them
 from app.models.user import User
@@ -209,6 +210,18 @@ def create_app() -> FastAPI:
                 db.add(ReferralIndex(user_rid=root_rid, parent_rid=None, path=root_rid, depth=0))
                 db.add(Wallet(user_rid=root_rid, balance=0, withdrawable_balance=0))
                 db.add(Code(product_code="CT-ROOT-SEED", owner_rid=root_rid, price=20.00, tier_type="public"))
+                
+                # Seed 10 initial activation RID codes so the registration dropdown is not empty
+                for _ in range(10):
+                    db.add(Code(
+                        generated_rid=generate_admin_rid(),
+                        owner_rid=root_rid,
+                        price=20.00,
+                        tier_type="public",
+                        platform_share=0.05,
+                        seller_share=0.70,
+                        family_share=0.25
+                    ))
                 
                 # Seed default system settings
                 defaults = [
