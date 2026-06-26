@@ -14,7 +14,12 @@ class NetworkEngine:
         else:
             parent_node = db.query(NetworkTree).filter(NetworkTree.user_id == parent_id).first()
             if not parent_node:
-                raise ValueError("Parent node not found in network tree.")
+                if parent_id == 1:
+                    parent_node = NetworkTree(user_id=1, parent_id=None, path="1", depth=0)
+                    db.add(parent_node)
+                    db.flush()
+                else:
+                    raise ValueError("Parent node not found in network tree.")
             
             path = f"{parent_node.path}.{user_id}"
             depth = parent_node.depth + 1

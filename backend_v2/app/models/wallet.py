@@ -41,7 +41,7 @@ class WithdrawalRequest(Base):
     user_rid = Column(String, index=True)
     amount = Column(Numeric(12, 2), nullable=False)
     
-    status = Column(String, default="PENDING") # PENDING, APPROVED, REJECTED
+    status = Column(String, default="PENDING", index=True) # PENDING, APPROVED, REJECTED
     payout_method = Column(String) # Mobile Money, Paystack, Bank
     payout_details = Column(JSON, nullable=True) # JSON blob for flexibility
     

@@ -4,6 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy import text
 from app.core.config import settings, sanitize_secrets
 from app.core.database import Base, engine
@@ -22,6 +23,45 @@ from app.models.learning import CoursePayment, VideoProgress
 from app.models.marketplace import CourseCategory, CourseEnrollment, CourseReview, Certificate
 from app.models.engagement import Quiz, QuizQuestion, QuizOption, QuizAttempt, Discussion, DiscussionReply
 from app.models.shop import Product, Order, Escrow, ShopSetting
+
+import json
+import logging
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            log_record["exception"] = self.formatException(record.exc_info)
+        # Include custom extra fields if they exist
+        for key, val in record.__dict__.items():
+            if key not in ["args", "asctime", "created", "exc_info", "exc_text", "filename", "funcName", "levelname", "levelno", "lineno", "module", "msecs", "message", "msg", "name", "pathname", "process", "processName", "relativeCreated", "stack_info", "thread", "threadName", "taskName"]:
+                log_record[key] = val
+        return json.dumps(log_record)
+
+def setup_logging():
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    
+    # Remove existing handlers to avoid duplicates
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        
+    handler = logging.StreamHandler()
+    handler.setFormatter(JSONFormatter())
+    logger.addHandler(handler)
+    
+    # Configure uvicorn loggers to use the same structured handler
+    for log_name in ["uvicorn.error", "uvicorn.access", "uvicorn", "fastapi"]:
+        l = logging.getLogger(log_name)
+        l.handlers = [handler]
+        l.propagate = False
+
+setup_logging()
 
 def create_app() -> FastAPI:
     logger = logging.getLogger("uvicorn.error")
@@ -59,6 +99,11 @@ def create_app() -> FastAPI:
             status_code=422,
             content={"detail": "Invalid request data."},
         )
+
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=settings.ALLOWED_HOSTS_LIST,
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -184,17 +229,18 @@ def create_app() -> FastAPI:
                 if not db.query(ShopSetting).first():
                     db.add(ShopSetting())
                 
-                # Seed default commissions
-                for key, val, desc in [
-                    ("shop_platform_commission", "0.05", "Platform commission for e-commerce shop purchases (e.g. 0.05 = 5%)"),
-                    ("course_platform_commission", "0.05", "Platform commission for course purchases (e.g. 0.05 = 5%)")
-                ]:
-                    exists = db.query(SystemSetting).filter(SystemSetting.key == key).first()
-                    if not exists:
-                        db.add(SystemSetting(key=key, value=val, description=desc))
-                
                 db.commit()
-                print("Seeded root + settings + tiers + 11 categories + shop settings + commission settings")
+                print("Seeded root + settings + tiers + 11 categories + shop settings")
+            
+            # Unconditionally seed critical default settings if they are missing
+            for key, val, desc in [
+                ("shop_platform_commission", "0.05", "Platform commission for e-commerce shop purchases (e.g. 0.05 = 5%)"),
+                ("course_platform_commission", "0.05", "Platform commission for course purchases (e.g. 0.05 = 5%)")
+            ]:
+                exists = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+                if not exists:
+                    db.add(SystemSetting(key=key, value=val, description=desc))
+            db.commit()
             
             # Seed Learning Forest (The Skill Tree) - Run independently
             if not db.query(SkillNode).first():
@@ -240,10 +286,14 @@ def create_app() -> FastAPI:
             print(sanitize_secrets(f"Startup logic failed: {e}"))
         finally:
             db.close()
+    from contextlib import asynccontextmanager
 
-    @app.on_event("startup")
-    def on_startup():
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
         startup_logic()
+        yield
+
+    app.router.lifespan_context = lifespan
 
     # Core Module Inclusion
     app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])

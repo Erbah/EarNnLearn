@@ -22,7 +22,7 @@ class Code(Base):
     parent_rid = Column(String, index=True)
     session_id = Column(UUID(as_uuid=True), nullable=True)
     
-    used = Column(Boolean, default=False)
+    used = Column(Boolean, default=False, index=True)
     price = Column(Numeric(12, 2), default=20.00)
     currency = Column(String, default="GHS")
     tier_type = Column(String, default="public")

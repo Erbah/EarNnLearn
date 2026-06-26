@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from app.core.database import get_db, SessionLocal
 from app.core.rate_limit import login_rate_limiter, register_rate_limiter
-from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user
+from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user, generate_refresh_token, hash_refresh_token
 from app.core.config import settings
 from app.models.user import User
+from app.models.refresh_token import RefreshToken
 from app.models.wallet import Wallet
 from app.models.code import Code
 from app.models.transaction import Transaction
@@ -143,10 +144,23 @@ def register_user(request: Request, response: Response, user_in: UserCreate, bac
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     sub_identifier = new_user.email or new_user.phone
     access_token = create_access_token(
-        data={"sub": sub_identifier, "role": new_user.role}, expires_delta=access_token_expires
+        data={"sub": sub_identifier, "role": new_user.role, "status": new_user.status, "user_id": str(new_user.id)}, expires_delta=access_token_expires
     )
     
-    # Set secure cookie
+    refresh_token = generate_refresh_token()
+    hashed_refresh_token = hash_refresh_token(refresh_token)
+    expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    
+    db_refresh_token = RefreshToken(
+        user_id=new_user.id,
+        token=hashed_refresh_token,
+        expires_at=expires_at,
+        is_used=False
+    )
+    db.add(db_refresh_token)
+    db.commit()
+    
+    # Set secure cookies
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -154,7 +168,16 @@ def register_user(request: Request, response: Response, user_in: UserCreate, bac
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="strict",
-        secure=True
+        secure=not settings.TESTING
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        expires=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        samesite="strict",
+        secure=not settings.TESTING
     )
 
     paystack_url = None
@@ -271,10 +294,23 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
     sub_claim = user.rid if user.rid else (user.email or user.phone)
     
     access_token = create_access_token(
-        data={"sub": sub_claim, "role": user.role}, expires_delta=access_token_expires
+        data={"sub": sub_claim, "role": user.role, "status": user.status, "user_id": str(user.id)}, expires_delta=access_token_expires
     )
     
-    # Set secure cookie
+    refresh_token = generate_refresh_token()
+    hashed_refresh_token = hash_refresh_token(refresh_token)
+    expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    
+    db_refresh_token = RefreshToken(
+        user_id=user.id,
+        token=hashed_refresh_token,
+        expires_at=expires_at,
+        is_used=False
+    )
+    db.add(db_refresh_token)
+    db.commit()
+    
+    # Set secure cookies
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -282,7 +318,16 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="strict",
-        secure=True
+        secure=not settings.TESTING
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        expires=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        samesite="strict",
+        secure=not settings.TESTING
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
@@ -290,7 +335,7 @@ def login_for_access_token(response: Response, login_data: LoginRequest, db: Ses
 @router.get("/me", response_model=UserResponse)
 def read_users_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Extract just the codes as strings
-    resp = UserResponse.from_orm(current_user)
+    resp = UserResponse.model_validate(current_user)
     resp_dict = resp.model_dump()
     
     codes = db.query(Code).filter(Code.owner_rid == current_user.rid).all()
@@ -397,17 +442,172 @@ def get_token(current_user: User = Depends(get_current_user)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@router.post("/refresh", response_model=Token)
+def refresh_token(response: Response, request: Request, db: Session = Depends(get_db)):
+    """
+    Refreshes the access token using a refresh token HTTP-only cookie.
+    Implements Token Rotation & Anomaly Detection.
+    """
+    refresh_token_cookie = request.cookies.get("refresh_token")
+    if not refresh_token_cookie:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    hashed_token = hash_refresh_token(refresh_token_cookie)
+    db_token = db.query(RefreshToken).filter(RefreshToken.token == hashed_token).first()
+
+    if not db_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    if db_token.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token expired",
+        )
+
+    user = db_token.user
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    # Anomaly Detection: Token Reuse
+    if db_token.is_used:
+        # Invalidate all user sessions (revoke all refresh tokens for this user)
+        logger.warning(
+            f"Token reuse anomaly detected! User ID: {user.id}. Invalidating all refresh tokens."
+        )
+        db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update({"is_used": True})
+        db.commit()
+        
+        # Clear cookies
+        response.delete_cookie(key="access_token", path="/", httponly=True, samesite="strict", secure=not settings.TESTING)
+        response.delete_cookie(key="refresh_token", path="/", httponly=True, samesite="strict", secure=not settings.TESTING)
+        
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token reuse anomaly detected. Sessions invalidated.",
+        )
+
+    # Mark the current token as used
+    db_token.is_used = True
+    db.commit()
+
+    # Generate new access token
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    sub_claim = user.rid if user.rid else (user.email or user.phone)
+    new_access_token = create_access_token(
+        data={"sub": sub_claim, "role": user.role, "status": user.status, "user_id": str(user.id)},
+        expires_delta=access_token_expires
+    )
+
+    # Generate new refresh token
+    new_refresh_token = generate_refresh_token()
+    new_hashed_refresh_token = hash_refresh_token(new_refresh_token)
+    expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    db_new_refresh_token = RefreshToken(
+        user_id=user.id,
+        token=new_hashed_refresh_token,
+        expires_at=expires_at,
+        is_used=False,
+        parent_token_id=db_token.id
+    )
+    db.add(db_new_refresh_token)
+    db.commit()
+
+    # Set secure cookies
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        expires=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="strict",
+        secure=not settings.TESTING
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        expires=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        samesite="strict",
+        secure=not settings.TESTING
+    )
+
+    return {"access_token": new_access_token, "token_type": "bearer"}
+
+
 @router.post("/logout")
-def logout_user(response: Response):
+def logout_user(response: Response, request: Request, db: Session = Depends(get_db)):
     """
-    Clears the access token cookie from the client browser.
+    Clears the access token cookie from the client browser and blocklists it in Redis.
+    Also revokes/invalidates the refresh token in the database.
     """
+    # 1. Invalidate Refresh Token in Database
+    refresh_token_cookie = request.cookies.get("refresh_token")
+    if refresh_token_cookie:
+        hashed_token = hash_refresh_token(refresh_token_cookie)
+        db_token = db.query(RefreshToken).filter(RefreshToken.token == hashed_token).first()
+        if db_token:
+            db_token.is_used = True
+            db.commit()
+
+    # 2. Blocklist Access Token in Redis
+    token = None
+    try:
+        from fastapi.security.utils import get_authorization_scheme_param
+        authorization = request.headers.get("Authorization")
+        scheme, param = get_authorization_scheme_param(authorization)
+        if scheme.lower() == "bearer":
+            token = param
+    except Exception:
+        pass
+
+    if not token:
+        token = request.cookies.get("access_token")
+
+    if token:
+        try:
+            from jose import jwt
+            from app.core.redis import redis_client
+            
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            jti = payload.get("jti")
+            exp = payload.get("exp")
+            if jti and exp:
+                now = datetime.utcnow().timestamp()
+                time_remaining = int(exp - now)
+                if time_remaining > 0:
+                    try:
+                        redis_client.setex(f"blacklist:token:{jti}", time_remaining, "true")
+                    except Exception as e:
+                        logger.warning(f"Redis blocklist set failed: {e}")
+        except Exception as e:
+            logger.debug(f"Failed to decode token during logout: {e}")
+
+    # 3. Delete Cookies
     response.delete_cookie(
         key="access_token",
         path="/",
         httponly=True,
         samesite="strict",
-        secure=True
+        secure=not settings.TESTING
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        path="/",
+        httponly=True,
+        samesite="strict",
+        secure=not settings.TESTING
     )
     return {"status": "success", "message": "Logged out successfully"}
 

@@ -20,9 +20,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME="0.0.0.0"
 
+# Create system group and user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy files and change ownership
 COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+USER nextjs
+
+EXPOSE 3000
 CMD ["node", "server.js"]

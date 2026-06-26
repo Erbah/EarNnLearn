@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 
 class CodeCreate(BaseModel):
@@ -16,8 +16,7 @@ class CodeResponse(BaseModel):
     price: float
     tier_type: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class ActivationRequest(BaseModel):
     product_code: str

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Wallet,
@@ -59,6 +59,8 @@ export default function WalletPage() {
 
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showAddFundsModal, setShowAddFundsModal] = useState(false);
+  const [depositLoading, setDepositLoading] = useState(false);
+  const idempotencyKeyRef = useRef<string>('');
   const [addAmount, setAddAmount] = useState(100);
   const [withdrawAmount, setWithdrawAmount] = useState(minW);
   const [bankCode, setBankCode] = useState("MTN");
@@ -102,10 +104,12 @@ export default function WalletPage() {
   }, [fetchWalletData]);
 
   async function handleDeposit() {
+    if (depositLoading) return;
+    setDepositLoading(true);
     try {
       const res = await api.post(`${API}/wallet/deposit`, {
         amount: addAmount
-      });
+      }, { headers: { "Idempotency-Key": idempotencyKeyRef.current } });
 
       if (res.data.authorization_url) {
         // Redirect to Paystack
@@ -116,6 +120,9 @@ export default function WalletPage() {
     } catch (err) {
       alert("Error initializing deposit");
       console.error(err);
+      idempotencyKeyRef.current = crypto.randomUUID();
+    } finally {
+      setDepositLoading(false);
     }
   }
 
@@ -226,7 +233,7 @@ export default function WalletPage() {
                   <span className="text-sm font-medium text-primary uppercase tracking-wider">Total Balance</span>
                 </div>
                 <button
-                  onClick={() => setShowAddFundsModal(true)}
+                  onClick={() => { setShowAddFundsModal(true); idempotencyKeyRef.current = crypto.randomUUID(); }}
                   className="p-1 px-3 bg-primary text-background text-[10px] font-bold rounded-lg hover:scale-105 transition-transform flex items-center gap-1 uppercase tracking-widest"
                 >
                   <Plus className="w-3 h-3" /> Add Funds
@@ -641,10 +648,10 @@ export default function WalletPage() {
 
               <button
                 onClick={handleDeposit}
-                disabled={addAmount < 1}
+                disabled={addAmount < 1 || depositLoading}
                 className="w-full bg-primary text-background py-4 rounded-2xl font-bold hover:scale-[1.02] transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 mt-4"
               >
-                Proceed to Payment <ArrowUpRight className="w-4 h-4" />
+                {depositLoading ? "Processing..." : "Proceed to Payment"} <ArrowUpRight className="w-4 h-4" />
               </button>
 
               <div className="flex items-center justify-center gap-2 text-[10px] text-gray-500 uppercase tracking-widest">

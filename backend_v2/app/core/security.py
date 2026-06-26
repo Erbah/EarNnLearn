@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
+from app.core.redis import redis_client
+import uuid
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -22,13 +24,22 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
+    now = datetime.utcnow()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+        expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "iat": now, "jti": str(uuid.uuid4())})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
     return encoded_jwt
+
+def generate_refresh_token() -> str:
+    import secrets
+    return secrets.token_urlsafe(32)
+
+def hash_refresh_token(token: str) -> str:
+    import hashlib
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 def get_current_user(
     request: Request,
@@ -71,17 +82,43 @@ def get_current_user(
 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        
+        jti: str = payload.get("jti")
+        if jti:
+            try:
+                if redis_client.get(f"blacklist:token:{jti}"):
+                    raise credentials_exception
+            except Exception as e:
+                # Fail open if Redis is down temporarily, but log it
+                import logging
+                logging.getLogger(__name__).warning(f"Redis blocklist check failed: {e}")
+
         sub: str = payload.get("sub")
+        role: str = payload.get("role", "USER")
+        status_val: str = payload.get("status", "pending")
+        user_id_str: str = payload.get("user_id")
+        
         if sub is None:
             raise credentials_exception
+            
+        import uuid
+        user_id = uuid.UUID(user_id_str) if user_id_str else None
+        
+        # Determine if sub is an email, phone, or rid
+        email = sub if "@" in sub else None
+        phone = sub if sub.startswith("+") or (sub.isdigit() and len(sub) > 6) else None
+        rid = sub if not email and not phone else None
+        
+        # Construct stateless User object
+        user = User(
+            id=user_id,
+            rid=rid,
+            email=email,
+            phone=phone,
+            role=role,
+            status=status_val
+        )
     except jwt.JWTError:
-        raise credentials_exception
-    
-    # sub can be either email, phone (pre-activation), or rid (post-activation)
-    user = db.query(User).filter(
-        (User.rid == sub) | (User.email == sub) | (User.phone == sub)
-    ).first()
-    if user is None:
         raise credentials_exception
 
     # Enforce active check for all routes except auth/me and auth/logout
@@ -132,12 +169,39 @@ def get_current_user_optional(
 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        
+        jti: str = payload.get("jti")
+        if jti:
+            try:
+                if redis_client.get(f"blacklist:token:{jti}"):
+                    return None
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Redis blocklist check failed: {e}")
+
         sub: str = payload.get("sub")
         if sub is None:
             return None
-        user = db.query(User).filter(
-            (User.rid == sub) | (User.email == sub) | (User.phone == sub)
-        ).first()
+            
+        role: str = payload.get("role", "USER")
+        status_val: str = payload.get("status", "pending")
+        user_id_str: str = payload.get("user_id")
+        
+        import uuid
+        user_id = uuid.UUID(user_id_str) if user_id_str else None
+        
+        email = sub if "@" in sub else None
+        phone = sub if sub.startswith("+") or (sub.isdigit() and len(sub) > 6) else None
+        rid = sub if not email and not phone else None
+        
+        user = User(
+            id=user_id,
+            rid=rid,
+            email=email,
+            phone=phone,
+            role=role,
+            status=status_val
+        )
         return user
     except Exception:
         return None

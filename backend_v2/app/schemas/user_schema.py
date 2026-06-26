@@ -1,4 +1,5 @@
-from pydantic import BaseModel, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
+from pydantic.alias_generators import to_camel
 from uuid import UUID
 
 class UserCreate(BaseModel):
@@ -27,6 +28,8 @@ class UserCreate(BaseModel):
     # Notifications
     preferred_notification_method: str | None = "auto"
 
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
     @model_validator(mode='after')
     def check_contact_method(self) -> 'UserCreate':
         if not self.phone and not self.email:
@@ -35,14 +38,14 @@ class UserCreate(BaseModel):
 
 class UserResponse(BaseModel):
     id: UUID
-    name: str
+    name: str | None = None
     email: EmailStr | None = None
     phone: str | None = None
     rid: str | None = None
-    tier_type: str
-    role: str
-    status: str
-    preferred_payment_method: str
+    tier_type: str | None = "public"
+    role: str | None = "USER"
+    status: str | None = "active"
+    preferred_payment_method: str | None = "mobile_money"
     product_codes: list[str] = []
     seller_percentage: float | None = 0.70
     activation_price: float | None = 20.0
@@ -53,15 +56,14 @@ class UserResponse(BaseModel):
     # Elite Personalization
     learning_goal: str | None = "General Exploration"
     preferred_style: str | None = "Balanced"
-    onboarding_completed: bool = False
-    last_onboarding_step: int = 0
-    is_beta_user: bool = True
+    onboarding_completed: bool | None = False
+    last_onboarding_step: int | None = 0
+    is_beta_user: bool | None = True
     
     # Notifications
-    preferred_notification_method: str = "auto"
+    preferred_notification_method: str | None = "auto"
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True, alias_generator=to_camel)
 
 class Token(BaseModel):
     access_token: str
@@ -82,6 +84,8 @@ class OnboardingUpdate(BaseModel):
     preferred_style: str | None = None
     onboarding_completed: bool | None = None
 
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
 class UserProfileUpdate(BaseModel):
     name: str | None = None
     email: EmailStr | None = None
@@ -99,3 +103,5 @@ class UserProfileUpdate(BaseModel):
     current_password: str | None = None
     new_password: str | None = None
     preferred_notification_method: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)

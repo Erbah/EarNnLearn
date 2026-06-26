@@ -45,7 +45,7 @@ class User(Base):
     payout_name = Column(String, nullable=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
-    status = Column(String, default="active")
+    status = Column(String, default="active", index=True)
     
     # Gamification Stats
     total_xp = Column(Integer, default=0)
@@ -70,6 +70,7 @@ class User(Base):
 
     # Relationships
     codes = relationship("Code", primaryjoin="User.rid == Code.owner_rid", foreign_keys="[Code.owner_rid]", overlaps="codes")
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
 
 class InstructorProfile(Base):
     __tablename__ = "instructor_profiles"

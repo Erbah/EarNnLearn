@@ -12,7 +12,7 @@ Full control center for the platform:
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, text
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Annotated
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -470,17 +470,16 @@ def delete_season_rids(
 
 class TransactionOut(BaseModel):
     id: uuid.UUID
-    code_id: uuid.UUID | None
+    code_id: uuid.UUID | None = None
     buyer_rid: str
     seller_rid: str
     amount: Decimal
     currency: str
-    payment_method: str | None
-    payment_reference: str | None
+    payment_method: str | None = None
+    payment_reference: str | None = None
     status: str
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 # ═══════════════════════════════════════
 #  TRANSACTION / PAYMENT MANAGEMENT

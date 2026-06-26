@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useUser } from "@/context/UserContext";
@@ -34,6 +34,7 @@ export default function ActivateCodePage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error" | "pending">("idle");
   const [message, setMessage] = useState("");
+  const idempotencyKeyRef = useRef<string>("");
   const [sellerInfo, setSellerInfo] = useState<any>(null);
   const [reference, setReference] = useState("");
   const [affiliateCode, setAffiliateCode] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export default function ActivateCodePage() {
 
   useEffect(() => {
     const controller = new AbortController();
+    idempotencyKeyRef.current = crypto.randomUUID();
     loadUserCodes(controller.signal);
     api.get(`${API}/wallet/`, { signal: controller.signal })
       .then(res => setWalletBalance(Number(res.data.balance) || 0))
@@ -122,7 +124,7 @@ export default function ActivateCodePage() {
       const amountToAdd = Math.max(targetAmount - walletBalance, targetAmount);
       const res = await api.post(`${API}/wallet/deposit`, {
         amount: amountToAdd
-      });
+      }, { headers: { "Idempotency-Key": idempotencyKeyRef.current } });
 
       if (res.data.authorization_url) {
         window.location.href = res.data.authorization_url;
@@ -133,6 +135,7 @@ export default function ActivateCodePage() {
     } catch (err: any) {
       setStatus("error");
       setMessage(err.response?.data?.detail || "Error initializing deposit");
+      idempotencyKeyRef.current = crypto.randomUUID();
     } finally {
       setLoading(false);
     }

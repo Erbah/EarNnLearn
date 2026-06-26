@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     ENFORCE_HTTPS: bool = False
     
     SECRET_KEY: str = "DEVELOPMENT_SECRET_KEY_REPLACE_IN_PROD"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # 15 minutes
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7    # 7 days
     
     # Root User Seeding
     ROOT_USER_EMAIL: str = "root@ceditrees.com"
@@ -38,6 +39,18 @@ class Settings(BaseSettings):
             logging.getLogger(__name__).error("BACKEND_CORS_ORIGINS is not configured. CORS will reject all origins.")
             return []  # Fail-closed: deny all rather than allow all
         return origins
+
+    # Trusted Host Header configuration
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1,earnnlearn.up.railway.app,www.earnnlearn.up.railway.app,earnnnlearn.up.railway.app,www.earnnnlearn.up.railway.app"
+
+    @property
+    def ALLOWED_HOSTS_LIST(self) -> list[str]:
+        if self.TESTING:
+            return ["*"]
+        hosts = [h.strip() for h in self.ALLOWED_HOSTS.split(",") if h.strip()]
+        if not hosts:
+            return ["*"]
+        return hosts
 
     # Database
     DATABASE_BACKEND: str = "sqlite"

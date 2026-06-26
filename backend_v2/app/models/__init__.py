@@ -11,3 +11,4 @@ from .progress import CourseProgress
 from .notification import Notification
 from .transaction import Transaction
 from .learning import CoursePayment, VideoProgress, SkillNode
+from .refresh_token import RefreshToken

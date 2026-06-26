@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ShoppingBag, 
@@ -60,6 +60,7 @@ export default function ShopPage() {
   const [shippingAddress, setShippingAddress] = useState("");
   const [buyLoading, setBuyLoading] = useState(false);
   const [buySuccess, setBuySuccess] = useState(false);
+  const idempotencyKeyRef = useRef<string>('');
   const [buyError, setBuyError] = useState<string | null>(null);
 
   const fetchShopData = useCallback(async (signal?: AbortSignal) => {
@@ -95,6 +96,7 @@ export default function ShopPage() {
     setShippingAddress("");
     setBuySuccess(false);
     setBuyError(null);
+    idempotencyKeyRef.current = crypto.randomUUID();
   };
 
   const handlePurchase = async () => {
@@ -111,7 +113,7 @@ export default function ShopPage() {
         product_id: selectedProduct.id,
         quantity: quantity,
         shipping_address: selectedProduct.product_type === "PHYSICAL" ? shippingAddress : null
-      });
+      }, { headers: { "Idempotency-Key": idempotencyKeyRef.current } });
 
       setBuySuccess(true);
       // Refresh shop data
@@ -119,6 +121,7 @@ export default function ShopPage() {
     } catch (err: any) {
       console.error(err);
       setBuyError(err.response?.data?.detail || "Purchase failed. Please check your balance.");
+      idempotencyKeyRef.current = crypto.randomUUID();
     } finally {
       setBuyLoading(false);
     }

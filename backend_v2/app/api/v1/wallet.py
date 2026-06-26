@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from decimal import Decimal
 from app.core.database import get_db
@@ -9,7 +10,8 @@ from app.models.wallet import Wallet, WalletTransaction, WithdrawalRequest
 from app.models.admin import SystemSetting
 from app.models.transaction import Transaction
 from app.services.paystack_service import paystack_service
-from pydantic import BaseModel
+from app.services.cache_service import cache_service
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 class WalletResponse(BaseModel):
@@ -18,8 +20,7 @@ class WalletResponse(BaseModel):
     locked_balance: Decimal
     currency: str
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class WithdrawalRequestCreate(BaseModel):
     amount: Decimal
@@ -33,9 +34,7 @@ class WithdrawalRequestOut(BaseModel):
     payout_method: str
     created_at: datetime
     
-    class Config:
-        from_attributes = True
-    
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 class DepositRequest(BaseModel):
     amount: Decimal
 
@@ -366,23 +365,6 @@ def verify_wlp_and_payout(request_id: str, body: WLPVerifyRequest, current_user:
         req.wlp_code = None # clear it
     else:
         req.status = "PENDING"
-        req.admin_notes = f"WLP Verified but payout failed: {result['message']}"
-        req.wlp_code = None
-        
-    db.commit()
-    db.refresh(req)
-    return req
-
-@router.post("/deposit")
-def initialize_deposit(body: DepositRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Initialize a wallet deposit via Paystack.
-    """
-    if not current_user.rid:
-        raise HTTPException(status_code=400, detail="User not activated")
-
-    if body.amount < 5:
-        raise HTTPException(status_code=400, detail="Minimum deposit is 5 GHS")
 
     metadata = {
         "user_id": str(current_user.id),
@@ -411,7 +393,12 @@ def initialize_deposit(body: DepositRequest, current_user: User = Depends(get_cu
     db.add(new_tx)
     db.commit()
 
-    return {
+    response_data = {
         "authorization_url": paystack_res["data"]["authorization_url"],
         "reference": paystack_res["data"]["reference"]
     }
+
+    if idempotency_key:
+        cache_service.set_json(f"idemp:wallet:deposit:{idempotency_key}", response_data, 86400)
+
+    return response_data

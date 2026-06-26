@@ -6,15 +6,14 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.wallet import Wallet, WalletTransaction
 from app.models.transaction import ReferralIndex
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from decimal import Decimal
 
 class NetworkNode(BaseModel):
     user_rid: str
     depth: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class TreeNode(BaseModel):
     id: str

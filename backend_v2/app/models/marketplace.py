@@ -26,7 +26,7 @@ class CourseEnrollment(Base):
     course_id = Column(String, nullable=False, index=True)
     user_rid = Column(String, nullable=False, index=True)
     enrolled_at = Column(DateTime, default=datetime.utcnow)
-    completed = Column(Boolean, default=False)
+    completed = Column(Boolean, default=False, index=True)
     completed_at = Column(DateTime, nullable=True)
     progress_percent = Column(Integer, default=0)
 

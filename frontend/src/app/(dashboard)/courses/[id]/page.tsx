@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -32,9 +32,11 @@ export default function CourseDetailPage() {
   const [feasibility, setFeasibility] = useState<any>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<any>(null);
+  const idempotencyKeyRef = useRef<string>('');
 
   useEffect(() => {
     if (!id) return;
+    idempotencyKeyRef.current = crypto.randomUUID();
     const controller = new AbortController();
 
     api.get(`${API}/courses/${id}`, { signal: controller.signal })
@@ -89,7 +91,7 @@ export default function CourseDetailPage() {
   async function handleDirectCheckout() {
     setEnrolling(true);
     try {
-      const res = await api.post(`${API}/learn/checkout/${id}`);
+      const res = await api.post(`${API}/learn/checkout/${id}`, {}, { headers: { "Idempotency-Key": idempotencyKeyRef.current } });
       if (res.data.authorization_url) {
         window.location.href = res.data.authorization_url;
       } else {
@@ -97,6 +99,7 @@ export default function CourseDetailPage() {
       }
     } catch (e: any) {
       alert(e.response?.data?.detail || "Checkout failed");
+      idempotencyKeyRef.current = crypto.randomUUID();
     }
     setEnrolling(false);
   }

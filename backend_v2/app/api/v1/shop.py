@@ -1,8 +1,8 @@
 from typing import List, Optional
 from decimal import Decimal
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status, Query, Header
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -11,6 +11,7 @@ from app.core.permissions import require_super_admin, require_education_admin
 from app.models.user import User
 from app.models.shop import Product, Order, Escrow, ShopSetting
 from app.services.shop_service import ShopService
+from app.services.cache_service import cache_service
 
 router = APIRouter()
 
@@ -36,8 +37,7 @@ class ProductOut(BaseModel):
     review_feedback: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class OrderCreate(BaseModel):
     product_id: str
@@ -56,8 +56,7 @@ class OrderOut(BaseModel):
     buyer_confirmed: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class ShipOrder(BaseModel):
     tracking_code: str
@@ -73,8 +72,7 @@ class SettingsOut(BaseModel):
     ai_rules_prompt: str
     platform_commission: Decimal
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class AdminProductReview(BaseModel):
     approved: bool
@@ -117,7 +115,17 @@ def get_approved_products(db: Session = Depends(get_db)):
     Fetches all approved product listings for the store catalog.
     """
     ShopService.release_expired_digital_escrows(db)
-    return db.query(Product).filter(Product.status.in_(["APPROVED", "ADMIN_APPROVED"]), Product.stock > 0).all()
+    cache_key = "shop:products:approved"
+    cached = cache_service.get_json(cache_key)
+    if cached is not None:
+        return cached
+
+    products = db.query(Product).filter(Product.status.in_(["APPROVED", "ADMIN_APPROVED"]), Product.stock > 0).all()
+    # Cache the serialized dicts for 5 minutes
+    product_dicts = [ProductOut.model_validate(p).model_dump(mode='json') for p in products]
+    cache_service.set_json(cache_key, product_dicts, expire_seconds=300)
+    
+    return products
 
 
 @router.get("/products/my-listings", response_model=List[ProductOut])
@@ -146,12 +154,19 @@ def get_product_details(product_id: str, db: Session = Depends(get_db)):
 def buy_product(
     body: OrderCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    idempotency_key: str = Header(..., alias="Idempotency-Key")
 ):
     """
     Purchases a product, debits the buyer's wallet, and moves funds into escrow.
     """
-    product = db.query(Product).filter(Product.id == body.product_id).first()
+    if idempotency_key:
+        cached_res = cache_service.get_json(f"idemp:shop:buy:{idempotency_key}")
+        if cached_res:
+            return cached_res
+
+    # Use with_for_update() to acquire a row-level lock and prevent race conditions on inventory
+    product = db.query(Product).filter(Product.id == body.product_id).with_for_update().first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     if product.status not in ["APPROVED", "ADMIN_APPROVED"]:
@@ -184,6 +199,8 @@ def buy_product(
         db.add(product)
         db.commit()
         db.refresh(order)
+        # Invalidate cache since stock decreased
+        cache_service.invalidate("shop:products:approved")
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -191,8 +208,22 @@ def buy_product(
         db.rollback()
         raise HTTPException(status_code=500, detail="Transaction failed processing escrow.")
 
-    return order
+    order_dict = {
+        "id": order.id,
+        "buyer_rid": order.buyer_rid,
+        "product_id": order.product_id,
+        "quantity": order.quantity,
+        "total_price": float(order.total_price),
+        "shipping_address": order.shipping_address,
+        "shipping_status": order.shipping_status,
+        "tracking_code": order.tracking_code,
+        "created_at": order.created_at.isoformat()
+    }
 
+    if idempotency_key:
+        cache_service.set_json(f"idemp:shop:buy:{idempotency_key}", order_dict, 86400)
+
+    return order
 
 @router.post("/orders/{order_id}/ship", response_model=OrderOut)
 def ship_order(
@@ -365,6 +396,10 @@ def admin_manual_review(
     db.add(product)
     db.commit()
     db.refresh(product)
+    
+    # Invalidate cache if approval status changed
+    cache_service.invalidate("shop:products:approved")
+    
     return product
 
 

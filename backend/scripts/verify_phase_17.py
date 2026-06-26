@@ -1,7 +1,16 @@
 import requests
 
 API = "http://localhost:8000/api/v1/admin"
-HEADERS = {"Content-Type": "application/json"}
+def get_token():
+    try:
+        r = requests.post("http://localhost:8000/api/v1/admin/login", json={"admin_password": "erbah1983"})
+        if r.status_code == 200:
+            return r.json().get("token")
+    except: pass
+    return "TEST_TOKEN"
+
+TOKEN = get_token()
+HEADERS = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
 def test_inspector_v2():
     print("--- Phase 17: Database Inspector Enhancements Verification ---")

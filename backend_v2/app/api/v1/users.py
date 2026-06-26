@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Returns the current authenticated user profile."""
-    resp = UserResponse.from_orm(current_user)
+    resp = UserResponse.model_validate(current_user)
     resp_dict = resp.model_dump()
     
     from app.models.code import Code

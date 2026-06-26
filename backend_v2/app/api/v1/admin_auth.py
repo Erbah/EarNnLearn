@@ -73,7 +73,7 @@ def login_admin(body: AdminLoginRequest, response: Response, db: Session = Depen
         raise HTTPException(status_code=500, detail="No Super Admin user found in database")
 
     new_token = create_access_token(
-        data={"sub": admin_user.rid, "tier_type": "admin", "role": admin_user.role}
+        data={"sub": admin_user.rid, "tier_type": "admin", "role": admin_user.role, "status": admin_user.status, "user_id": str(admin_user.id)}
     )
     
     # Set secure cookie

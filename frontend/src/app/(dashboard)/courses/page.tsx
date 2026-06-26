@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Filter, Star, Users, BookOpen, ChevronRight, ChevronDown,
@@ -399,7 +400,14 @@ export default function CoursesPage() {
                     {/* Course Banner */}
                     <div className="h-36 bg-gradient-to-br from-primary/20 via-blue-600/10 to-purple-600/10 flex items-center justify-center relative overflow-hidden">
                       {course.thumbnail_url ? (
-                        <img src={course.thumbnail_url} alt={course.title} className="absolute inset-0 w-full h-full object-cover z-0" />
+                        <Image 
+                          src={course.thumbnail_url} 
+                          alt={course.title} 
+                          fill 
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          priority={i < 6}
+                          className="object-cover z-0" 
+                        />
                       ) : (
                         <BookOpen className="w-10 h-10 text-primary/50 relative z-10" />
                       )}

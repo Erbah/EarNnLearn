@@ -2,12 +2,18 @@ import requests
 import time
 
 API = "http://localhost:8000/api/v1/admin"
-TOKEN = None # Add logic to get token if needed, but for dev we might have open routes or I'll just use the token search approach
+def get_token():
+    try:
+        r = requests.post("http://localhost:8000/api/v1/admin/login", json={"admin_password": "erbah1983"})
+        if r.status_code == 200:
+            return r.json().get("token")
+    except: pass
+    return "TEST_TOKEN"
+
+TOKEN = get_token()
 
 def get_headers():
-    # In a real test we'd login, here we assume it's skip-auth in dev or we have a hardcoded token
-    # For simplicity, if auth is required, this script will fail until I find a valid token
-    return {"Authorization": "Bearer TEST_TOKEN", "Content-Type": "application/json"}
+    return {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
 def test_inspector():
     print("--- Phase 16: Database Inspector Verification ---")

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.course import LearningTrack, TrackCourse, Course
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -15,8 +15,7 @@ class TrackCourseOut(BaseModel):
     course_title: Optional[str] = None
     course_thumbnail: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class TrackOut(BaseModel):
     id: str
@@ -27,8 +26,7 @@ class TrackOut(BaseModel):
     created_at: datetime
     courses: Optional[List[TrackCourseOut]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 @router.get("/", response_model=List[TrackOut])
 def get_all_tracks(db: Session = Depends(get_db)):
@@ -60,7 +58,6 @@ def get_track_details(track_id: str, db: Session = Depends(get_db)):
             
     # Need to return an object matching the Pydantic schema
     # Pydantic from_attributes works with dictionaries too or objects
-    result = TrackOut.from_orm(track)
     # We construct manually to inject courses
     return {
         "id": track.id,

@@ -115,7 +115,7 @@ def run_activation_engine(db: Session, user: User, target_code: Code, transactio
         import traceback
         print(f"[ERROR] Profit distribution failed: {e}")
         print(traceback.format_exc())
-        db.commit()  # Ensure activation state is saved even if profit calc fails
+        db.rollback()  # Rollback partial profit distribution modifications to maintain integrity
 
 
     return generated_first_code

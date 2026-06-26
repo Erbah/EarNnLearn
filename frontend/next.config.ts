@@ -25,11 +25,30 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   output: "standalone",
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+    minimumCacheTTL: 604800, // Cache optimized images for 7 days
+  },
   async headers() {
     return [
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        // Cache static assets aggressively
+        source: '/_next/static/(.*)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
       },
     ];
   },

@@ -1,5 +1,5 @@
 [build]
-builder = "NIXPACKS"
+builder = "DOCKERFILE"
 
 [deploy]
 startCommand = "python apply_schema_updates.py && uvicorn main:app --host 0.0.0.0 --port $PORT"

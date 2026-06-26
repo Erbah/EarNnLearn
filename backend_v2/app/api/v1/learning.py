@@ -8,8 +8,8 @@ Implements the earn-to-learn economic engine:
 - Debt threshold pausing
 - Feasibility estimation
 """
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
@@ -28,6 +28,7 @@ from app.models.marketplace import Certificate
 from app.models.engagement import Quiz, QuizAttempt
 from app.models.transaction import Transaction
 from app.services.paystack_service import paystack_service
+from app.services.cache_service import cache_service
 from app.models.admin import Season, Tier, SystemSetting
 from app.services.gamification_service import GamificationService
 
@@ -284,10 +285,20 @@ def enroll_paid_course(course_id: str, body: EnrollRequest, current_user: User =
     }
 
 @router.post("/checkout/{course_id}")
-def initialize_course_checkout(course_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def initialize_course_checkout(
+    course_id: str, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db),
+    idempotency_key: str = Header(..., alias="Idempotency-Key")
+):
     """
     Initialize a direct course purchase via Paystack.
     """
+    if idempotency_key:
+        cached_res = cache_service.get_json(f"idemp:learning:checkout:{idempotency_key}")
+        if cached_res:
+            return cached_res
+
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -331,10 +342,15 @@ def initialize_course_checkout(course_id: str, current_user: User = Depends(get_
     db.add(new_tx)
     db.commit()
 
-    return {
+    response_data = {
         "authorization_url": paystack_res["data"]["authorization_url"],
         "reference": paystack_res["data"]["reference"]
     }
+
+    if idempotency_key:
+        cache_service.set_json(f"idemp:learning:checkout:{idempotency_key}", response_data, 86400)
+
+    return response_data
 
 # ═══════════════════════════════════════
 #  WATCH VIDEO (AUTO-DEDUCTION & ANTI-CHEAT)
@@ -693,8 +709,9 @@ def get_gamification_hud(current_user: User = Depends(get_current_user), db: Ses
     db.commit()
     
     # Calculate progress percent to next level
-    next_level_xp = int(100 * (current_user.level ** 1.5))
-    prev_level_xp = int(100 * ((current_user.level - 1) ** 1.5)) if current_user.level > 1 else 0
+    user_level = current_user.level or 1
+    next_level_xp = int(100 * (user_level ** 1.5))
+    prev_level_xp = int(100 * ((user_level - 1) ** 1.5)) if user_level > 1 else 0
     
     range_xp = next_level_xp - prev_level_xp
     progress_xp = (current_user.total_xp or 0) - prev_level_xp

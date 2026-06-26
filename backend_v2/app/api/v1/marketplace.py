@@ -7,7 +7,7 @@ Supports the global learning marketplace where creators earn through the referra
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from decimal import Decimal
 import uuid, random, string
@@ -25,6 +25,7 @@ from app.models.transaction import ReferralIndex
 from app.models.notification import Notification
 from app.services.currency_engine import currency_engine
 from app.services.ingestion_service import ingestion_service
+from app.services.cache_service import cache_service
 from app.models.code import Code
 from app.models.admin import SystemSetting
 
@@ -70,9 +71,9 @@ class ReviewCreate(BaseModel):
 class CourseOut(BaseModel):
     id: str
     title: str
-    description: str | None
+    description: str | None = None
     creator_rid: str
-    creator_name: str | None
+    creator_name: str | None = None
     category: str
     skill_level: str
     price: float
@@ -81,8 +82,7 @@ class CourseOut(BaseModel):
     is_published: bool
     approval_status: str
     thumbnail_url: str | None = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 # ═══════════════════════════════════════
@@ -99,6 +99,11 @@ def browse_courses(
     db: Session = Depends(get_db)
 ):
     """Browse published courses in the marketplace."""
+    cache_key = f"marketplace:courses:browse:{category}:{skill_level}:{sort}:{skip}:{limit}"
+    cached = cache_service.get_json(cache_key)
+    if cached is not None:
+        return cached
+
     q = db.query(Course).filter(Course.approval_status == "approved")
 
     if category:
@@ -113,7 +118,12 @@ def browse_courses(
     else:
         q = q.order_by(desc(Course.created_at))
 
-    return q.offset(skip).limit(limit).all()
+    courses = q.offset(skip).limit(limit).all()
+    
+    course_dicts = [CourseOut.model_validate(c).model_dump(mode='json') for c in courses]
+    cache_service.set_json(cache_key, course_dicts, expire_seconds=300)
+    
+    return courses
 
 @router.get("/pool")
 def get_marketplace_pool(limit: int = 5, db: Session = Depends(get_db)):
@@ -387,6 +397,8 @@ def create_course(
     except:
         pass
 
+    cache_service.invalidate_pattern("marketplace:courses:browse:*")
+
     return course
 
 
@@ -433,6 +445,9 @@ def update_course(course_id: str, body: CourseUpdate, current_user: User = Depen
         setattr(course, field, val)
     db.commit()
     db.refresh(course)
+    
+    cache_service.invalidate_pattern("marketplace:courses:browse:*")
+    
     return course
 
 

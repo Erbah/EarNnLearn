@@ -22,13 +22,22 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models here so Alembic can discover them
-from app.models.user import User
-from app.models.wallet import Wallet, WalletTransaction
+from app.models.user import User, InstructorProfile
+from app.models.wallet import Wallet, WalletTransaction, WithdrawalRequest
 from app.models.transaction import Transaction, ReferralIndex
 from app.models.code import Code
-from app.models.course import Course, Module, Video
+from app.models.course import Course, Module, Video, LearningTrack, TrackCourse
 from app.models.progress import CourseProgress
 from app.models.ai import AIUsage, AILesson, LessonProgress, LessonChat, SubjectRoadmap, AIAsset
+from app.models.refresh_token import RefreshToken
+from app.models.shop import Product, Order, Escrow, ShopSetting
+from app.models.analytics import OnboardingMetric
+from app.models.marketplace import CourseCategory, CourseEnrollment, CourseReview, Certificate
+from app.models.engagement import Quiz, QuizQuestion, QuizOption, QuizAttempt, Discussion, DiscussionReply
+from app.models.learning import CoursePayment, VideoProgress, SkillNode
+from app.models.notification import Notification
+from app.models.admin import SystemSetting
+from app.models.monitoring import AIPerformanceLog
 
 # Override the url in alembic.ini with the one from our config
 config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)

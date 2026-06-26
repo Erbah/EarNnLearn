@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from decimal import Decimal
 import uuid
@@ -14,8 +14,7 @@ class SettingOut(BaseModel):
     key: str
     value: str
     description: str | None = None
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class TierUpdate(BaseModel):
     code_percentage: int | None = None
@@ -31,8 +30,7 @@ class TierOut(BaseModel):
     family_share: float
     master_share: float
     is_active: bool
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class TierGenConfig(BaseModel):
     tier_type: str
@@ -55,14 +53,13 @@ class CodeUpdate(BaseModel):
 
 class UserOut(BaseModel):
     id: uuid.UUID
-    rid: str | None
-    name: str | None
+    rid: str | None = None
+    name: str | None = None
     email: str
     tier_type: str
     status: str
-    parent_rid: str | None
-    class Config:
-        from_attributes = True
+    parent_rid: str | None = None
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class AnalyticsOut(BaseModel):
     total_users: int
@@ -76,10 +73,9 @@ class AnalyticsOut(BaseModel):
 
 class AdminLogOut(BaseModel):
     action: str
-    details: dict | None
+    details: dict | None = None
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class WithdrawalRequestOut(BaseModel):
     id: str
@@ -87,10 +83,9 @@ class WithdrawalRequestOut(BaseModel):
     amount: Decimal
     status: str
     payout_method: str
-    payout_details: dict | None
+    payout_details: dict | None = None
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class CodeGenerationSessionOut(BaseModel):
     id: str | uuid.UUID
@@ -101,8 +96,7 @@ class CodeGenerationSessionOut(BaseModel):
     seller_share: float
     family_share: float
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class AIAdviceOut(BaseModel):
     advice: str
@@ -119,12 +113,11 @@ class NotificationOut(BaseModel):
     id: str
     title: str
     message: str
-    link: str | None
+    link: str | None = None
     type: str
     is_read: bool
     created_at: datetime
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class CourseApprovalRequest(BaseModel):
     reason: str | None = None

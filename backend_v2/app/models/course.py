@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Numeric, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, String, Integer, Numeric, DateTime, ForeignKey, Boolean, Index
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
 
@@ -33,6 +33,13 @@ class Course(Base):
     enrollment_count = Column(Integer, default=0)
     
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_course_status_created", "approval_status", "created_at"),
+        Index("idx_course_status_category", "approval_status", "category"),
+        Index("idx_course_status_rating", "approval_status", "avg_rating"),
+        Index("idx_course_category_published", "category", "is_published"),
+    )
 
 class Module(Base):
     __tablename__ = "modules"

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, Boolean, Integer, JSON
+from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, Boolean, Integer, JSON, Index
 from app.core.database import Base
 
 class Product(Base):
@@ -21,6 +21,11 @@ class Product(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    __table_args__ = (
+        Index("idx_product_status_stock", "status", "stock"),
+        Index("idx_product_status_created", "status", "created_at"),
+    )
+
 
 class Order(Base):
     __tablename__ = "orders"
@@ -39,6 +44,10 @@ class Order(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_order_status_created", "shipping_status", "created_at"),
+    )
 
 
 class Escrow(Base):

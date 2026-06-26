@@ -6,12 +6,15 @@ connect_args = {}
 if settings.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
     connect_args = {"check_same_thread": False, "timeout": 30}
 
+engine_kwargs = {"pool_pre_ping": True}
+if not settings.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
+    engine_kwargs["pool_size"] = 20
+    engine_kwargs["max_overflow"] = 10
+
 engine = create_engine(
     settings.SQLALCHEMY_DATABASE_URI,
-    pool_pre_ping=True,
-    pool_size=20,
-    max_overflow=10,
-    connect_args=connect_args
+    connect_args=connect_args,
+    **engine_kwargs
 )
 print(sanitize_secrets(f"DEBUG: SQLAlchemy connecting to: {settings.SQLALCHEMY_DATABASE_URI}"))
 

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 from app.core.database import get_db, SessionLocal
 from app.core.security import get_current_user
 from app.core.permissions import require_education_admin, require_super_admin
+from app.services.cache_service import cache_service
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ALLOWED_EXTENSIONS = {".pdf", ".epub", ".docx", ".txt", ".pptx", ".csv"}
@@ -89,7 +90,26 @@ def check_lesson_access(lesson: AILesson, user: User):
 # ═══════════════════════════════════════
 @router.get("/courses")
 def list_all_courses(current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
-    return db.query(Course).all()
+    cache_key = "admin:education:courses:all"
+    cached = cache_service.get_json(cache_key)
+    if cached is not None:
+        return cached
+
+    courses = db.query(Course).all()
+    
+    # Simple serialization for cache
+    course_dicts = [
+        {
+            "id": c.id, "title": c.title, "description": c.description,
+            "creator_rid": c.creator_rid, "category": c.category,
+            "skill_level": c.skill_level, "price": c.price,
+            "avg_rating": c.avg_rating, "enrollment_count": c.enrollment_count,
+            "is_published": c.is_published, "approval_status": c.approval_status
+        } for c in courses
+    ]
+    cache_service.set_json(cache_key, course_dicts, expire_seconds=300)
+    
+    return courses
 
 @router.get("/courses/{course_id}/stats")
 def get_course_admin_stats(course_id: str, current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
@@ -172,17 +192,26 @@ def list_all_quizzes(
 
 @router.get("/quizzes/stats")
 def get_global_quiz_stats(current_user: Annotated[User, Depends(require_education_admin)], db: Session = Depends(get_db)):
+    cache_key = "admin:education:quizzes:stats"
+    cached = cache_service.get_json(cache_key)
+    if cached is not None:
+        return cached
+
     total_quizzes = db.query(func.count(Quiz.id)).scalar() or 0
     total_attempts = db.query(func.count(QuizAttempt.id)).scalar() or 0
     passed_attempts = db.query(func.count(QuizAttempt.id)).filter(QuizAttempt.passed == True).scalar() or 0
     
     pass_rate = (passed_attempts / total_attempts * 100) if total_attempts > 0 else 0
     
-    return {
+    stats = {
         "total_quizzes": total_quizzes,
         "total_attempts": total_attempts,
         "avg_pass_rate": round(pass_rate, 1)
     }
+    
+    cache_service.set_json(cache_key, stats, expire_seconds=300)
+    
+    return stats
 
 
 # ═══════════════════════════════════════

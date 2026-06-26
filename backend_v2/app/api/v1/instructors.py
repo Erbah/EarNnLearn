@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.user import InstructorProfile, User
 from app.models.course import Course
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 
 router = APIRouter()
@@ -16,8 +16,7 @@ class InstructorOut(BaseModel):
     credentials: Optional[str] = None
     avatar_url: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class CourseSimpleOut(BaseModel):
     id: str
@@ -27,8 +26,7 @@ class CourseSimpleOut(BaseModel):
     category: Optional[str] = None
     price: float
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 @router.get("/{instructor_rid}", response_model=InstructorOut)
 def get_instructor_profile(instructor_rid: str, db: Session = Depends(get_db)):

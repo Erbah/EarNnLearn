@@ -3,12 +3,13 @@ import sqlalchemy as sa
 from sqlalchemy import text
 
 def run_updates():
-    db_url = os.getenv("DATABASE_URL", "")
+    from app.core.config import settings
+    db_url = os.getenv("DATABASE_URL", settings.SQLALCHEMY_DATABASE_URI)
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
         
     if not db_url:
-        print("No DATABASE_URL found. Skipping raw schema updates.")
+        print("No DATABASE_URL or configured database URI found. Skipping schema updates.")
         return
 
     print("Running schema updates...")
@@ -56,6 +57,7 @@ def run_updates():
         import app.models.learning
         import app.models.marketplace
         import app.models.engagement
+        import app.models.refresh_token
         
         Base.metadata.create_all(bind=engine)
         print("Successfully ensured all tables exist.")

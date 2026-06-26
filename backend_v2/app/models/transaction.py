@@ -18,7 +18,7 @@ class Transaction(Base):
     payment_method = Column(String)
     payment_reference = Column(String, index=True)
     
-    status = Column(String, default="pending") # pending, success, failed
+    status = Column(String, default="pending", index=True) # pending, success, failed
     
     created_at = Column(DateTime, default=datetime.utcnow)
 

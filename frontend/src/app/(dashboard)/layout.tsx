@@ -91,7 +91,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   }, [user, handleRetry]);
 
   // --- 🚨 Elite Hardening: Beta Access Gate ---
-  const isBetaAuthorized = user?.is_beta_user || user?.role === 'SUPER_ADMIN';
+  const isBetaAuthorized = user?.is_beta_user || user?.role === 'SUPER_ADMIN' || process.env.NODE_ENV === 'development';
   const isPublicRoute = pathname?.startsWith('/admin/launch-dashboard'); // Allow admin to see dashboard
 
   if (loading) {
