@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update && apt-get install -y --no-install-recommends gcc build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
 
-COPY backend_v2/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Stage 2: Runtime image
@@ -26,7 +26,7 @@ RUN groupadd -g 10001 appgroup && \
 
 # Copy installed packages from builder
 COPY --from=builder /root/.local /home/appuser/.local
-COPY --chown=appuser:appgroup backend_v2/ .
+COPY --chown=appuser:appgroup . .
 
 USER appuser
 

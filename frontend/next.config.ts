@@ -16,7 +16,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://api.paystack.co http://127.0.0.1:8000 http://localhost:8000 https://*.railway.app https://*.up.railway.app",
+      "connect-src 'self' https://api.paystack.co http://127.0.0.1:8000 http://localhost:8000 https://*.run.app https://*.web.app https://*.firebaseapp.com https://*.railway.app https://*.up.railway.app",
       "frame-ancestors 'none'",
     ].join("; "),
   },

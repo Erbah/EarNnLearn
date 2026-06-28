@@ -1,6 +1,9 @@
+import logging
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.core.config import settings, sanitize_secrets
+
+_logger = logging.getLogger(__name__)
 
 connect_args = {}
 if settings.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
@@ -16,7 +19,7 @@ engine = create_engine(
     connect_args=connect_args,
     **engine_kwargs
 )
-print(sanitize_secrets(f"DEBUG: SQLAlchemy connecting to: {settings.SQLALCHEMY_DATABASE_URI}"))
+_logger.debug("SQLAlchemy connecting to: %s", sanitize_secrets(settings.SQLALCHEMY_DATABASE_URI))
 
 # Enable WAL mode for SQLite for better concurrent access
 if settings.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
