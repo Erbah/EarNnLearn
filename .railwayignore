@@ -1,0 +1,16 @@
+# Custom Railway ignore file
+node_modules/
+venv/
+venv_v2/
+frontend/
+.next/
+.git/
+.agent/
+tmp/
+*.db
+*.db-shm
+*.db-wal
+*err.txt
+*error.txt
+*out.txt
+*log.txt

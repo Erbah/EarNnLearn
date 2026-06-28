@@ -1,0 +1,44 @@
+.env
+*.db
+*.db-shm
+*.db-wal
+*err.txt
+*error.txt
+*out.txt
+*log.txt
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+venv/
+.git/
+.gitignore
+scratch/
+tests/
+uploads/
+codes_dump.json
+last_roadmap.json
+simulation_logs.json
+railway.toml
+
+# Debug / dev scripts
+debug_*.py
+test_*.py
+check_*.py
+migrate_*.py
+sync_*.py
+seed_*.py
+find_*.py
+inspect_*.py
+init_*.py
+create_*.py
+clean_*.py
+# apply_schema_updates.py
+upgrade.py
+verify_paystack_*.py
+
+# Alembic migration state (schema handled at startup)
+alembic/
+
+# IDE
+.vscode/
+.idea/

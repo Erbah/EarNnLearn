@@ -47,6 +47,10 @@ phase_9_results.txt
 test_output*.txt
 verify_output.txt
 verify_p*.txt
+
+# Deployment scripts with live secrets — NEVER commit these
+configure-secrets.ps1
+deploy.ps1
 debug_registration.py
 simple_check.py
 temp_fix_db.py
@@ -72,7 +76,10 @@ test_*.py
 verify_paystack_*.py
 backend_v2/app/uploads/
 *.db-*
-*.txt
+*err.txt
+*error.txt
+*out.txt
+*log.txt
 scratch/
 package.json
 package-lock.json
