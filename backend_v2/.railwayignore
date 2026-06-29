@@ -16,3 +16,5 @@ tmp/
 .railway-config-pull-*/
 __pycache__/
 *.pyc
+app/uploads/
+
