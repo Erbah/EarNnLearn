@@ -16,11 +16,22 @@ let inMemoryToken: string | null = null;
 export const setClientToken = (token: string | null) => {
   inMemoryToken = token;
   if (typeof window !== 'undefined') {
+    if (token) {
+      sessionStorage.setItem('access_token', token);
+    } else {
+      sessionStorage.removeItem('access_token');
+    }
     localStorage.removeItem('access_token'); // Clean up legacy localstorage
   }
 };
 
-export const getClientToken = () => inMemoryToken;
+export const getClientToken = () => {
+  if (inMemoryToken) return inMemoryToken;
+  if (typeof window !== 'undefined') {
+    inMemoryToken = sessionStorage.getItem('access_token');
+  }
+  return inMemoryToken;
+};
 
 // Request Interceptor: Attach Token automatically
 api.interceptors.request.use(
