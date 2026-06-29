@@ -109,19 +109,20 @@ export default function DashboardPage() {
         <div className="relative z-10 flex flex-col gap-3 w-full md:w-[400px]">
           <div className="bg-background/90 border border-white/20 rounded-2xl p-3 lg:p-4 flex items-center justify-between gap-3 lg:gap-4 shadow-xl">
             <div className="truncate font-mono text-white text-sm md:text-lg lg:text-xl font-black tracking-widest min-w-0">
-              {user?.product_codes?.[0] || "GENERATING..."}
+              {user?.product_codes?.[0] || user?.productCodes?.[0] || "GENERATING..."}
             </div>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
-                if (!user?.product_codes?.[0]) return;
+                const code = user?.product_codes?.[0] || user?.productCodes?.[0];
+                if (!code) return;
                 // Use the canonical app URL so shared links point to the live site, not localhost
                 const origin = APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-                const link = `${origin}/register?code=${user?.product_codes[0]}&type=product_code`;
+                const link = `${origin}/register?code=${code}&type=product_code`;
                 const shareData = {
                   title: 'Join LearNnEarn',
-                  text: `Join me on LearNnEarn! Use my activation code: ${user?.product_codes[0]}`,
+                  text: `Join me on LearNnEarn! Use my activation code: ${code}`,
                   url: link
                 };
 
@@ -159,8 +160,8 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Activations"
-          value={user?.product_codes?.length ? String(user.product_codes.length) : "0"}
-          trend={user?.product_codes?.length ? "+Growing" : "0"}
+          value={user?.product_codes?.length ? String(user.product_codes.length) : user?.productCodes?.length ? String(user.productCodes.length) : "0"}
+          trend={(user?.product_codes?.length || user?.productCodes?.length) ? "+Growing" : "0"}
           isPositive={true}
           icon={KeyRound}
           delay={0.3}

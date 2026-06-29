@@ -65,7 +65,32 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
       
       const res = await api.get(`${API}/auth/me`, { signal });
-      setUser(res.data);
+      const userData = res.data;
+      if (userData) {
+        const normalized: any = { ...userData };
+        const mappings: [string, string][] = [
+          ['isBetaUser', 'is_beta_user'],
+          ['productCodes', 'product_codes'],
+          ['sellerPercentage', 'seller_percentage'],
+          ['activationPrice', 'activation_price'],
+          ['minWithdrawal', 'min_withdrawal'],
+          ['withdrawalFee', 'withdrawal_fee'],
+          ['defaultCurrency', 'default_currency'],
+          ['onboardingCompleted', 'onboarding_completed'],
+          ['lastOnboardingStep', 'last_onboarding_step']
+        ];
+        for (const [camel, snake] of mappings) {
+          if (userData[camel] !== undefined && userData[snake] === undefined) {
+            normalized[snake] = userData[camel];
+          }
+          if (userData[snake] !== undefined && userData[camel] === undefined) {
+            normalized[camel] = userData[snake];
+          }
+        }
+        setUser(normalized);
+      } else {
+        setUser(null);
+      }
     } catch (err: any) {
       if (axios.isCancel(err)) return;
       // Handle validation errors (arrays) and detail objects
