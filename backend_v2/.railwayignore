@@ -1,0 +1,18 @@
+# Custom Railway ignore file for backend_v2
+node_modules/
+venv/
+venv_v2/
+.git/
+.agent/
+tmp/
+*.db
+*.db-shm
+*.db-wal
+*.log
+*err.txt
+*error.txt
+*out.txt
+*log.txt
+.railway-config-pull-*/
+__pycache__/
+*.pyc
