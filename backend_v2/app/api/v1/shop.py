@@ -22,6 +22,7 @@ class ProductCreate(BaseModel):
     price: Decimal = Field(..., gt=0)
     product_type: str = Field("PHYSICAL", pattern="^(PHYSICAL|DIGITAL)$")
     image_urls: Optional[List[str]] = None
+    category: str = Field("other", pattern="^(electronics|books|educational|house_ware|clothing|other)$")
 
 class ProductOut(BaseModel):
     id: str
@@ -33,6 +34,7 @@ class ProductOut(BaseModel):
     stock: int
     image_urls: Optional[List[str]] = None
     product_type: str
+    category: str
     status: str
     review_feedback: Optional[str] = None
     created_at: datetime
@@ -98,29 +100,42 @@ def create_product(
         price=body.price,
         product_type=body.product_type,
         image_urls=body.image_urls,
+        category=body.category,
         status="PENDING_AI_REVIEW"
     )
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
     
+    # Invalidate catalog cache since a new product is added (even if pending, to be clean)
+    cache_service.invalidate("shop:products:approved:all")
+    for cat in ["electronics", "books", "educational", "house_ware", "clothing", "other"]:
+        cache_service.invalidate(f"shop:products:approved:{cat}")
+
     # Trigger AI Review asynchronously
     background_tasks.add_task(ShopService.trigger_ai_review, db, db_product)
     return db_product
 
 
 @router.get("/products", response_model=List[ProductOut])
-def get_approved_products(db: Session = Depends(get_db)):
+def get_approved_products(
+    category: Optional[str] = Query(None, pattern="^(electronics|books|educational|house_ware|clothing|other)$"),
+    db: Session = Depends(get_db)
+):
     """
-    Fetches all approved product listings for the store catalog.
+    Fetches all approved product listings for the store catalog, optionally filtered by category.
     """
     ShopService.release_expired_digital_escrows(db)
-    cache_key = "shop:products:approved"
+    cache_key = f"shop:products:approved:{category or 'all'}"
     cached = cache_service.get_json(cache_key)
     if cached is not None:
         return cached
 
-    products = db.query(Product).filter(Product.status.in_(["APPROVED", "ADMIN_APPROVED"]), Product.stock > 0).all()
+    query = db.query(Product).filter(Product.status.in_(["APPROVED", "ADMIN_APPROVED"]), Product.stock > 0)
+    if category:
+        query = query.filter(Product.category == category)
+    products = query.all()
+    
     # Cache the serialized dicts for 5 minutes
     product_dicts = [ProductOut.model_validate(p).model_dump(mode='json') for p in products]
     cache_service.set_json(cache_key, product_dicts, expire_seconds=300)
@@ -200,7 +215,9 @@ def buy_product(
         db.commit()
         db.refresh(order)
         # Invalidate cache since stock decreased
-        cache_service.invalidate("shop:products:approved")
+        cache_service.invalidate("shop:products:approved:all")
+        if product.category:
+            cache_service.invalidate(f"shop:products:approved:{product.category}")
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -398,7 +415,9 @@ def admin_manual_review(
     db.refresh(product)
     
     # Invalidate cache if approval status changed
-    cache_service.invalidate("shop:products:approved")
+    cache_service.invalidate("shop:products:approved:all")
+    if product.category:
+        cache_service.invalidate(f"shop:products:approved:{product.category}")
     
     return product
 

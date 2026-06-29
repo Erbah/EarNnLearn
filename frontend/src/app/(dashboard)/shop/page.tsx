@@ -31,6 +31,7 @@ interface Product {
   stock: number;
   image_urls: string[] | null;
   product_type: "PHYSICAL" | "DIGITAL";
+  category: string;
   status: string;
 }
 
@@ -44,6 +45,16 @@ const formatPrice = (val: any) => {
   return isNaN(num) ? "0.00" : num.toFixed(2);
 };
 
+const CATEGORIES = [
+  { id: "ALL", label: "All Categories" },
+  { id: "electronics", label: "Electronics" },
+  { id: "books", label: "Books" },
+  { id: "educational", label: "Educational" },
+  { id: "house_ware", label: "House Ware" },
+  { id: "clothing", label: "Clothing" },
+  { id: "other", label: "Other" }
+];
+
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [wallet, setWallet] = useState<WalletData | null>(null);
@@ -53,6 +64,7 @@ export default function ShopPage() {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<"ALL" | "PHYSICAL" | "DIGITAL">("ALL");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
 
   // Buy Modal
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -63,12 +75,13 @@ export default function ShopPage() {
   const idempotencyKeyRef = useRef<string>('');
   const [buyError, setBuyError] = useState<string | null>(null);
 
-  const fetchShopData = useCallback(async (signal?: AbortSignal) => {
+  const fetchShopData = useCallback(async (cat?: string, signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
+      const categoryParam = cat && cat !== "ALL" ? `?category=${cat}` : "";
       const [pRes, wRes] = await Promise.all([
-        api.get(`${API}/shop/products`, { signal }),
+        api.get(`${API}/shop/products${categoryParam}`, { signal }),
         api.get(`${API}/wallet/`, { signal })
       ]);
       setProducts(pRes.data);
@@ -86,9 +99,9 @@ export default function ShopPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchShopData(controller.signal);
+    fetchShopData(selectedCategory, controller.signal);
     return () => controller.abort();
-  }, [fetchShopData]);
+  }, [fetchShopData, selectedCategory]);
 
   const handleOpenBuyModal = (product: Product) => {
     setSelectedProduct(product);
@@ -117,7 +130,7 @@ export default function ShopPage() {
 
       setBuySuccess(true);
       // Refresh shop data
-      fetchShopData();
+      fetchShopData(selectedCategory);
     } catch (err: any) {
       console.error(err);
       setBuyError(err.response?.data?.detail || "Purchase failed. Please check your balance.");
@@ -165,6 +178,23 @@ export default function ShopPage() {
         </div>
       </div>
 
+      {/* Category Filter Bar */}
+      <div className="flex flex-wrap gap-2 pb-2 border-b border-white/5">
+        {CATEGORIES.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.id)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+              selectedCategory === cat.id
+                ? "bg-primary text-background border-primary shadow-lg shadow-primary/15 scale-105"
+                : "bg-card text-gray-400 border-white/5 hover:text-white hover:border-white/10"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
       {/* Filters & Search */}
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
         {/* Search */}
@@ -185,7 +215,7 @@ export default function ShopPage() {
             <button
               key={type}
               onClick={() => setSelectedType(type)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 selectedType === type 
                   ? "bg-primary text-background shadow-lg" 
                   : "text-gray-400 hover:text-white"
@@ -220,11 +250,11 @@ export default function ShopPage() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className="group p-6 rounded-3xl bg-card border border-white/5 hover:border-primary/20 transition-all flex flex-col justify-between shadow-xl relative"
+              className="group p-6 rounded-3xl bg-card border border-white/5 hover:border-primary/20 transition-all flex flex-col justify-between shadow-xl relative overflow-hidden"
             >
               <div>
                 {/* Type Badge */}
-                <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold text-gray-300">
+                <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/80 border border-white/10 backdrop-blur-md text-[10px] font-bold text-gray-300 z-10">
                   {product.product_type === "PHYSICAL" ? (
                     <>
                       <Truck className="w-3.5 h-3.5 text-primary" />
@@ -238,8 +268,13 @@ export default function ShopPage() {
                   )}
                 </div>
 
+                {/* Category Badge */}
+                <div className="absolute top-4 left-4 px-3 py-1 rounded-full bg-slate-950/80 border border-white/10 backdrop-blur-md text-[10px] font-extrabold text-primary uppercase tracking-wider z-10">
+                  {product.category?.replace('_', ' ') || 'other'}
+                </div>
+
                 {/* Cover Icon placeholder */}
-                <div className="w-full h-40 bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-white/5 flex items-center justify-center mb-5 group-hover:border-primary/10 transition-colors">
+                <div className="w-full h-40 bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-white/5 flex items-center justify-center mb-5 group-hover:border-primary/10 transition-colors relative">
                   {product.product_type === "PHYSICAL" ? (
                     <ShoppingBag className="w-12 h-12 text-primary/30 group-hover:scale-105 transition-transform" />
                   ) : (

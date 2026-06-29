@@ -15,6 +15,7 @@ class Product(Base):
     stock = Column(Integer, default=1)
     image_urls = Column(JSON, nullable=True) # Stored as a list of image paths
     product_type = Column(String, default="PHYSICAL") # PHYSICAL or DIGITAL
+    category = Column(String, nullable=False, default="other", server_default="other")
     status = Column(String, default="PENDING_AI_REVIEW") # PENDING_AI_REVIEW, APPROVED, REJECTED, ADMIN_APPROVED, ADMIN_REJECTED
     review_feedback = Column(String, nullable=True)
     

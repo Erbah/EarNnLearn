@@ -83,3 +83,6 @@ backend_v2/app/uploads/
 scratch/
 package.json
 package-lock.json
+
+.vercel
+.env*

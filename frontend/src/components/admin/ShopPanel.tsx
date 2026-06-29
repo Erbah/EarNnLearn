@@ -29,6 +29,7 @@ interface Product {
   currency: string;
   stock: number;
   product_type: "PHYSICAL" | "DIGITAL";
+  category: string;
   status: string;
   review_feedback: string | null;
   created_at: string;
@@ -235,7 +236,7 @@ export default function ShopPanel() {
                       </span>
                     </div>
                     <p className="text-xs text-gray-400 line-clamp-1">{p.description}</p>
-                    <p className="text-[10px] text-gray-500">Seller: <strong className="font-mono text-gray-400">{p.seller_rid}</strong> | Price: GHS {p.price} | Type: {p.product_type}</p>
+                    <p className="text-[10px] text-gray-500">Seller: <strong className="font-mono text-gray-400">{p.seller_rid}</strong> | Price: GHS {p.price} | Type: {p.product_type} | Category: <span className="text-secondary font-bold capitalize">{p.category?.replace(/_/g, " ") || 'other'}</span></p>
                     {p.review_feedback && (
                       <p className="text-[10px] text-red-400 bg-red-500/5 p-2 rounded-lg border border-red-500/10 italic">
                         AI Flag: "{p.review_feedback}"

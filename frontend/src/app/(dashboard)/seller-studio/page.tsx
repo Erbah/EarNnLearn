@@ -31,6 +31,7 @@ interface Product {
   currency: string;
   stock: number;
   product_type: "PHYSICAL" | "DIGITAL";
+  category: string;
   status: string;
   review_feedback: string | null;
   created_at: string;
@@ -67,6 +68,7 @@ export default function SellerStudioPage() {
   const [newDesc, setNewDesc] = useState("");
   const [newPrice, setNewPrice] = useState("10.00");
   const [newType, setNewType] = useState<"PHYSICAL" | "DIGITAL">("PHYSICAL");
+  const [newCategory, setNewCategory] = useState("other");
   const [newStock, setNewStock] = useState(5);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -119,6 +121,7 @@ export default function SellerStudioPage() {
         description: newDesc,
         price: parseFloat(newPrice),
         product_type: newType,
+        category: newCategory,
         stock: newStock
       });
 
@@ -128,6 +131,7 @@ export default function SellerStudioPage() {
       setNewDesc("");
       setNewPrice("10.00");
       setNewType("PHYSICAL");
+      setNewCategory("other");
       setNewStock(5);
       
       // Reload
@@ -266,10 +270,15 @@ export default function SellerStudioPage() {
               >
                 <div>
                   <div className="flex justify-between items-start gap-4 mb-4">
-                    {/* Status Badge */}
-                    <span className={`px-2.5 py-1 rounded-full border text-[9px] uppercase font-bold tracking-wider ${getStatusColor(product.status)}`}>
-                      {product.status.replace(/_/g, " ")}
-                    </span>
+                    {/* Status & Category Badge */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className={`px-2.5 py-1 rounded-full border text-[9px] uppercase font-bold tracking-wider ${getStatusColor(product.status)}`}>
+                        {product.status.replace(/_/g, " ")}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-900 border border-white/5 text-[8px] uppercase font-extrabold text-secondary w-fit tracking-wider">
+                        {product.category?.replace(/_/g, " ") || "other"}
+                      </span>
+                    </div>
                     {/* Type indicator */}
                     <span className="text-[10px] text-gray-500 font-mono">
                       {product.product_type}
@@ -454,7 +463,7 @@ export default function SellerStudioPage() {
                       <button
                         type="button"
                         onClick={() => setNewType("PHYSICAL")}
-                        className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                        className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                           newType === "PHYSICAL"
                             ? "bg-secondary/10 border-secondary text-white"
                             : "bg-background border-white/10 text-gray-400 hover:text-white"
@@ -466,7 +475,7 @@ export default function SellerStudioPage() {
                       <button
                         type="button"
                         onClick={() => setNewType("DIGITAL")}
-                        className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                        className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                           newType === "DIGITAL"
                             ? "bg-secondary/10 border-secondary text-white"
                             : "bg-background border-white/10 text-gray-400 hover:text-white"
@@ -476,6 +485,23 @@ export default function SellerStudioPage() {
                         Digital Delivery
                       </button>
                     </div>
+                  </div>
+
+                  {/* Category select */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Product Category *</label>
+                    <select
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="w-full bg-background border border-white/10 rounded-xl p-3 focus:outline-none focus:border-secondary/50 text-white text-xs select-custom cursor-pointer"
+                    >
+                      <option value="electronics" className="bg-slate-950 text-white">Electronics</option>
+                      <option value="books" className="bg-slate-950 text-white">Books</option>
+                      <option value="educational" className="bg-slate-950 text-white">Educational</option>
+                      <option value="house_ware" className="bg-slate-950 text-white">House Ware</option>
+                      <option value="clothing" className="bg-slate-950 text-white">Clothing</option>
+                      <option value="other" className="bg-slate-950 text-white">Other</option>
+                    </select>
                   </div>
                 </div>
 
