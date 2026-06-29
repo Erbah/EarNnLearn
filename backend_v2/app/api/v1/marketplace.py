@@ -479,10 +479,17 @@ def add_video(module_id: str, body: VideoCreate, current_user: User = Depends(ge
     if course.creator_rid != current_user.rid and current_user.role not in ["SUPER_ADMIN", "EDUCATION_ADMIN"]:
         raise HTTPException(status_code=403, detail="Not authorized to edit this module's course")
 
+    import re
+    youtube_id = body.youtube_id.strip()
+    if not (len(youtube_id) == 11 and re.match(r'^[a-zA-Z0-9_-]{11}$', youtube_id)):
+        match = re.search(r'(?:v=|\/embed\/|\/v\/|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})', youtube_id)
+        if match:
+            youtube_id = match.group(1)
+
     video = Video(
         module_id=module_id, 
         title=body.title, 
-        youtube_id=body.youtube_id, 
+        youtube_id=youtube_id, 
         duration=body.duration, 
         position=body.position,
         is_preview=body.is_preview

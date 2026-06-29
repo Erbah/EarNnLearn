@@ -53,6 +53,13 @@ class PlaylistIngestor:
         Tries manual English first, then falls back to translation or any generated sub.
         Returns the raw text as a continuous string.
         """
+        import re
+        youtube_id = youtube_id.strip()
+        if not (len(youtube_id) == 11 and re.match(r'^[a-zA-Z0-9_-]{11}$', youtube_id)):
+            match = re.search(r'(?:v=|\/embed\/|\/v\/|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})', youtube_id)
+            if match:
+                youtube_id = match.group(1)
+
         from youtube_transcript_api import YouTubeTranscriptApi
         try:
             ytt_api = YouTubeTranscriptApi()

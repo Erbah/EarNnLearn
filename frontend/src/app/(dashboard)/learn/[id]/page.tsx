@@ -19,8 +19,12 @@ interface ModuleItem { id: string; title: string; position: number; videos: Vide
 
 const extractYouTubeID = (urlOrId: string) => {
   if (!urlOrId) return "";
-  const match = urlOrId.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/);
-  return (match && match[1]) ? match[1] : urlOrId;
+  const trimmed = urlOrId.trim();
+  if (trimmed.length === 11 && /^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const match = trimmed.match(/(?:v=|\/embed\/|\/v\/|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return (match && match[1]) ? match[1] : trimmed;
 };
 
 export default function LearnPage() {
