@@ -42,6 +42,8 @@ def run_updates():
                 "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS user_rid VARCHAR;",
                 "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS type VARCHAR DEFAULT 'SYSTEM';",
                 "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;",
+                # products table
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR DEFAULT 'other';",
                 # indexes
                 "CREATE INDEX IF NOT EXISTS idx_video_progress_video_id ON video_progress (video_id);",
                 "CREATE INDEX IF NOT EXISTS idx_video_progress_user_video ON video_progress (user_rid, video_id);",
