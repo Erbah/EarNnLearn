@@ -104,20 +104,17 @@ def get_current_user(
         import uuid
         user_id = uuid.UUID(user_id_str) if user_id_str else None
         
-        # Determine if sub is an email, phone, or rid
-        email = sub if "@" in sub else None
-        phone = sub if sub.startswith("+") or (sub.isdigit() and len(sub) > 6) else None
-        rid = sub if not email and not phone else None
-        
-        # Construct stateless User object
-        user = User(
-            id=user_id,
-            rid=rid,
-            email=email,
-            phone=phone,
-            role=role,
-            status=status_val
-        )
+        # Query database for fresh user state (resolves stale stateless token status issue)
+        user = None
+        if user_id:
+            user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            user = db.query(User).filter(
+                (User.email == sub) | (User.phone == sub) | (User.rid == sub)
+            ).first()
+            
+        if not user:
+            raise credentials_exception
     except jwt.JWTError:
         raise credentials_exception
 
@@ -190,18 +187,14 @@ def get_current_user_optional(
         import uuid
         user_id = uuid.UUID(user_id_str) if user_id_str else None
         
-        email = sub if "@" in sub else None
-        phone = sub if sub.startswith("+") or (sub.isdigit() and len(sub) > 6) else None
-        rid = sub if not email and not phone else None
-        
-        user = User(
-            id=user_id,
-            rid=rid,
-            email=email,
-            phone=phone,
-            role=role,
-            status=status_val
-        )
+        user = None
+        if user_id:
+            user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            user = db.query(User).filter(
+                (User.email == sub) | (User.phone == sub) | (User.rid == sub)
+            ).first()
+            
         return user
     except Exception:
         return None
