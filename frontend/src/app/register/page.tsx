@@ -68,7 +68,8 @@ function RegisterForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Ref to prevent double validation
-  const lastVerifiedCodeRef = useRef<string>("");
+  const lastVerifiedCodeRef = useRef<string>(null || "");
+  const isSubmittingRef = useRef<boolean>(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -324,6 +325,8 @@ function RegisterForm() {
   }, [formData.syncPayout, formData.paymentMethod, formData.paymentProvider, formData.paymentNumber]);
 
   async function handleRegister() {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setLoading(true);
     setSubmitError(null);
     try {
@@ -359,6 +362,8 @@ function RegisterForm() {
         if (data.paystack_url && data.paystack_url !== "#simulated-paystack-checkout") {
           // Real Paystack payment — redirect user to checkout
           window.location.href = data.paystack_url;
+          // Keep isSubmittingRef.current = true to prevent subsequent clicks while redirecting
+          return;
         } else if (data.user.status === "pending") {
           // Mobile money or simulated — poll for activation
           setIsActivating(true);
@@ -368,14 +373,16 @@ function RegisterForm() {
           router.push("/dashboard");
         }
       }
+      isSubmittingRef.current = false;
+      setLoading(false);
     } catch (e: any) {
+      isSubmittingRef.current = false;
+      setLoading(false);
       const data = e.response?.data;
       const errorMessage = data && Array.isArray(data.detail)
         ? data.detail.map((err: any) => `${err.msg} (${err.loc.join('.')})`).join(", ")
         : data?.detail || "Registration failed";
       setSubmitError(errorMessage || "An error occurred during registration");
-    } finally {
-      setLoading(false);
     }
   }
 
