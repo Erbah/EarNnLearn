@@ -68,7 +68,7 @@ function RegisterForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Ref to prevent double validation
-  const lastVerifiedCodeRef = useRef<string>(null || "");
+  const lastVerifiedCodeRef = useRef<string>("");
   const isSubmittingRef = useRef<boolean>(false);
 
   const router = useRouter();
