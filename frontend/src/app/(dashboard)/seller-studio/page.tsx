@@ -380,25 +380,30 @@ export default function SellerStudioPage() {
       {/* Add Product Modal */}
       <AnimatePresence>
         {showAddModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div 
+            onClick={() => setShowAddModal(false)}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
               className="bg-card border border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl relative"
             >
-              {/* Close */}
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="absolute top-6 right-6 p-2 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white transition-all cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
               <form onSubmit={handleAddProduct} className="space-y-6">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block mb-1">Create Listing</span>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Upload Product details</h2>
+                <div className="flex justify-between items-start gap-4">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block mb-1">Create Listing</span>
+                    <h2 className="text-2xl font-black text-white tracking-tight">Upload Product details</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="p-2.5 rounded-xl bg-slate-900 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
                 <div className="space-y-4">
@@ -545,25 +550,31 @@ export default function SellerStudioPage() {
       {/* Ship Order Modal */}
       <AnimatePresence>
         {selectedOrder && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div 
+            onClick={() => setSelectedOrder(null)}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto"
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
               className="bg-card border border-white/10 rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl relative"
             >
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="absolute top-6 right-6 p-2 rounded-xl hover:bg-white/5 text-gray-400 hover:text-white transition-all cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
               <div className="space-y-6">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block mb-1">Process Shipment</span>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Shipment Tracking</h2>
-                  <p className="text-xs text-gray-400 mt-1">Order Ref: #{selectedOrder.id.slice(0, 8)}</p>
+                <div className="flex justify-between items-start gap-4">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-secondary tracking-widest block mb-1">Process Shipment</span>
+                    <h2 className="text-2xl font-black text-white tracking-tight">Shipment Tracking</h2>
+                    <p className="text-xs text-gray-400 mt-1">Order Ref: #{selectedOrder.id.slice(0, 8)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOrder(null)}
+                    className="p-2.5 rounded-xl bg-slate-900 border border-white/10 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer shrink-0"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
                 <div className="space-y-2">
