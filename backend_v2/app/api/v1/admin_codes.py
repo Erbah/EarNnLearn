@@ -404,12 +404,35 @@ def list_seasons(current_user: Annotated[User, Depends(require_super_admin)], db
 @router.post("/seasons")
 def create_season(body: SeasonCreate, current_user: Annotated[User, Depends(require_super_admin)], db: Session = Depends(get_db)):
     
-    # Deactivate other seasons and set their end_date to mark the boundary
+    # 1. Fetch currently active seasons to identify which ones are deactivating
+    active_seasons = db.query(Season).filter(Season.is_active == True).all()
+    
+    # 2. Deactivate other active seasons and set their end_date to mark the boundary
     db.query(Season).filter(Season.is_active == True).update({
         "is_active": False,
         "end_date": body.start_date
     })
     
+    # 3. Automatically purge all unused generated activation RIDs belonging to the deactivated seasons
+    for old_season in active_seasons:
+        query = db.query(Code).filter(
+            Code.used == False,
+            Code.generated_rid != None,
+            Code.created_at >= old_season.start_date,
+            Code.created_at < body.start_date
+        )
+        purged_count = query.delete(synchronize_session=False)
+        db.add(AdminLog(
+            admin_rid=current_user.rid,
+            action="AUTO_DELETED_SEASON_RIDS",
+            details={
+                "season_id": str(old_season.id),
+                "season_number": old_season.season_number,
+                "deleted_count": purged_count
+            }
+        ))
+    
+    # 4. Insert the new active season record
     season = Season(
         season_number=body.season_number, 
         start_date=body.start_date,
