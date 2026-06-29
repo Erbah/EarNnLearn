@@ -127,7 +127,7 @@ def create_app() -> FastAPI:
         allow_origins=settings.CORS_ORIGINS_LIST,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+        allow_headers=["*"],
     )
 
     if settings.ENFORCE_HTTPS:
