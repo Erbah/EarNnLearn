@@ -18,8 +18,11 @@ export const setClientToken = (token: string | null) => {
   if (typeof window !== 'undefined') {
     if (token) {
       sessionStorage.setItem('access_token', token);
+      // Also write cookie so that Next.js server-side middleware can access it
+      document.cookie = `access_token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
     } else {
       sessionStorage.removeItem('access_token');
+      document.cookie = "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     }
     localStorage.removeItem('access_token'); // Clean up legacy localstorage
   }
