@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     DATABASE_BACKEND: str = "sqlite"
     DATABASE_URL: str = ""
     
+    # Sentry Error Monitoring DSN
+    SENTRY_DSN: str = ""
+
+    
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "user"
     POSTGRES_PASSWORD: str = "password"
@@ -128,7 +132,8 @@ def sanitize_secrets(value: any) -> str:
     if settings.PAYSTACK_SECRET_KEY:
         text = text.replace(settings.PAYSTACK_SECRET_KEY, "********")
     for key in [settings.GOOGLE_API_KEY, settings.OPENAI_API_KEY, settings.ANTHROPIC_API_KEY,
-                settings.DEEPSEEK_API_KEY, settings.AI_API_KEY, settings.INITIAL_ADMIN_PASSWORD]:
+                settings.DEEPSEEK_API_KEY, settings.AI_API_KEY, settings.INITIAL_ADMIN_PASSWORD,
+                settings.SENTRY_DSN]:
         if key:
             text = text.replace(key, "********")
     return text

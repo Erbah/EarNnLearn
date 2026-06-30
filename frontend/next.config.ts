@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 import withBundleAnalyzer from "@next/bundle-analyzer";
+import { withSentryConfig } from "@sentry/nextjs";
+
 
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
@@ -16,7 +18,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://api.paystack.co http://127.0.0.1:8000 http://localhost:8000 https://*.run.app https://*.web.app https://*.firebaseapp.com https://*.railway.app https://*.up.railway.app",
+      "connect-src 'self' https://api.paystack.co http://127.0.0.1:8000 http://localhost:8000 https://*.run.app https://*.web.app https://*.firebaseapp.com https://*.railway.app https://*.up.railway.app https://*.sentry.io",
       "frame-ancestors 'none'",
     ].join("; "),
   },
@@ -58,4 +60,13 @@ const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
-export default withAnalyzer(nextConfig);
+const isSentryEnabled = !!(process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_AUTH_TOKEN);
+
+const configWithAnalyzer = withAnalyzer(nextConfig);
+
+export default isSentryEnabled
+  ? withSentryConfig(configWithAnalyzer, {
+      silent: true,
+    })
+  : configWithAnalyzer;
+

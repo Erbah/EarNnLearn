@@ -7,6 +7,15 @@ from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy import text
 from app.core.config import settings, sanitize_secrets
+
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+    )
+
 from app.core.database import Base, engine
 from app.api.v1 import auth, wallet, codes, referral, admin_auth, admin_settings, admin_ai, admin_codes, admin_analytics, marketplace, learning, ai, payments, education, users, engagement, tracks, instructors, shop
 from app.services.code_engine import generate_admin_rid
