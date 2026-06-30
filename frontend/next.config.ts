@@ -61,13 +61,12 @@ const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
-const isSentryEnabled = !!(process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_AUTH_TOKEN);
-
 const configWithAnalyzer = withAnalyzer(nextConfig);
 
-export default isSentryEnabled
-  ? withSentryConfig(configWithAnalyzer, {
-      silent: true,
-    })
-  : configWithAnalyzer;
+export default withSentryConfig(configWithAnalyzer, {
+  silent: true,
+  sourcemaps: {
+    disable: true,
+  },
+});
 
