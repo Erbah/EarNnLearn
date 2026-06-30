@@ -14,11 +14,12 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
       "connect-src 'self' https://api.paystack.co http://127.0.0.1:8000 http://localhost:8000 https://*.run.app https://*.web.app https://*.firebaseapp.com https://*.railway.app https://*.up.railway.app https://*.sentry.io",
+      "frame-src 'self' https://www.youtube.com https://youtube.com",
       "frame-ancestors 'none'",
     ].join("; "),
   },
