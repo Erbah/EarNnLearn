@@ -17,6 +17,7 @@ import {
   X,
   ShoppingBag,
   Store,
+  Bug,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUser } from "@/context/UserContext";
@@ -61,6 +62,7 @@ const navItems = [
   { name: "Creator",       href: "/creator",   icon: ArrowRightLeft,   roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Settings",      href: "/settings",  icon: Settings,         roles: ["USER", "SUPER_ADMIN", "EDUCATION_ADMIN"] },
   { name: "Platform Admin",href: "/admin",     icon: Shield,           roles: ["SUPER_ADMIN", "EDUCATION_ADMIN"] },
+  { name: "Error Logs",    href: "https://earnnlearn.sentry.io", icon: Bug, roles: ["SUPER_ADMIN"] },
 ];
 
 // ─── Sidebar Inner Content ────────────────────────────────────────────────────
@@ -130,30 +132,51 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
           {filteredItems.map((item) => {
             const isActive = pathname === item.href;
+            const isExternal = item.href.startsWith("http");
+
+            const linkContent = (
+              <div
+                className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 relative group
+                  ${isActive
+                    ? "text-primary bg-primary/10 border border-primary/20"
+                    : "text-foreground hover:text-white hover:bg-white/5"
+                  }`}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="active-indicator"
+                    className="absolute inset-0 bg-primary/10 rounded-xl"
+                    initial={false}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
+                <item.icon
+                  className={`w-5 h-5 z-10 flex-shrink-0 ${
+                    isActive ? "text-primary" : "text-gray-400 group-hover:text-white transition-colors"
+                  }`}
+                />
+                <span className="z-10 font-medium">{item.name}</span>
+              </div>
+            );
+
+            if (isExternal) {
+              return (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onClose}
+                  className="block"
+                >
+                  {linkContent}
+                </a>
+              );
+            }
+
             return (
               <Link key={item.name} href={item.href} onClick={onClose}>
-                <div
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 relative group
-                    ${isActive
-                      ? "text-primary bg-primary/10 border border-primary/20"
-                      : "text-foreground hover:text-white hover:bg-white/5"
-                    }`}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="active-indicator"
-                      className="absolute inset-0 bg-primary/10 rounded-xl"
-                      initial={false}
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    />
-                  )}
-                  <item.icon
-                    className={`w-5 h-5 z-10 flex-shrink-0 ${
-                      isActive ? "text-primary" : "text-gray-400 group-hover:text-white transition-colors"
-                    }`}
-                  />
-                  <span className="z-10 font-medium">{item.name}</span>
-                </div>
+                {linkContent}
               </Link>
             );
           })}
